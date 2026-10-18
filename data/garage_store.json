@@ -14,7 +14,7 @@
       "driveType": "Полный привод (All-Mode 4x4-i)",
       "currentMileage": 206000,
       "lastMileageUpdate": "07.06.2026",
-      "colorHex": "#ca8a04",
+      "colorHex": "#171717",
       "bodyType": "suv",
       "model3dUrl": "/models/bmw_3_e46.glb"
     },
@@ -32,7 +32,7 @@
       "driveType": "AWD-i",
       "currentMileage": 16000,
       "lastMileageUpdate": "01.07.2026",
-      "colorHex": "#64748b",
+      "colorHex": "#1e40af",
       "bodyType": "suv",
       "model3dUrl": "/models/car_concept.glb"
     },
@@ -50,7 +50,7 @@
       "driveType": "xDrive",
       "currentMileage": 142000,
       "lastMileageUpdate": "18.06.2026",
-      "colorHex": "#dc2626",
+      "colorHex": "#f1f5f9",
       "bodyType": "sedan",
       "model3dUrl": "/models/bmw_3_e46.glb"
     },
@@ -104,7 +104,7 @@
       "driveType": "Полный привод Part-time / Torque-on-Demand",
       "currentMileage": 25000,
       "lastMileageUpdate": "11.09.2026",
-      "colorHex": "#f1f5f9",
+      "colorHex": "#dc2626",
       "bodyType": "suv",
       "photoUrl": "/images/mobile-cars/catalog/processed/tank-300.png"
     },
@@ -266,7 +266,7 @@
       "driveType": "Полный привод",
       "currentMileage": 20000,
       "lastMileageUpdate": "13.09.2026",
-      "colorHex": "#1e40af",
+      "colorHex": "#dc2626",
       "bodyType": "suv"
     },
     {
@@ -300,24 +300,7 @@
       "driveType": "Задний привод",
       "currentMileage": 25000,
       "lastMileageUpdate": "14.09.2026",
-      "colorHex": "#cbd5e1",
-      "bodyType": "coupe"
-    },
-    {
-      "id": "car-1792325598496",
-      "make": "Mercedes-Benz",
-      "model": "E-Class",
-      "generation": "W213 / S213 / C238 / A238 (2016–2023)",
-      "year": 2019,
-      "licensePlate": "О742УМ 197",
-      "vin": "JN1TBNT31U0048123",
-      "engine": "2.0T M274/M264 (197 л.с. E200)",
-      "fuelType": "Бензин (АИ-95/98)",
-      "transmission": "АКПП 9G-Tronic",
-      "driveType": "Полный привод 4MATIC",
-      "currentMileage": 206000,
-      "lastMileageUpdate": "18.10.2026",
-      "colorHex": "#64748b",
+      "colorHex": "#dc2626",
       "bodyType": "coupe"
     }
   ],
@@ -837,19 +820,6 @@
   ],
   "toFixTasks": [
     {
-      "id": "tf-ai-1792318680709",
-      "vehicleId": "car-2",
-      "title": "Проверка системы охлаждения и промывка радиаторов (AI)",
-      "priority": "medium",
-      "estimatedCost": 6500,
-      "category": "ТО и замена жидкостей",
-      "description": "Добавлено по рекомендации Garage AI Core после анализа ресурса антифриза.",
-      "linkedPartSku": "",
-      "dueDate": "",
-      "createdAt": "2026-10-18T10:17:57.549Z",
-      "status": "pending"
-    },
-    {
       "id": "tf-ai-1789199944741",
       "vehicleId": "car-1789148549596",
       "title": "Проверка системы охлаждения и промывка радиаторов (AI)",
@@ -950,5 +920,5 @@
       "parts": []
     }
   ],
-  "lastUpdated": "2026-10-18T14:11:09.387Z"
+  "lastUpdated": "2026-09-14T04:44:47.009Z"
 }
