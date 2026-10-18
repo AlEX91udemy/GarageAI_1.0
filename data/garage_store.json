@@ -14,7 +14,7 @@
       "driveType": "Полный привод (All-Mode 4x4-i)",
       "currentMileage": 206000,
       "lastMileageUpdate": "07.06.2026",
-      "colorHex": "#94a3b8",
+      "colorHex": "#ca8a04",
       "bodyType": "suv",
       "model3dUrl": "/models/bmw_3_e46.glb"
     },
@@ -950,5 +950,5 @@
       "parts": []
     }
   ],
-  "lastUpdated": "2026-10-18T13:28:26.256Z"
+  "lastUpdated": "2026-10-18T14:11:09.387Z"
 }
