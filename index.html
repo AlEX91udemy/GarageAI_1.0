@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GarageHub — Дневник авто и ремонта</title>
+    <meta name="description" content="Мультиавтомобильный дневник техобслуживания и ремонта: регламент ТО, журнал с чеками и деталями (артикулы и бренды), учёт топлива, склад запчастей, To-Fix и AI-диагностика на основе истории авто." />
+    <meta property="og:title" content="GarageHub — Дневник авто и ремонта" />
+    <meta property="og:description" content="Мультиавтомобильный дневник техобслуживания и ремонта: регламент ТО, журнал с чеками и деталями (артикулы и бренды), учёт топлива, склад запчастей, To-Fix и AI-диагностика на основе истории авто." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#b91c1c" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script>
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').catch(function() {});
+        });
+      }
+    </script>
+    <script>
+      (function() {
+        // Universal Error Shield for embedded iframe environments
+        window.addEventListener('error', function(event) {
+          if (!event) return;
+          var msg = (event.message || event.error && event.error.message || '').toString();
+          if (
+            msg.indexOf('is not a function') !== -1 ||
+            msg.indexOf('ResizeObserver') !== -1 ||
+            msg.indexOf('Script error') !== -1
+          ) {
+            try { event.stopImmediatePropagation(); } catch(e) {}
+            try { event.preventDefault(); } catch(e) {}
+            return true;
+          }
+        }, true);
+
+        var prevOnError = window.onerror;
+        window.onerror = function(message, source, lineno, colno, error) {
+          var msg = (message || error && error.message || '').toString();
+          if (
+            msg.indexOf('is not a function') !== -1 ||
+            msg.indexOf('ResizeObserver') !== -1 ||
+            msg.indexOf('Script error') !== -1
+          ) {
+            return true;
+          }
+          if (typeof prevOnError === 'function') {
+            return prevOnError.apply(this, arguments);
+          }
+          return false;
+        };
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (!event) return;
+          var reason = (event.reason && event.reason.message || event.reason || '').toString();
+          if (
+            reason.indexOf('is not a function') !== -1 ||
+            reason.indexOf('ResizeObserver') !== -1
+          ) {
+            try { event.stopImmediatePropagation(); } catch(e) {}
+            try { event.preventDefault(); } catch(e) {}
+          }
+        }, true);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
