@@ -110,9 +110,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <div className="text-xs text-neutral-500 font-mono truncate">
               {userEmail}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-600 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>GarageHub PRO • Синхронизировано</span>
+            <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? "bg-emerald-500" : "bg-neutral-400"}`} />
+              <span>{isAuthenticated ? "GarageHub PRO • Синхронизировано" : "Гостевой режим • Аккаунт не подключён"}</span>
             </div>
           </div>
         </div>

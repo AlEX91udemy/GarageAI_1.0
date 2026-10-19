@@ -112,6 +112,9 @@ interface GarageDatabase {
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
+const SESSIONS_FILE = process.env.GARAGE_SESSIONS_FILE
+  ? path.resolve(process.env.GARAGE_SESSIONS_FILE)
+  : path.join(DATA_DIR, "sessions.json");
 const DB_FILE = process.env.GARAGE_DB_FILE
   ? path.resolve(process.env.GARAGE_DB_FILE)
   : path.join(DATA_DIR, "garage_store.json");
@@ -1307,6 +1310,47 @@ const loginAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
 const SESSION_COOKIE = "garagehub_session";
 
+function loadSessions(): void {
+  try {
+    if (!fs.existsSync(SESSIONS_FILE)) return;
+    const parsed = JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8"));
+    if (!Array.isArray(parsed)) return;
+    const now = Date.now();
+    for (const value of parsed) {
+      if (!value || typeof value !== "object") continue;
+      const record = value as Partial<SessionRecord>;
+      if (
+        typeof record.tokenHash !== "string" ||
+        typeof record.csrfSecret !== "string" ||
+        typeof record.userId !== "string" ||
+        typeof record.createdAt !== "number" ||
+        typeof record.expiresAt !== "number" ||
+        record.expiresAt <= now
+      ) continue;
+      sessions.set(record.tokenHash, record as SessionRecord);
+    }
+  } catch (error) {
+    console.error("Session storage initialization failed:", error);
+  }
+}
+
+function persistSessions(): void {
+  try {
+    fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
+    const now = Date.now();
+    const active = [...sessions.values()].filter(
+      (session) => session.expiresAt > now && !session.revokedAt,
+    );
+    const temporary = `${SESSIONS_FILE}.tmp`;
+    fs.writeFileSync(temporary, JSON.stringify(active, null, 2), "utf-8");
+    fs.renameSync(temporary, SESSIONS_FILE);
+  } catch (error) {
+    console.error("Session persistence failed:", error);
+  }
+}
+
+loadSessions();
+
 // Периодическая очистка устаревших окон rate-limit, чтобы Map не росла бесконечно
 // при работе сервера под нагрузкой с разных IP.
 const rateLimitCleanupTimer = setInterval(() => {
@@ -1326,6 +1370,7 @@ const rateLimitCleanupTimer = setInterval(() => {
       sessions.delete(key);
     }
   }
+  persistSessions();
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 // Не удерживаем процесс живым только ради очистки таймеров
 rateLimitCleanupTimer.unref?.();
@@ -1426,6 +1471,7 @@ function rateLimitedLogin(req: express.Request, res: express.Response): boolean 
 function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
   const { record, token } = createSession(userId);
   sessions.set(record.tokenHash, record);
+  persistSessions();
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
   return { username, csrfToken: record.csrfSecret };
 }
@@ -1467,6 +1513,7 @@ app.post("/api/auth/login", (req, res) => {
 app.post("/api/auth/logout", (req, res) => {
   const session = getSession(req);
   if (session) session.revokedAt = Date.now();
+  persistSessions();
   res.setHeader("Set-Cookie", clearSessionCookie());
   res.json({ success: true });
 });
@@ -1490,6 +1537,7 @@ app.get("/api/auth/session", (req, res) => {
     session.tokenHash = nextHash;
     session.csrfSecret = crypto.randomBytes(24).toString("base64url");
     sessions.set(nextHash, session);
+    persistSessions();
     res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
   }
   res.json({ username: user.username, csrfToken: session.csrfSecret });
