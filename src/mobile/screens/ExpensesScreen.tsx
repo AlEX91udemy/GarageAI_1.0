@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Car,
   Droplet,
+  Trash2,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord, GaragePart } from "../../types";
 
@@ -38,6 +39,7 @@ interface ExpensesScreenProps {
   onAddFuel: () => void;
   onAddExpense?: () => void;
   onScanReceipt?: () => void;
+  onDeleteFuel?: (recordId: string) => void;
 }
 
 export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
@@ -48,11 +50,14 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   onAddFuel,
   onAddExpense,
   onScanReceipt,
+  onDeleteFuel,
 }) => {
   const [activeTab, setActiveTab] = useState<"summary" | "fuel_log">("summary");
   const [chartMode, setChartMode] = useState<"pie" | "bar">("pie");
   const [selectedMetric, setSelectedMetric] = useState<"cost_per_km" | "fuel_cost_km" | "service_total" | "fuel_total" | null>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [swipedRecordId, setSwipedRecordId] = useState<string | null>(null);
+  const swipeStartX = React.useRef<number | null>(null);
 
   const vehicleFuel = fuelRecords.filter((f) => f.vehicleId === vehicle.id);
   const vehicleServices = serviceRecords.filter((s) => s.vehicleId === vehicle.id);
@@ -409,8 +414,23 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
               vehicleFuel.map((record) => (
                 <div
                   key={record.id}
-                  className="p-3.5 rounded-3xl bg-white border border-neutral-200/90 hover:border-neutral-300 transition space-y-2 shadow-xs"
+                  className="relative overflow-hidden rounded-3xl border border-neutral-200/90 shadow-xs"
+                  onTouchStart={(event) => { swipeStartX.current = event.touches[0]?.clientX ?? null; }}
+                  onTouchEnd={(event) => {
+                    const startX = swipeStartX.current;
+                    const endX = event.changedTouches[0]?.clientX ?? startX ?? 0;
+                    if (startX !== null && startX - endX > 45 && onDeleteFuel) setSwipedRecordId(record.id);
+                    if (startX !== null && endX - startX > 45) setSwipedRecordId(null);
+                    swipeStartX.current = null;
+                  }}
                 >
+                  {onDeleteFuel && (
+                    <button type="button" aria-label="Удалить запись о заправке" onClick={() => { onDeleteFuel(record.id); setSwipedRecordId(null); }} className="absolute inset-y-0 right-0 w-20 bg-red-600 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-bold">
+                      <Trash2 className="w-4 h-4" />
+                      <span>Удалить</span>
+                    </button>
+                  )}
+                  <div className={`relative z-10 p-3.5 bg-white transition-transform duration-200 space-y-2 ${swipedRecordId === record.id ? "-translate-x-20" : "translate-x-0"}`}>
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
@@ -448,6 +468,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                       </span>
                     </div>
                   )}
+                  </div>
                 </div>
               ))
             )}

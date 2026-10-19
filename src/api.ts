@@ -7,6 +7,7 @@ import {
   ToFixTask,
   TuningStage,
   DiagnosticResult,
+  ReminderRecord,
 } from "./types";import type { Brand, Model, Generation, Modification, KnowledgeChunk } from "./catalog/types";
 
 let csrfToken: string | null = null;
@@ -71,6 +72,7 @@ export async function logout(): Promise<void> {
 
 export interface FullGarageData {
   vehicles: Vehicle[];
+  reminders: ReminderRecord[];
   serviceRecords: ServiceRecord[];
   fuelRecords: FuelRecord[];
   oemSchedules: OemScheduleItem[];
@@ -102,6 +104,37 @@ export interface VehicleStats {
   }>;
 }
 
+// Reminder APIs
+export async function fetchReminders(): Promise<ReminderRecord[]> {
+  const res = await authenticatedFetch("/api/reminders");
+  if (!res.ok) throw new Error("Не удалось загрузить напоминания");
+  return res.json();
+}
+
+export async function createReminder(reminder: Partial<ReminderRecord>): Promise<ReminderRecord> {
+  const res = await authenticatedFetch("/api/reminders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reminder),
+  });
+  if (!res.ok) throw new Error("Не удалось создать напоминание");
+  return res.json();
+}
+
+export async function updateReminder(id: string, reminder: Partial<ReminderRecord>): Promise<ReminderRecord> {
+  const res = await authenticatedFetch(`/api/reminders/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reminder),
+  });
+  if (!res.ok) throw new Error("Не удалось обновить напоминание");
+  return res.json();
+}
+
+export async function deleteReminder(id: string): Promise<void> {
+  const res = await authenticatedFetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Не удалось удалить напоминание");
+}
 export interface PartLookupResult {
   standardName: string;
   oemArticle: string;

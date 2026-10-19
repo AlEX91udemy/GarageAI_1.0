@@ -28,6 +28,7 @@ import {
   ToFixTask,
   TuningStage,
   MaintenanceCategory,
+  ReminderRecord,
 } from "./types";
 import {
   fetchGarageData,
@@ -53,6 +54,9 @@ import {
   updateTuningStage as apiUpdateTuningStage,
   deleteTuningStage as apiDeleteTuningStage,
   FullGarageData,
+  createReminder as apiCreateReminder,
+  updateReminder as apiUpdateReminder,
+  deleteReminder as apiDeleteReminder,
 } from "./api";
 import { CarHeader } from "./components/CarHeader";
 import { Dashboard } from "./components/Dashboard";
@@ -137,6 +141,7 @@ export default function App() {
   };
   // Persistent state initialized from localStorage or mockData
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [reminders, setReminders] = useState<ReminderRecord[]>([]);
 
   const [activeVehicleId, setActiveVehicleId] = useState<string>(() => {
     return vehicles[0]?.id || "empty-garage";
@@ -192,6 +197,7 @@ export default function App() {
     try {
       const data = await fetchGarageData();
       setVehicles(data.vehicles || []);
+      setReminders(data.reminders || []);
       setServiceRecords(data.serviceRecords || []);
       setFuelRecords(data.fuelRecords || []);
       setOemSchedules(data.oemSchedules || []);
@@ -219,6 +225,7 @@ export default function App() {
             return exists ? prev : data.vehicles[0].id;
           });
         }
+        if (data.reminders) setReminders(data.reminders);
         if (data.serviceRecords) setServiceRecords(data.serviceRecords);
         if (data.fuelRecords) setFuelRecords(data.fuelRecords);
         if (data.oemSchedules) setOemSchedules(data.oemSchedules);
@@ -232,6 +239,7 @@ export default function App() {
         // Guest mode must never expose the demo garage cached in localStorage.
         // Local cache is only a fallback for an authenticated session.
         setVehicles([]);
+        setReminders([]);
         setActiveVehicleId("empty-garage");
         setServiceRecords([]);
         setFuelRecords([]);
@@ -250,6 +258,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("garagehub_vehicles", JSON.stringify(vehicles));
   }, [vehicles]);
+
+  useEffect(() => {
+    localStorage.setItem("garagehub_reminders", JSON.stringify(reminders));
+  }, [reminders]);
 
   useEffect(() => {
     localStorage.setItem(
@@ -652,8 +664,13 @@ export default function App() {
           }}
           onUpdateVehicleColor={(_vehicleId, color) => handleUpdateVehicleColor(color)}
           onAuthSuccess={handleAuthSuccess}
+          onDeleteFuelRecord={(id) => {
+            setFuelRecords((prev) => prev.filter((record) => record.id !== id));
+            apiDeleteFuelRecord(id).catch(console.error);
+          }}
           onLogout={() => {
             setVehicles([]);
+            setReminders([]);
             setActiveVehicleId("empty-garage");
             setServiceRecords([]);
             setFuelRecords([]);
