@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, logout, restoreSession } from "../../api";
+import { login, register, logout, restoreSession, type AuthSession } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -55,9 +55,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authBusy, setAuthBusy] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    restoreSession().then((session) => setIsAuthenticated(Boolean(session)));
+    restoreSession().then((session) => {
+      setIsAuthenticated(Boolean(session));
+      setSessionUsername(session?.username ?? null);
+    });
   }, []);
 
   const submitAuth = async (event: React.FormEvent) => {
@@ -65,9 +69,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setAuthBusy(true);
     setAuthError(null);
     try {
-      if (authMode === "login") await login(username, password);
-      else await register(username, password);
+      const session: AuthSession = authMode === "login"
+        ? await login(username, password)
+        : await register(username, password);
       setIsAuthenticated(true);
+      setSessionUsername(session.username);
       setPassword("");
       onAuthSuccess?.();
     } catch (error) {
@@ -105,10 +111,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-black text-neutral-900 truncate">
-              Александр Самбур
+              {isAuthenticated ? sessionUsername ?? username : "Гостевой профиль"}
             </h3>
             <div className="text-xs text-neutral-500 font-mono truncate">
-              {userEmail}
+              {isAuthenticated ? userEmail : "Войдите в аккаунт для синхронизации"}
             </div>
             <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? "bg-emerald-500" : "bg-neutral-400"}`} />
@@ -137,7 +143,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти и синхронизировать" : "Создать аккаунт"}</button>
             </form>
           ) : (
-            <button type="button" onClick={() => { void logout().finally(() => setIsAuthenticated(false)); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
+            <button type="button" onClick={() => { void logout().finally(() => { setIsAuthenticated(false); setSessionUsername(null); }); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
           )}
         </div>
 
