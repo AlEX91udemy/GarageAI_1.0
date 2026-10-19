@@ -19,8 +19,19 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      sourcemap: true,
-      minify: false,
+      // Production: минификация включена, sourcemap отключены (не отдаём исходники клиентам).
+      sourcemap: false,
+      minify: true,
+      rollupOptions: {
+        output: {
+          // Three.js и React вынесены в отдельные чанки: они редко меняются
+          // и кэшируются браузером отдельно от бизнес-кода.
+          manualChunks: {
+            three: ['three'],
+            react_vendor: ['react', 'react-dom'],
+          },
+        },
+      },
     },
   };
 });

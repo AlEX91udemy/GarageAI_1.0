@@ -8,7 +8,7 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('server.js',{force:true})\"",
     "lint": "tsc --noEmit",
     "test": "vitest run --environment happy-dom",
     "catalog:audit": "tsx scripts/catalog-audit.ts"
@@ -25,8 +25,7 @@
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "three": "^0.185.1",
-    "vite": "^6.2.3"
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
