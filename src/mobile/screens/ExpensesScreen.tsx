@@ -143,9 +143,6 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
           <div>
             <h2 className="text-xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
               <span>Расходы</span>
-              <span className="text-xs font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-lg">
-                Финансы & Топливо
-              </span>
             </h2>
             <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
               <Car className="w-3.5 h-3.5 text-red-600" />
@@ -154,22 +151,6 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            {onScanReceipt && (
-              <button
-                onClick={onScanReceipt}
-                className="p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-red-600 border border-neutral-200 transition cursor-pointer"
-                title="Сканировать чек"
-              >
-                <ScanLine className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              onClick={onAddFuel}
-              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Заправка</span>
-            </button>
             {onAddExpense && (
               <button
                 type="button"
