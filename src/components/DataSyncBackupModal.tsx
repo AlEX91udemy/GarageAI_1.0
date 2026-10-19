@@ -38,6 +38,7 @@ interface DataSyncBackupModalProps {
   onClose: () => void;
   onDataReloaded: (data: FullGarageData) => void;
   isOnline: boolean;
+  vehicleId?: string;
 }
 
 export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
@@ -45,8 +46,9 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   onClose,
   onDataReloaded,
   isOnline,
+  vehicleId,
 }) => {
-  const [isAdmin, setIsAdmin] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(() => Boolean(getAdminToken()));
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setIsAdmin(true);
+      setIsAdmin(Boolean(getAdminToken()));
       setAuthError(null);
       setStatusMessage(null);
       setConfirmReset(false);
@@ -123,7 +125,8 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
   const handleExport = async () => {
     try {
-      const res = await authenticatedFetch("/api/backup/export");
+      const query = !getAdminToken() && vehicleId ? `?vehicleId=${encodeURIComponent(vehicleId)}` : "";
+      const res = await authenticatedFetch(`/api/backup/export${query}`);
       if (!res.ok) {
         throw new Error("Доступ запрещен. Требуются права администратора.");
       }
@@ -137,7 +140,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setStatusMessage({ type: "success", text: "Резервная копия базы данных успешно скачана!" });
+      setStatusMessage({ type: "success", text: vehicleId ? "Данные автомобиля успешно скачаны!" : "Полная резервная копия успешно скачана!" });
     } catch (err: any) {
       setStatusMessage({ type: "error", text: err.message || "Ошибка экспорта" });
     }
@@ -177,7 +180,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       const data = await resetDatabase();
       onDataReloaded(data);
       loadStats();
-      setStatusMessage({ type: "success", text: "База данных успешно возвращена к заводским демо-данным!" });
+      setStatusMessage({ type: "success", text: "Данные текущего гаража успешно сброшены!" });
     } catch (err: any) {
       setStatusMessage({ type: "error", text: "Ошибка сброса: " + err.message });
     } finally {
@@ -254,6 +257,24 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
               )}
               <span>{statusMessage.text}</span>
             </div>
+          )}
+
+          {!isAdmin && vehicleId && (
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-between p-3.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-neutral-800 flex items-center justify-center"><Download className="w-4 h-4 text-emerald-400" /></div>
+                <div className="text-left">
+                  <div className="text-white font-extrabold">Экспорт данных автомобиля</div>
+                  <div className="text-[11px] text-neutral-400 font-normal">Скачать только данные выбранного автомобиля</div>
+                </div>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-mono">Скачать</span>
+            </button>
           )}
 
           {/* ADMIN GATE: If not logged in as Admin, show Auth Prompt */}
@@ -423,7 +444,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                 {confirmReset ? (
                   <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs space-y-2.5">
                     <div className="font-bold text-red-900">
-                      Вы действительно хотите сбросить все данные к исходным демонстрационным записям?
+                      Вы действительно хотите сбросить данные текущего гаража?
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -456,9 +477,9 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                         <RotateCcw className="w-4 h-4 text-red-600" />
                       </div>
                       <div className="text-left">
-                        <div className="text-red-900 font-extrabold">Сброс к демонстрационным данным</div>
+                        <div className="text-red-900 font-extrabold">Сбросить данные</div>
                         <div className="text-[11px] text-red-600 font-normal">
-                          Восстановить автопарк (Nissan X-Trail, Toyota Corolla Cross, BMW 3)
+                          Очистить данные текущего гаража
                         </div>
                       </div>
                     </div>
