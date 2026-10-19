@@ -66,21 +66,21 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
+        <div>
+          <h2 className="text-xl font-black text-neutral-900 tracking-tight">
             Склад запчастей
           </h2>
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
+          <p className="text-xs text-neutral-500">
             {parts.length} позиций на хранении и в заказе
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5">
           {onOpenScanBarcode && (
             <button
               onClick={onOpenScanBarcode}
-              className="w-9 h-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 inline-flex items-center justify-center transition cursor-pointer shrink-0"
+              className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition cursor-pointer"
               title="Сканировать штрихкод детали"
             >
               <ScanBarcode className="w-4 h-4 text-red-600" />
@@ -88,9 +88,9 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
           )}
           <button
             onClick={onAddPart}
-            className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-red-600/20 transition cursor-pointer active:scale-95 shrink-0"
+            className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-red-600/20 transition cursor-pointer active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Деталь</span>
           </button>
         </div>

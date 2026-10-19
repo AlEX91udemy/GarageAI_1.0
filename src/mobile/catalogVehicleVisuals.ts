@@ -1,10 +1,8 @@
-import { CAR_CATALOG, CarBodyType } from "../carCatalog";
-
 export interface CatalogVehicleVisual {
   make: string;
   model: string;
   slug: string;
-  bodyType: CarBodyType;
+  bodyType: "suv" | "sedan" | "hatchback" | "coupe";
   src: string;
   alt: string;
   paintMaskSrc?: string;
@@ -23,7 +21,7 @@ export const USER_BODY_TYPE_VISUALS = {
   src: (color: string, bodyType: string) => `/images/body-types/${color}/${bodyType}.png`,
 } as const;
 
-const BASE_CATALOG_VEHICLE_VISUALS: CatalogVehicleVisual[] = 
+export const CATALOG_VEHICLE_VISUALS: CatalogVehicleVisual[] = 
 [
   {
     "make": "Nissan",
@@ -796,30 +794,3 @@ const BASE_CATALOG_VEHICLE_VISUALS: CatalogVehicleVisual[] =
     "alt": "Omoda C5"
   }
 ];
-
-const toSlug = (value: string) =>
-  value.toLowerCase().replace(/[^a-z0-9а-я]+/gi, "-").replace(/^-|-$/g, "");
-
-const baseKeySet = new Set(
-  BASE_CATALOG_VEHICLE_VISUALS.map((v) => `${v.make.toLowerCase()}::${v.model.toLowerCase()}`)
-);
-
-export const CATALOG_VEHICLE_VISUALS: CatalogVehicleVisual[] = [
-  ...BASE_CATALOG_VEHICLE_VISUALS,
-  ...CAR_CATALOG.flatMap((make) =>
-    make.models
-      .filter((model) => !baseKeySet.has(`${make.name.toLowerCase()}::${model.name.toLowerCase()}`))
-      .map((model): CatalogVehicleVisual => ({
-        make: make.name,
-        model: model.name,
-        bodyType: model.defaultBodyType,
-        slug: `${toSlug(make.name)}-${toSlug(model.name)}`,
-        src: USER_BODY_TYPE_VISUALS.src("red", model.defaultBodyType),
-        sourceTitle: `GarageHub Body Template (${model.defaultBodyType})`,
-        sourceUrl: USER_BODY_TYPE_VISUALS.src("red", model.defaultBodyType),
-        license: "GarageHub Standard Template",
-        alt: `${make.name} ${model.name}`,
-      }))
-  ),
-];
-

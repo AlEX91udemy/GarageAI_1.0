@@ -12,7 +12,6 @@ import {
   Car,
   Wrench,
   Check,
-  Copy,
 } from "lucide-react";
 import { Vehicle, GaragePart, ToFixTask } from "../../types";
 
@@ -49,14 +48,6 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [partStatusFilter, setPartStatusFilter] = useState<"all" | "in_stock" | "installed">("all");
   const [taskPriorityFilter, setTaskPriorityFilter] = useState<"all" | "high" | "medium" | "low">("all");
-  const [copiedSku, setCopiedSku] = useState<string | null>(null);
-
-  const handleCopySku = (e: React.MouseEvent, sku: string) => {
-    e.stopPropagation();
-    navigator.clipboard?.writeText(sku).catch(() => {});
-    setCopiedSku(sku);
-    setTimeout(() => setCopiedSku(null), 1800);
-  };
 
   // Parts for this vehicle or common
   const vehicleParts = garageParts.filter(
@@ -86,43 +77,46 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Top Header */}
-      <div className="px-4 pt-3.5 pb-3 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
-              Гараж и склад
+      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+              <span>Гараж</span>
+              <span className="text-xs font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-lg">
+                Склад & To-Fix
+              </span>
             </h2>
-            <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 truncate">
-              <Car className="w-3.5 h-3.5 text-red-600 shrink-0" />
-              <span className="truncate">{vehicle.make} {vehicle.model}</span>
+            <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
+              <Car className="w-3.5 h-3.5 text-red-600" />
+              <span>{vehicle.make} {vehicle.model}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             <button
               onClick={activeSegment === "inventory" ? onAddPart : onAddTask}
-              className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95 shrink-0"
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>{activeSegment === "inventory" ? "Деталь" : "Задача"}</span>
             </button>
           </div>
         </div>
 
         {/* 2 Segment Tabs: Склад запчастей vs Список To-Fix */}
-        <div className="mt-3 grid grid-cols-2 gap-1 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
+        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
           <button
             onClick={() => setActiveSegment("inventory")}
-            className={`h-9 px-2.5 rounded-xl font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeSegment === "inventory"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <Package className="w-3.5 h-3.5 shrink-0" />
+            <Package className="w-3.5 h-3.5" />
             <span>Склад запчастей</span>
             <span
-              className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono leading-none ${
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
                 activeSegment === "inventory"
                   ? "bg-red-100 text-red-700 font-bold"
                   : "bg-neutral-200 text-neutral-600"
@@ -134,16 +128,16 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
           <button
             onClick={() => setActiveSegment("to_fix")}
-            className={`h-9 px-2.5 rounded-xl font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeSegment === "to_fix"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <ListTodo className="w-3.5 h-3.5 shrink-0" />
+            <ListTodo className="w-3.5 h-3.5" />
             <span>Список To-Fix</span>
             {pendingTasks.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono leading-none bg-amber-100 text-amber-800 font-bold">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-amber-100 text-amber-800 font-bold">
                 {pendingTasks.length}
               </span>
             )}
@@ -244,21 +238,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500 pt-1.5 border-t border-neutral-100">
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopySku(e, part.partNumber)}
-                      className="inline-flex items-center gap-1 hover:text-red-600 transition cursor-pointer"
-                      title="Скопировать артикул"
-                    >
-                      <span>SKU: {part.partNumber}</span>
-                      {copiedSku === part.partNumber ? (
-                        <span className="text-emerald-600 font-bold inline-flex items-center gap-0.5">
-                          <Check className="w-3 h-3" /> Скопировано
-                        </span>
-                      ) : (
-                        <Copy className="w-3 h-3 opacity-60" />
-                      )}
-                    </button>
+                    <span>SKU: {part.partNumber}</span>
                     {part.location && (
                       <span className="flex items-center gap-1 text-neutral-600">
                         <MapPin className="w-3 h-3 text-red-600" />

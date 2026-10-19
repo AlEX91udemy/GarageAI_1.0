@@ -20,7 +20,6 @@ import {
   findMake,
   findModel,
   findGeneration,
-  findPopularCarEntry,
 } from "../carCatalog";
 
 const STANDARD_BODY_TYPES: CarBodyType[] = [
@@ -84,56 +83,14 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
   const matchedMake = findMake(make);
   const matchedModel = matchedMake ? findModel(make, model) : undefined;
   const matchedGen = matchedMake && matchedModel ? findGeneration(make, model, generation) : undefined;
-  const popularEntry = matchedMake && matchedModel ? findPopularCarEntry(matchedMake.name, matchedModel.name) : undefined;
 
   // Determine available options in current cascade state
   const availableModels: CarModelInfo[] = matchedMake ? matchedMake.models : [];
   const availableGenerations: CarGenerationInfo[] = matchedModel ? matchedModel.generations : [];
 
-  // Restrict available body types to confirmed variants for the selected generation/model.
-  // Only fall back to all standard body types when entering a custom make/model/generation.
-  const availableBodyTypes: Array<{ type: CarBodyType; label: string; subLabel?: string }> = React.useMemo(() => {
-    if (matchedGen && !customGenMode && matchedGen.bodyTypes.length > 0) {
-      return matchedGen.bodyTypes.map((bt) => ({
-        type: bt.type,
-        label: BODY_TYPE_LABELS[bt.type] || bt.label,
-        subLabel: bt.label,
-      }));
-    }
-    if (matchedModel && !customModelMode && matchedModel.generations.length > 0) {
-      const seen = new Map<CarBodyType, string>();
-      for (const gen of matchedModel.generations) {
-        for (const bt of gen.bodyTypes) {
-          if (!seen.has(bt.type)) {
-            seen.set(bt.type, bt.label);
-          }
-        }
-      }
-      if (seen.size > 0) {
-        return Array.from(seen.entries()).map(([type, subLabel]) => ({
-          type,
-          label: BODY_TYPE_LABELS[type] || subLabel,
-          subLabel,
-        }));
-      }
-    }
-    return STANDARD_BODY_TYPES.map((type) => ({ type, label: BODY_TYPE_LABELS[type] }));
-  }, [matchedGen, matchedModel, customGenMode, customModelMode]);
-
-  // Ensure current bodyType is always valid for the active catalog generation/model
-  useEffect(() => {
-    if (matchedGen && !customGenMode && matchedGen.bodyTypes.length > 0) {
-      const isAllowed = matchedGen.bodyTypes.some((bt) => bt.type === bodyType);
-      if (!isAllowed) {
-        onChangeBodyType?.(matchedGen.defaultBodyType || matchedGen.bodyTypes[0].type);
-      }
-    } else if (matchedModel && !customModelMode && availableBodyTypes.length > 0) {
-      const isAllowed = availableBodyTypes.some((bt) => bt.type === bodyType);
-      if (!isAllowed) {
-        onChangeBodyType?.(matchedModel.defaultBodyType || availableBodyTypes[0].type);
-      }
-    }
-  }, [matchedGen, matchedModel, customGenMode, customModelMode, bodyType, availableBodyTypes]);
+  // Body type is an independent vehicle attribute. All standard styles remain available
+  // regardless of the selected model or generation.
+  const availableBodyTypes = STANDARD_BODY_TYPES.map((type) => ({ type, label: BODY_TYPE_LABELS[type] }));
 
   // Sync custom modes if incoming value doesn't match catalog
   useEffect(() => {
@@ -169,7 +126,6 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
       if (firstModel.generations.length > 0) {
         const firstGen = firstModel.generations[0];
         onChangeGeneration?.(firstGen.name);
-        onChangeBodyType?.(firstGen.defaultBodyType || firstModel.defaultBodyType);
         onChangeYear?.(firstGen.defaultYear);
         if (firstGen.engineSuggestions?.[0]) {
           onChangeEngine?.(firstGen.engineSuggestions[0]);
@@ -185,8 +141,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         }
       } else {
         onChangeGeneration?.("");
-        onChangeBodyType?.(firstModel.defaultBodyType);
-      }
+        }
     } else {
       onChangeModel?.("");
       onChangeGeneration?.("");
@@ -210,7 +165,6 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         // Auto-select first generation of this model
         const firstGen = mod.generations[0];
         onChangeGeneration?.(firstGen.name);
-        onChangeBodyType?.(firstGen.defaultBodyType || mod.defaultBodyType);
         onChangeYear?.(firstGen.defaultYear);
         if (firstGen.engineSuggestions?.[0]) {
           onChangeEngine?.(firstGen.engineSuggestions[0]);
@@ -226,7 +180,6 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         }
       } else {
         onChangeGeneration?.("");
-        onChangeBodyType?.(mod.defaultBodyType);
       }
     }
   };
@@ -243,17 +196,12 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
 
     const gen = findGeneration(make, model, genName);
     if (gen) {
-      // Sync body type if current bodyType is not available for this generation
-      const bodyAllowed = gen.bodyTypes.some((bt) => bt.type === bodyType);
-      if (!bodyAllowed) {
-        onChangeBodyType?.(gen.defaultBodyType || gen.bodyTypes[0]?.type);
-      }
 
       // Link: Year default
       onChangeYear?.(gen.defaultYear);
 
-      // Auto-suggest specifications
-      if (gen.engineSuggestions?.[0]) {
+      // Auto-suggest specifications if empty or user wants defaults
+      if ((!engine || engine === "2.0L") && gen.engineSuggestions?.[0]) {
         onChangeEngine?.(gen.engineSuggestions[0]);
       }
       if (gen.transmissionSuggestions?.[0]) {
@@ -268,6 +216,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
     }
   };
 
+  // Body type is intentionally independent from generation.
   const handleSelectBodyType = (newBodyType: CarBodyType) => {
     onChangeBodyType?.(newBodyType);
   };
@@ -275,34 +224,17 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
   return (
     <div className="space-y-3 bg-neutral-50/80 p-3.5 rounded-2xl border border-neutral-200/90 shadow-xs">
       {/* Cascade Link Visual Breadcrumb */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200/60 pb-2">
+      <div className="flex items-center justify-between border-b border-neutral-200/60 pb-2">
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-neutral-700">
           <LinkIcon className="w-3.5 h-3.5 text-red-600" />
           <span>Каталог автомобиля: Марка ➔ Модель ➔ Поколение</span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {popularEntry && (
-            <span
-              className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1"
-              title={`${popularEntry.notes} (${popularEntry.source}, ${popularEntry.period})`}
-            >
-              <Sparkles className="w-3 h-3 text-amber-600" />
-              {popularEntry.rank !== null ? `#${popularEntry.rank} ` : "ТОП-100 РФ · "}
-              {popularEntry.popularityType === "new_sales"
-                ? "Новые продажи РФ"
-                : popularEntry.popularityType === "used_market"
-                  ? "Вторичный рынок РФ"
-                  : "Автопарк РФ"}{" "}
-              ({popularEntry.period})
-            </span>
-          )}
-          {matchedGen && (
-            <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
-              <Check className="w-3 h-3 text-emerald-600" />
-              Поколение выбрано из каталога
-            </span>
-          )}
-        </div>
+        {matchedGen && (
+          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+            <Check className="w-3 h-3 text-emerald-600" />
+            Поколение выбрано из каталога
+          </span>
+        )}
       </div>
 
       {/* Row 1: Linked Make & Model */}

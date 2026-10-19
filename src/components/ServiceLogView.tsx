@@ -18,8 +18,6 @@ import {
   RotateCcw,
   History,
   FileDown,
-  Copy,
-  Check,
 } from "lucide-react";
 import { ServiceRecord, Vehicle, MaintenanceCategory } from "../types";
 import { exportServiceBookToPdf } from "../utils/serviceBookPdfExport";
@@ -47,21 +45,6 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
   const [selectedReceiptUrl, setSelectedReceiptUrl] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isHistoryListCollapsed, setIsHistoryListCollapsed] = useState(false);
-  const [copiedSku, setCopiedSku] = useState<string | null>(null);
-
-  const handleCopySku = async (sku: string) => {
-    if (!sku) return;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(sku);
-      }
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    } catch {
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    }
-  };
 
   const vehicleRecords = records.filter((r) => r.vehicleId === vehicle.id);
 
@@ -296,25 +279,20 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                   >
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 font-mono tabular-nums">
-                          <span className="font-semibold text-neutral-800">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-neutral-800 bg-neutral-100 px-2 py-0.5 rounded-full">
                             {record.date}
                           </span>
-                          <span aria-hidden="true">·</span>
-                          <span className="font-bold text-red-600">
+                          <span className="text-[11px] font-mono font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">
                             {record.mileage.toLocaleString("ru-RU")} км
                           </span>
-                          <span aria-hidden="true">·</span>
-                          <span className="font-sans text-neutral-600">
+                          <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md font-medium">
                             {record.category}
                           </span>
                           {record.receiptImages && record.receiptImages.length > 0 && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className="inline-flex items-center gap-1 font-sans text-emerald-700 font-medium">
-                                <CheckCircle className="w-3 h-3" /> Чек прикреплён
-                              </span>
-                            </>
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-medium">
+                              <CheckCircle className="w-3 h-3" /> Чек прикреплен
+                            </span>
                           )}
                         </div>
 
@@ -330,7 +308,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                       </div>
 
                       <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-100">
-                        <div className="text-left sm:text-right font-mono tabular-nums">
+                        <div className="text-left sm:text-right font-mono">
                           <div className="text-[10px] text-neutral-400">Сумма</div>
                           <div className="text-sm sm:text-base font-extrabold text-neutral-900">
                             {record.totalCost.toLocaleString("ru-RU")} ₽
@@ -395,29 +373,13 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                                       <td className="py-2 px-3 font-medium">{p.name}</td>
                                       <td className="py-2 px-3 text-neutral-600">{p.brand || "—"}</td>
                                       <td className="py-2 px-3 font-mono font-bold text-neutral-900">
-                                        {p.partNumber ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => handleCopySku(p.partNumber)}
-                                            className="inline-flex items-center gap-1.5 text-red-600 hover:underline cursor-pointer"
-                                            title="Скопировать артикул детали"
-                                          >
-                                            <span>{p.partNumber}</span>
-                                            {copiedSku === p.partNumber ? (
-                                              <Check className="w-3.5 h-3.5 text-emerald-500" />
-                                            ) : (
-                                              <Copy className="w-3 h-3 opacity-60" />
-                                            )}
-                                          </button>
-                                        ) : (
-                                          "—"
-                                        )}
+                                        {p.partNumber || "—"}
                                       </td>
-                                      <td className="py-2 px-3 text-center font-mono tabular-nums">{p.quantity}</td>
-                                      <td className="py-2 px-3 text-right font-mono tabular-nums text-neutral-600">
+                                      <td className="py-2 px-3 text-center font-mono">{p.quantity}</td>
+                                      <td className="py-2 px-3 text-right font-mono text-neutral-600">
                                         {p.unitPrice.toLocaleString("ru-RU")} ₽
                                       </td>
-                                      <td className="py-2 px-3 text-right font-mono tabular-nums font-semibold text-neutral-900">
+                                      <td className="py-2 px-3 text-right font-mono font-semibold text-neutral-900">
                                         {(p.quantity * p.unitPrice).toLocaleString("ru-RU")} ₽
                                       </td>
                                     </tr>

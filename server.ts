@@ -47,6 +47,7 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 // Middleware for parsing JSON with 25mb limit for receipt photos
 app.use(express.json({ limit: "25mb" }));
@@ -322,49 +323,27 @@ app.put("/api/vehicles/:id", (req, res) => {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
 
-  const existing = dbMemory.vehicles[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.make !== undefined && (typeof body.make !== "string" || !body.make.trim())) {
+  const updates = { ...req.body } as Partial<Vehicle>;
+  if (updates.make !== undefined && (typeof updates.make !== "string" || !updates.make.trim())) {
     return res.status(400).json({ error: "Марка не может быть пустой" });
   }
-  if (body.model !== undefined && (typeof body.model !== "string" || !body.model.trim())) {
+  if (updates.model !== undefined && (typeof updates.model !== "string" || !updates.model.trim())) {
     return res.status(400).json({ error: "Модель не может быть пустой" });
   }
-  if (body.bodyType !== undefined && (typeof body.bodyType !== "string" || !VALID_BODY_TYPES.has(body.bodyType as any))) {
+  if (updates.bodyType !== undefined && !VALID_BODY_TYPES.has(updates.bodyType)) {
     return res.status(400).json({ error: "Некорректный тип кузова" });
   }
   if (
-    body.colorHex !== undefined &&
-    (typeof body.colorHex !== "string" || !/^#[0-9a-f]{6}$/i.test(body.colorHex))
+    updates.colorHex !== undefined &&
+    (typeof updates.colorHex !== "string" || !/^#[0-9a-f]{6}$/i.test(updates.colorHex))
   ) {
     return res.status(400).json({ error: "Некорректный цвет кузова" });
   }
-  if (body.currentMileage !== undefined && (!Number.isFinite(Number(body.currentMileage)) || Number(body.currentMileage) < 0)) {
-    return res.status(400).json({ error: "Некорректное значение пробега" });
-  }
-  if (body.year !== undefined && (!Number.isFinite(Number(body.year)) || Number(body.year) < 1900 || Number(body.year) > 2100)) {
-    return res.status(400).json({ error: "Некорректный год выпуска" });
-  }
 
   dbMemory.vehicles[index] = {
-    ...existing,
+    ...dbMemory.vehicles[index],
+    ...updates,
     id: req.params.id,
-    make: typeof body.make === "string" ? body.make.trim() : existing.make,
-    model: typeof body.model === "string" ? body.model.trim() : existing.model,
-    generation: typeof body.generation === "string" ? body.generation.trim() : existing.generation,
-    year: body.year !== undefined ? Number(body.year) : existing.year,
-    licensePlate: typeof body.licensePlate === "string" ? body.licensePlate.trim() : existing.licensePlate,
-    vin: typeof body.vin === "string" ? body.vin.trim() : existing.vin,
-    engine: typeof body.engine === "string" ? body.engine.trim() : existing.engine,
-    fuelType: typeof body.fuelType === "string" ? body.fuelType.trim() : existing.fuelType,
-    transmission: typeof body.transmission === "string" ? body.transmission.trim() : existing.transmission,
-    driveType: typeof body.driveType === "string" ? body.driveType.trim() : existing.driveType,
-    currentMileage: body.currentMileage !== undefined ? Number(body.currentMileage) : existing.currentMileage,
-    lastMileageUpdate: typeof body.lastMileageUpdate === "string" ? body.lastMileageUpdate : existing.lastMileageUpdate,
-    colorHex: typeof body.colorHex === "string" ? body.colorHex : existing.colorHex,
-    bodyType: typeof body.bodyType === "string" ? (body.bodyType as Vehicle["bodyType"]) : existing.bodyType,
-    photoUrl: body.photoUrl === undefined ? existing.photoUrl : typeof body.photoUrl === "string" ? body.photoUrl : undefined,
-    model3dUrl: body.model3dUrl === undefined ? existing.model3dUrl : typeof body.model3dUrl === "string" ? body.model3dUrl : undefined,
   };
 
   saveDatabase();
@@ -493,21 +472,21 @@ app.post("/api/services", (req, res) => {
     if (task) task.status = "completed";
   }
 
-  // Mark garage parts installed if part numbers or explicit IDs match
-  const installedIds = new Set(Array.isArray(body.installedPartIds) ? body.installedPartIds : []);
-  const partNumbers = parts
-    .map((p) => (typeof p?.partNumber === "string" ? p.partNumber.trim().toLowerCase() : ""))
-    .filter(Boolean);
-  if (partNumbers.length > 0 || installedIds.size > 0) {
+  // Mark garage parts installed if part numbers match.
+  // Учитываем привязку детали к автомобилю и остаток: если на складе несколько
+  // экземпляров — списываем одну штуку, вместо мгновенной установки всей позиции.
+  if (parts.length > 0) {
+    const partNumbers = parts.map((p) => p.partNumber.toLowerCase());
     dbMemory.garageParts.forEach((gp) => {
-      const gpSku = typeof gp.partNumber === "string" ? gp.partNumber.trim().toLowerCase() : "";
       if (
-        installedIds.has(gp.id) ||
-        ((gp.vehicleId === newRecord.vehicleId || gp.vehicleId === "all") &&
-          gpSku.length > 0 &&
-          partNumbers.includes(gpSku))
+        (gp.vehicleId === newRecord.vehicleId || gp.vehicleId === "all") &&
+        partNumbers.includes(gp.partNumber.toLowerCase())
       ) {
-        gp.status = "installed";
+        if (gp.quantity > 1) {
+          gp.quantity -= 1;
+        } else {
+          gp.status = "installed";
+        }
       }
     });
   }
@@ -522,58 +501,45 @@ app.put("/api/services/:id", (req, res) => {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
   }
 
-  const existing = dbMemory.serviceRecords[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.title !== undefined && (typeof body.title !== "string" || !body.title.trim())) {
-    return res.status(400).json({ error: "Название работ не может быть пустым" });
-  }
-  if (body.parts !== undefined && !Array.isArray(body.parts)) {
-    return res.status(400).json({ error: "Поле parts должно быть массивом" });
-  }
-  if (body.mileage !== undefined && (!Number.isFinite(Number(body.mileage)) || Number(body.mileage) < 0)) {
-    return res.status(400).json({ error: "Некорректный пробег" });
-  }
+  // Валидация и белым списком разрешённые поля вместо слепого ...req.body
+  const current = dbMemory.serviceRecords[index];
+  const body = (req.body || {}) as Partial<ServiceRecord>;
 
-  const sanitizedParts = Array.isArray(body.parts)
-    ? body.parts
-        .filter((p): p is Record<string, unknown> => Boolean(p && typeof p === "object"))
-        .map((p, idx) => ({
-          id: typeof p.id === "string" && p.id ? p.id : `p-${Date.now()}-${idx}`,
-          name: typeof p.name === "string" ? p.name.trim() : "",
-          brand: typeof p.brand === "string" ? p.brand.trim() : "",
-          partNumber: typeof p.partNumber === "string" ? p.partNumber.trim() : "",
-          quantity: Number.isFinite(Number(p.quantity)) && Number(p.quantity) > 0 ? Number(p.quantity) : 1,
-          unitPrice: Number.isFinite(Number(p.unitPrice)) && Number(p.unitPrice) >= 0 ? Number(p.unitPrice) : 0,
-        }))
-    : existing.parts;
-
-  const laborCost =
-    body.laborCost !== undefined && Number.isFinite(Number(body.laborCost))
-      ? Number(body.laborCost)
-      : existing.laborCost;
-  const partsCost = sanitizedParts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0);
-  const totalCost =
-    body.totalCost !== undefined && Number.isFinite(Number(body.totalCost))
-      ? Number(body.totalCost)
-      : laborCost + partsCost;
+  const parts = Array.isArray(body.parts)
+    ? body.parts.map((p, i) => ({
+        id: typeof p?.id === "string" ? p.id : `part-${Date.now()}-${i}`,
+        name: typeof p?.name === "string" ? p.name : "",
+        brand: typeof p?.brand === "string" ? p.brand : "",
+        partNumber: typeof p?.partNumber === "string" ? p.partNumber : "",
+        quantity: Number(p?.quantity) || 1,
+        unitPrice: Number(p?.unitPrice) || 0,
+      }))
+    : current.parts;
 
   dbMemory.serviceRecords[index] = {
-    ...existing,
-    id: req.params.id,
-    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId.trim() : existing.vehicleId,
-    date: typeof body.date === "string" && body.date.trim() ? body.date.trim() : existing.date,
-    mileage: body.mileage !== undefined ? Number(body.mileage) : existing.mileage,
-    category: (typeof body.category === "string" && body.category.trim() ? body.category.trim() : existing.category) as ServiceRecord["category"],
-    title: typeof body.title === "string" ? body.title.trim() : existing.title,
-    description: typeof body.description === "string" ? body.description.trim() : existing.description,
-    laborCost,
-    parts: sanitizedParts,
-    totalCost,
-    serviceCenter: typeof body.serviceCenter === "string" ? body.serviceCenter.trim() : existing.serviceCenter,
+    ...current,
+    vehicleId:
+      typeof body.vehicleId === "string" && body.vehicleId.trim()
+        ? body.vehicleId
+        : current.vehicleId,
+    date: typeof body.date === "string" && body.date.trim() ? body.date : current.date,
+    mileage: body.mileage !== undefined ? Number(body.mileage) || 0 : current.mileage,
+    category:
+      typeof body.category === "string" && body.category.trim()
+        ? (body.category as ServiceRecord["category"])
+        : current.category,
+    title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
+    description: typeof body.description === "string" ? body.description : current.description,
+    laborCost: body.laborCost !== undefined ? Number(body.laborCost) || 0 : current.laborCost,
+    parts,
+    totalCost: body.totalCost !== undefined ? Number(body.totalCost) || 0 : current.totalCost,
+    serviceCenter:
+      typeof body.serviceCenter === "string" ? body.serviceCenter : current.serviceCenter,
     receiptImages: Array.isArray(body.receiptImages)
-      ? body.receiptImages.filter((img): img is string => typeof img === "string")
-      : existing.receiptImages,
-    notes: typeof body.notes === "string" ? body.notes.trim() : existing.notes,
+      ? body.receiptImages.map((img) => String(img))
+      : current.receiptImages,
+    notes: typeof body.notes === "string" ? body.notes : current.notes,
+    id: req.params.id,
   };
 
   saveDatabase();
@@ -733,28 +699,32 @@ app.put("/api/inventory/:id", (req, res) => {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
-  const existing = dbMemory.garageParts[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.name !== undefined && (typeof body.name !== "string" || !body.name.trim())) {
-    return res.status(400).json({ error: "Название детали не может быть пустым" });
-  }
-  if (body.status !== undefined && body.status !== "in_stock" && body.status !== "installed" && body.status !== "ordered") {
-    return res.status(400).json({ error: "Некорректный статус детали" });
-  }
+  // Валидация и белым списком разрешённые поля вместо слепого ...req.body
+  const current = dbMemory.garageParts[index];
+  const body = (req.body || {}) as Partial<GaragePart>;
 
   dbMemory.garageParts[index] = {
-    ...existing,
+    ...current,
+    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId : current.vehicleId,
+    name: typeof body.name === "string" && body.name.trim() ? body.name.trim() : current.name,
+    brand: typeof body.brand === "string" ? body.brand : current.brand,
+    partNumber:
+      typeof body.partNumber === "string" && body.partNumber.trim()
+        ? body.partNumber.trim().toUpperCase()
+        : current.partNumber,
+    quantity: body.quantity !== undefined ? Math.max(0, Number(body.quantity) || 0) : current.quantity,
+    purchasePrice: body.purchasePrice !== undefined ? Number(body.purchasePrice) || 0 : current.purchasePrice,
+    purchaseDate: typeof body.purchaseDate === "string" ? body.purchaseDate : current.purchaseDate,
+    location: typeof body.location === "string" ? body.location : current.location,
+    status:
+      body.status === "in_stock" || body.status === "installed" || body.status === "ordered"
+        ? body.status
+        : current.status,
+    category:
+      typeof body.category === "string" && body.category.trim()
+        ? (body.category as GaragePart["category"])
+        : current.category,
     id: req.params.id,
-    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId.trim() : existing.vehicleId,
-    name: typeof body.name === "string" ? body.name.trim() : existing.name,
-    brand: typeof body.brand === "string" ? body.brand.trim() : existing.brand,
-    partNumber: typeof body.partNumber === "string" ? body.partNumber.trim() : existing.partNumber,
-    quantity: body.quantity !== undefined && Number.isFinite(Number(body.quantity)) && Number(body.quantity) > 0 ? Number(body.quantity) : existing.quantity,
-    purchasePrice: body.purchasePrice !== undefined && Number.isFinite(Number(body.purchasePrice)) && Number(body.purchasePrice) >= 0 ? Number(body.purchasePrice) : existing.purchasePrice,
-    purchaseDate: typeof body.purchaseDate === "string" ? body.purchaseDate : existing.purchaseDate,
-    location: typeof body.location === "string" ? body.location.trim() : existing.location,
-    status: (body.status as GaragePart["status"]) || existing.status,
-    category: (typeof body.category === "string" ? body.category : existing.category) as GaragePart["category"],
   };
 
   saveDatabase();
@@ -934,32 +904,33 @@ app.put("/api/to-fix/:id", (req, res) => {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
-  const existing = dbMemory.toFixTasks[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.title !== undefined && (typeof body.title !== "string" || !body.title.trim())) {
-    return res.status(400).json({ error: "Название задачи не может быть пустым" });
-  }
-  if (body.status !== undefined && body.status !== "pending" && body.status !== "in_progress" && body.status !== "completed") {
-    return res.status(400).json({ error: "Некорректный статус задачи" });
-  }
-  if (body.priority !== undefined && body.priority !== "high" && body.priority !== "medium" && body.priority !== "low") {
-    return res.status(400).json({ error: "Некорректный приоритет задачи" });
-  }
+  // Валидация и белым списком разрешённые поля вместо слепого ...req.body
+  const current = dbMemory.toFixTasks[index];
+  const body = (req.body || {}) as Partial<ToFixTask>;
 
   dbMemory.toFixTasks[index] = {
-    ...existing,
+    ...current,
+    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId : current.vehicleId,
+    title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
+    priority:
+      body.priority === "high" || body.priority === "medium" || body.priority === "low"
+        ? body.priority
+        : current.priority,
+    estimatedCost: body.estimatedCost !== undefined ? Number(body.estimatedCost) || 0 : current.estimatedCost,
+    targetMileage: body.targetMileage !== undefined ? Number(body.targetMileage) || undefined : current.targetMileage,
+    category:
+      typeof body.category === "string" && body.category.trim()
+        ? (body.category as ToFixTask["category"])
+        : current.category,
+    description: typeof body.description === "string" ? body.description : current.description,
+    linkedPartSku: typeof body.linkedPartSku === "string" ? body.linkedPartSku : current.linkedPartSku,
+    dueDate: typeof body.dueDate === "string" ? body.dueDate : current.dueDate,
+    workHint: typeof body.workHint === "string" ? body.workHint : current.workHint,
+    status:
+      body.status === "pending" || body.status === "in_progress" || body.status === "completed"
+        ? body.status
+        : current.status,
     id: req.params.id,
-    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId.trim() : existing.vehicleId,
-    title: typeof body.title === "string" ? body.title.trim() : existing.title,
-    priority: (body.priority as ToFixTask["priority"]) || existing.priority,
-    estimatedCost: body.estimatedCost !== undefined && Number.isFinite(Number(body.estimatedCost)) ? Number(body.estimatedCost) : existing.estimatedCost,
-    targetMileage: body.targetMileage !== undefined && Number.isFinite(Number(body.targetMileage)) ? Number(body.targetMileage) : existing.targetMileage,
-    category: (typeof body.category === "string" ? body.category : existing.category) as ToFixTask["category"],
-    description: typeof body.description === "string" ? body.description.trim() : existing.description,
-    linkedPartSku: typeof body.linkedPartSku === "string" ? body.linkedPartSku.trim() : existing.linkedPartSku,
-    dueDate: typeof body.dueDate === "string" ? body.dueDate : existing.dueDate,
-    status: (body.status as ToFixTask["status"]) || existing.status,
-    workHint: typeof body.workHint === "string" ? body.workHint.trim() : existing.workHint,
   };
 
   saveDatabase();
@@ -1036,28 +1007,23 @@ app.put("/api/oem-schedule/:id", (req, res) => {
     return res.status(404).json({ error: "Пункт регламента не найден" });
   }
 
-  const existing = dbMemory.oemSchedules[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.title !== undefined && (typeof body.title !== "string" || !body.title.trim())) {
-    return res.status(400).json({ error: "Название пункта регламента не может быть пустым" });
-  }
-  if (body.intervalKm !== undefined && (!Number.isFinite(Number(body.intervalKm)) || Number(body.intervalKm) <= 0)) {
-    return res.status(400).json({ error: "Некорректный интервал пробега" });
-  }
+  // Валидация и белым списком разрешённые поля вместо слепого ...req.body
+  const current = dbMemory.oemSchedules[index];
+  const body = (req.body || {}) as Partial<OemScheduleItem>;
 
   dbMemory.oemSchedules[index] = {
-    ...existing,
+    ...current,
+    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId : current.vehicleId,
+    title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
+    category: typeof body.category === "string" && body.category.trim() ? body.category : current.category,
+    intervalKm: body.intervalKm !== undefined ? Number(body.intervalKm) || 0 : current.intervalKm,
+    intervalMonths: body.intervalMonths !== undefined ? Number(body.intervalMonths) || 0 : current.intervalMonths,
+    lastDoneKm: body.lastDoneKm !== undefined ? Number(body.lastDoneKm) || undefined : current.lastDoneKm,
+    lastDoneDate: typeof body.lastDoneDate === "string" ? body.lastDoneDate : current.lastDoneDate,
+    description: typeof body.description === "string" ? body.description : current.description,
+    oemPartHint: typeof body.oemPartHint === "string" ? body.oemPartHint : current.oemPartHint,
+    notes: typeof body.notes === "string" ? body.notes : current.notes,
     id: req.params.id,
-    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId.trim() : existing.vehicleId,
-    title: typeof body.title === "string" ? body.title.trim() : existing.title,
-    category: typeof body.category === "string" ? body.category.trim() : existing.category,
-    intervalKm: body.intervalKm !== undefined ? Number(body.intervalKm) : existing.intervalKm,
-    intervalMonths: body.intervalMonths !== undefined && Number.isFinite(Number(body.intervalMonths)) && Number(body.intervalMonths) > 0 ? Number(body.intervalMonths) : existing.intervalMonths,
-    lastDoneKm: body.lastDoneKm !== undefined && Number.isFinite(Number(body.lastDoneKm)) ? Number(body.lastDoneKm) : existing.lastDoneKm,
-    lastDoneDate: typeof body.lastDoneDate === "string" ? body.lastDoneDate : existing.lastDoneDate,
-    description: typeof body.description === "string" ? body.description.trim() : existing.description,
-    oemPartHint: typeof body.oemPartHint === "string" ? body.oemPartHint.trim() : existing.oemPartHint,
-    notes: typeof body.notes === "string" ? body.notes.trim() : existing.notes,
   };
 
   saveDatabase();
@@ -1085,10 +1051,13 @@ app.post("/api/tuning", (req, res) => {
 
   const newStage: TuningStage = {
     id: body.id || `ts-${Date.now()}`,
-    vehicleId: String(body.vehicleId).trim(),
-    title: String(body.title).trim(),
-    description: typeof body.description === "string" ? body.description.trim() : "",
-    status: body.status === "in_progress" || body.status === "completed" ? body.status : "planned",
+    vehicleId: body.vehicleId,
+    title: body.title.trim(),
+    stageName: body.stageName?.trim() || "",
+    brand: body.brand?.trim() || "",
+    sku: body.sku?.trim() || "",
+    description: body.description?.trim() || "",
+    status: body.status || "planned",
     estimatedBudget: Number(body.estimatedBudget) || 0,
     actualCost: Number(body.actualCost) || 0,
     parts: Array.isArray(body.parts) ? body.parts : [],
@@ -1105,28 +1074,26 @@ app.put("/api/tuning/:id", (req, res) => {
     return res.status(404).json({ error: "Тюнинг-этап не найден" });
   }
 
-  const existing = dbMemory.tuningStages[index];
-  const body = (req.body || {}) as Record<string, unknown>;
-  if (body.title !== undefined && (typeof body.title !== "string" || !body.title.trim())) {
-    return res.status(400).json({ error: "Название этапа не может быть пустым" });
-  }
-  if (body.status !== undefined && body.status !== "planned" && body.status !== "in_progress" && body.status !== "completed") {
-    return res.status(400).json({ error: "Некорректный статус этапа" });
-  }
-  if (body.parts !== undefined && !Array.isArray(body.parts)) {
-    return res.status(400).json({ error: "Поле parts должно быть массивом" });
-  }
+  // Валидация и белым списком разрешённые поля вместо слепого ...req.body
+  const current = dbMemory.tuningStages[index];
+  const body = (req.body || {}) as Partial<TuningStage>;
 
   dbMemory.tuningStages[index] = {
-    ...existing,
+    ...current,
+    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId : current.vehicleId,
+    title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
+    stageName: typeof body.stageName === "string" ? body.stageName : current.stageName,
+    brand: typeof body.brand === "string" ? body.brand : current.brand,
+    sku: typeof body.sku === "string" ? body.sku : current.sku,
+    description: typeof body.description === "string" ? body.description : current.description,
+    status:
+      body.status === "planned" || body.status === "in_progress" || body.status === "completed"
+        ? body.status
+        : current.status,
+    estimatedBudget: body.estimatedBudget !== undefined ? Number(body.estimatedBudget) || 0 : current.estimatedBudget,
+    actualCost: body.actualCost !== undefined ? Number(body.actualCost) || 0 : current.actualCost,
+    parts: Array.isArray(body.parts) ? body.parts : current.parts,
     id: req.params.id,
-    vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId.trim() : existing.vehicleId,
-    title: typeof body.title === "string" ? body.title.trim() : existing.title,
-    description: typeof body.description === "string" ? body.description.trim() : existing.description,
-    status: (body.status as TuningStage["status"]) || existing.status,
-    estimatedBudget: body.estimatedBudget !== undefined && Number.isFinite(Number(body.estimatedBudget)) ? Number(body.estimatedBudget) : existing.estimatedBudget,
-    actualCost: body.actualCost !== undefined && Number.isFinite(Number(body.actualCost)) ? Number(body.actualCost) : existing.actualCost,
-    parts: Array.isArray(body.parts) ? (body.parts as TuningStage["parts"]) : existing.parts,
   };
 
   saveDatabase();
@@ -1221,7 +1188,29 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET;
 const ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_LOGIN_LIMIT = 5;
+const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
+const adminLoginAttempts = new Map<string, { count: number; startedAt: number }>();
+
+// Периодическая очистка устаревших окон rate-limit, чтобы Map не росла бесконечно
+// при работе сервера под нагрузкой с разных IP.
+const rateLimitCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, window] of aiRequestWindows) {
+    if (now - window.startedAt >= AI_RATE_WINDOW_MS) {
+      aiRequestWindows.delete(key);
+    }
+  }
+  for (const [key, attempt] of adminLoginAttempts) {
+    if (now - attempt.startedAt >= ADMIN_LOGIN_WINDOW_MS) {
+      adminLoginAttempts.delete(key);
+    }
+  }
+}, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+// Не удерживаем процесс живым только ради очистки таймеров
+rateLimitCleanupTimer.unref?.();
 
 function issueAdminToken(): string | null {
   if (!ADMIN_SECRET) return null;
@@ -1281,41 +1270,34 @@ function requireAdminAuth(req: express.Request, res: express.Response, next: exp
   });
 }
 
-const ADMIN_VERIFY_RATE_LIMIT = 8;
-const ADMIN_VERIFY_WINDOW_MS = 15 * 60 * 1000;
-const adminVerifyWindows = new Map<string, { count: number; startedAt: number }>();
-
-function safeVerifyPassword(input: unknown, secret: string): boolean {
-  if (typeof input !== "string" || !input) return false;
-  const inputHash = crypto.createHash("sha256").update(input).digest();
-  const secretHash = crypto.createHash("sha256").update(secret).digest();
-  return crypto.timingSafeEqual(inputHash, secretHash);
-}
-
-// Admin login / key verification endpoint
+// Admin login / key verification endpoint (с защитой от перебора пароля)
 app.post("/api/admin/verify", (req, res) => {
   const clientId = req.ip || "unknown";
-  const now = Date.now();
-  const current = adminVerifyWindows.get(clientId);
-  const window =
-    !current || now - current.startedAt >= ADMIN_VERIFY_WINDOW_MS
-      ? { count: 0, startedAt: now }
-      : current;
+  if (!ADMIN_SECRET) {
+    return res.status(503).json({ success: false, error: "ADMIN_SECRET не настроен на сервере." });
+  }
 
-  if (window.count >= ADMIN_VERIFY_RATE_LIMIT) {
-    res.setHeader("Retry-After", Math.ceil((window.startedAt + ADMIN_VERIFY_WINDOW_MS - now) / 1000));
+  // Rate-limit попыток входа против brute-force перебора
+  const now = Date.now();
+  const attemptWindow = adminLoginAttempts.get(clientId);
+  if (attemptWindow && now - attemptWindow.startedAt < ADMIN_LOGIN_WINDOW_MS && attemptWindow.count >= ADMIN_LOGIN_LIMIT) {
+    res.setHeader("Retry-After", Math.ceil((attemptWindow.startedAt + ADMIN_LOGIN_WINDOW_MS - now) / 1000));
     return res.status(429).json({
       success: false,
-      error: "Слишком много попыток входа. Повторите попытку позже.",
+      error: "Слишком много неудачных попыток входа. Повторите попытку позже.",
     });
   }
 
   const { password } = req.body || {};
-  if (!ADMIN_SECRET) {
-    return res.status(503).json({ success: false, error: "ADMIN_SECRET не настроен на сервере." });
-  }
-  if (safeVerifyPassword(password, ADMIN_SECRET)) {
-    adminVerifyWindows.delete(clientId);
+  // Сравнение постоянного времени: длина проверяется отдельно,
+  // содержимое — через timingSafeEqual (защита от timing-атак).
+  const passwordValid =
+    typeof password === "string" &&
+    password.length === ADMIN_SECRET.length &&
+    crypto.timingSafeEqual(Buffer.from(password, "utf-8"), Buffer.from(ADMIN_SECRET, "utf-8"));
+
+  if (passwordValid) {
+    adminLoginAttempts.delete(clientId);
     return res.json({
       success: true,
       token: issueAdminToken(),
@@ -1323,8 +1305,13 @@ app.post("/api/admin/verify", (req, res) => {
     });
   }
 
-  window.count += 1;
-  adminVerifyWindows.set(clientId, window);
+  // Регистрируем неудачную попытку
+  const current = attemptWindow && now - attemptWindow.startedAt < ADMIN_LOGIN_WINDOW_MS
+    ? attemptWindow
+    : { count: 0, startedAt: now };
+  current.count += 1;
+  adminLoginAttempts.set(clientId, current);
+
   return res.status(401).json({
     success: false,
     error: "Неверный пароль или ключ администратора.",
@@ -1343,71 +1330,28 @@ app.get("/api/backup/export", requireAdminAuth, (_req, res) => {
 app.post("/api/backup/import", requireAdminAuth, (req, res) => {
   try {
     const data = req.body;
-    if (!data || !Array.isArray(data.vehicles) || data.vehicles.length === 0) {
+    if (!data || !Array.isArray(data.vehicles)) {
       return res.status(400).json({ error: "Некорректный формат файла резервной копии" });
     }
 
-    const validVehicles: Vehicle[] = [];
-    for (const v of data.vehicles) {
-      if (!v || typeof v !== "object" || typeof v.id !== "string" || typeof v.make !== "string" || typeof v.model !== "string") {
-        return res.status(400).json({ error: "Некорректная структура автомобилей в резервной копии" });
-      }
-      validVehicles.push({
-        id: v.id.trim(),
-        make: v.make.trim(),
-        model: v.model.trim(),
-        generation: typeof v.generation === "string" ? v.generation.trim() : "",
-        year: Number(v.year) || new Date().getFullYear(),
-        licensePlate: typeof v.licensePlate === "string" ? v.licensePlate.trim() : "",
-        vin: typeof v.vin === "string" ? v.vin.trim() : "",
-        engine: typeof v.engine === "string" ? v.engine.trim() : "Стандарт",
-        fuelType: typeof v.fuelType === "string" ? v.fuelType : "Бензин (АИ-95)",
-        transmission: typeof v.transmission === "string" ? v.transmission : "Автомат",
-        driveType: typeof v.driveType === "string" ? v.driveType : "Передний",
-        currentMileage: Number(v.currentMileage) || 0,
-        lastMileageUpdate: typeof v.lastMileageUpdate === "string" ? v.lastMileageUpdate : new Date().toLocaleDateString("ru-RU"),
-        colorHex: typeof v.colorHex === "string" && /^#[0-9a-f]{6}$/i.test(v.colorHex) ? v.colorHex : "#dc2626",
-        bodyType: typeof v.bodyType === "string" && VALID_BODY_TYPES.has(v.bodyType as any) ? v.bodyType : "sedan",
-        photoUrl: typeof v.photoUrl === "string" ? v.photoUrl : undefined,
-        model3dUrl: typeof v.model3dUrl === "string" ? v.model3dUrl : undefined,
-      });
+    // Лёгкая валидация структуры элементов перед заменой базы:
+    // каждый автомобиль обязан иметь строковый id и марку.
+    const vehicles = data.vehicles.filter(
+      (v: unknown): v is Vehicle =>
+        Boolean(v) && typeof v === "object" && typeof (v as Vehicle).id === "string" && typeof (v as Vehicle).make === "string"
+    );
+    if (data.vehicles.length > 0 && vehicles.length === 0) {
+      return res.status(400).json({ error: "В копии нет ни одного корректного автомобиля (нужны поля id и make)" });
     }
 
-    const validServiceRecords: ServiceRecord[] = Array.isArray(data.serviceRecords)
-      ? data.serviceRecords
-          .filter((r: any) => r && typeof r === "object" && typeof r.id === "string" && typeof r.vehicleId === "string" && typeof r.title === "string")
-          .map((r: any) => ({
-            id: r.id,
-            vehicleId: r.vehicleId,
-            date: typeof r.date === "string" ? r.date : new Date().toISOString().slice(0, 10),
-            mileage: Number(r.mileage) || 0,
-            category: r.category || "ТО и замена жидкостей",
-            title: r.title,
-            description: typeof r.description === "string" ? r.description : "",
-            laborCost: Number(r.laborCost) || 0,
-            parts: Array.isArray(r.parts) ? r.parts.filter((p: any) => p && typeof p.name === "string").map((p: any, i: number) => ({
-              id: typeof p.id === "string" ? p.id : `p-${i}`,
-              name: String(p.name || ""),
-              brand: String(p.brand || ""),
-              partNumber: String(p.partNumber || ""),
-              quantity: Number(p.quantity) || 1,
-              unitPrice: Number(p.unitPrice) || 0,
-            })) : [],
-            totalCost: Number(r.totalCost) || 0,
-            serviceCenter: typeof r.serviceCenter === "string" ? r.serviceCenter : "",
-            receiptImages: Array.isArray(r.receiptImages) ? r.receiptImages.filter((x: any) => typeof x === "string") : [],
-            notes: typeof r.notes === "string" ? r.notes : "",
-          }))
-      : [];
-
     dbMemory = {
-      vehicles: validVehicles,
-      serviceRecords: validServiceRecords,
-      fuelRecords: Array.isArray(data.fuelRecords) ? data.fuelRecords.filter((f: any) => f && typeof f === "object" && typeof f.id === "string" && typeof f.vehicleId === "string") : [],
-      oemSchedules: Array.isArray(data.oemSchedules) ? data.oemSchedules.filter((s: any) => s && typeof s === "object" && typeof s.id === "string" && typeof s.vehicleId === "string") : [],
-      garageParts: Array.isArray(data.garageParts) ? data.garageParts.filter((p: any) => p && typeof p === "object" && typeof p.id === "string" && typeof p.name === "string") : [],
-      toFixTasks: Array.isArray(data.toFixTasks) ? data.toFixTasks.filter((t: any) => t && typeof t === "object" && typeof t.id === "string" && typeof t.title === "string") : [],
-      tuningStages: Array.isArray(data.tuningStages) ? data.tuningStages.filter((t: any) => t && typeof t === "object" && typeof t.id === "string" && typeof t.title === "string") : [],
+      vehicles,
+      serviceRecords: Array.isArray(data.serviceRecords) ? data.serviceRecords : [],
+      fuelRecords: Array.isArray(data.fuelRecords) ? data.fuelRecords : [],
+      oemSchedules: Array.isArray(data.oemSchedules) ? data.oemSchedules : [],
+      garageParts: Array.isArray(data.garageParts) ? data.garageParts : [],
+      toFixTasks: Array.isArray(data.toFixTasks) ? data.toFixTasks : [],
+      tuningStages: Array.isArray(data.tuningStages) ? data.tuningStages : [],
       lastUpdated: new Date().toISOString(),
     };
 
@@ -1532,7 +1476,7 @@ ${retrievedContext}
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1582,7 +1526,7 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     const ai = getAi();
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_MODEL,
       contents: {
         parts: [
           {
@@ -1676,7 +1620,7 @@ app.post("/api/ai/oem-schedule", requireAiAccess, async (req, res) => {
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1728,7 +1672,7 @@ app.post("/api/ai/part-lookup", requireAiAccess, async (req, res) => {
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",

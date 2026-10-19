@@ -1,163 +1,97 @@
 import React, { useState } from "react";
 import {
   Gauge,
-  CheckCircle2,
   Plus,
-  DollarSign,
-  TrendingUp,
   Layers,
-  Wrench,
-  Tag,
   ChevronDown,
   ChevronUp,
   Trash2,
 } from "lucide-react";
 import { Vehicle, TuningStage } from "../types";
-import { INITIAL_TUNING_STAGES } from "../mockData";
-
-interface TuningStageItem {
-  id: string;
-  vehicleId: string;
-  stageName: string;
-  partTitle: string;
-  brand: string;
-  sku: string;
-  plannedCost: number;
-  actualCost?: number;
-  status: "planned" | "in_progress" | "installed";
-  notes?: string;
-}
 
 interface TuningProjectViewProps {
   vehicle: Vehicle;
-  tuningStages?: TuningStage[];
-  onAddStage?: (stage: TuningStage) => void;
-  onUpdateStage?: (stage: TuningStage) => void;
-  onDeleteStage?: (id: string) => void;
-}
-
-function toStageItem(stage: TuningStage): TuningStageItem {
-  const firstPart = stage.parts?.[0];
-  return {
-    id: stage.id,
-    vehicleId: stage.vehicleId,
-    stageName: firstPart?.name || "Доработка / Тюнинг",
-    partTitle: stage.title,
-    brand: firstPart?.brand || "",
-    sku: firstPart?.partNumber || "",
-    plannedCost: stage.estimatedBudget || 0,
-    actualCost: stage.actualCost || undefined,
-    status: stage.status === "completed" ? "installed" : stage.status,
-    notes: stage.description || undefined,
-  };
-}
-
-function fromStageItem(item: TuningStageItem): TuningStage {
-  return {
-    id: item.id,
-    vehicleId: item.vehicleId,
-    title: item.partTitle,
-    description: item.notes || "",
-    status: item.status === "installed" ? "completed" : item.status,
-    estimatedBudget: item.plannedCost,
-    actualCost: item.actualCost ?? (item.status === "installed" ? item.plannedCost : 0),
-    parts: [
-      {
-        id: `tp-${item.id}`,
-        name: item.stageName || "Тюнинг",
-        brand: item.brand || "OEM",
-        partNumber: item.sku || "",
-        quantity: 1,
-        unitPrice: item.actualCost || item.plannedCost || 0,
-      },
-    ],
-  };
+  /** Все этапы тюнинга (все автомобили) — компонент сам фильтрует по vehicle.id */
+  stages: TuningStage[];
+  onCreateStage: (stage: TuningStage) => void;
+  onUpdateStage: (stage: TuningStage) => void;
+  onDeleteStage: (stageId: string) => void;
 }
 
 export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
   vehicle,
-  tuningStages,
-  onAddStage,
+  stages: allStages,
+  onCreateStage,
   onUpdateStage,
   onDeleteStage,
 }) => {
-  const [fallbackStages, setFallbackStages] = useState<TuningStage[]>(INITIAL_TUNING_STAGES);
-  const sourceStages = tuningStages ?? fallbackStages;
-  const stages: TuningStageItem[] = sourceStages
-    .filter((s) => s.vehicleId === vehicle.id)
-    .map(toStageItem);
+  // Показываем только этапы текущего автомобиля — данные приходят с сервера.
+  const stages = allStages.filter((s) => s.vehicleId === vehicle.id);
+
+
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [isStageListCollapsed, setIsStageListCollapsed] = useState(false);
-  const [selectedTuningMetric, setSelectedTuningMetric] = useState<"readiness" | "spent" | "budget" | null>(null);
-  const [newStage, setNewStage] = useState("Подвеска и тормоза");
+  const [selectedTuningMetric, setSelectedTuningMetric] = useState<"readiness" | "spent" | "budget" | null>(null);  const [newStage, setNewStage] = useState("Подвеска и тормоза");
   const [newTitle, setNewTitle] = useState("");
   const [newBrand, setNewBrand] = useState("");
   const [newSku, setNewSku] = useState("");
   const [newCost, setNewCost] = useState(10000);
 
-  const totalPlanned = stages.reduce((sum, s) => sum + s.plannedCost, 0);
+  const totalPlanned = stages.reduce((sum, s) => sum + s.estimatedBudget, 0);
   const totalSpent = stages.reduce(
-    (sum, s) => sum + (s.actualCost || (s.status === "installed" ? s.plannedCost : 0)),
+    (sum, s) => sum + (s.actualCost || (s.status === "completed" ? s.estimatedBudget : 0)),
     0
   );
-  const completedCount = stages.filter((s) => s.status === "installed").length;
+  const completedCount = stages.filter((s) => s.status === "completed").length;
 
-  const handleToggleStatus = (id: string) => {
-    const target = stages.find((s) => s.id === id);
-    if (!target) return;
-    const nextStatus: TuningStageItem["status"] =
-      target.status === "planned"
+  const handleToggleStatus = (stage: TuningStage) => {
+    const nextStatus =
+      stage.status === "planned"
         ? "in_progress"
-        : target.status === "in_progress"
-        ? "installed"
+        : stage.status === "in_progress"
+        ? "completed"
         : "planned";
-    const updatedItem: TuningStageItem = {
-      ...target,
+    onUpdateStage({
+      ...stage,
       status: nextStatus,
-      actualCost: nextStatus === "installed" ? target.actualCost || target.plannedCost : target.actualCost,
-    };
-    const updatedStage = fromStageItem(updatedItem);
-    if (onUpdateStage) {
-      onUpdateStage(updatedStage);
-    } else {
-      setFallbackStages((prev) => prev.map((s) => (s.id === id ? updatedStage : s)));
-    }
+      actualCost: nextStatus === "completed" ? stage.actualCost || stage.estimatedBudget : stage.actualCost,
+    });
   };
 
   const handleAddUpgrade = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const item: TuningStageItem = {
-      id: "ts-" + Date.now(),
+    const item: TuningStage = {
+      id: "ts-" + crypto.randomUUID(),
       vehicleId: vehicle.id,
-      stageName: newStage.trim() || "Доработка",
-      partTitle: newTitle.trim(),
+      stageName: newStage.trim(),
+      title: newTitle.trim(),
       brand: newBrand.trim(),
       sku: newSku.trim(),
-      plannedCost: Number(newCost) || 0,
+      description: "",
+      estimatedBudget: Number(newCost) || 0,
+      actualCost: 0,
       status: "planned",
+      parts: [],
     };
-    const createdStage = fromStageItem(item);
-    if (onAddStage) {
-      onAddStage(createdStage);
-    } else {
-      setFallbackStages((prev) => [...prev, createdStage]);
-    }
+
+    onCreateStage(item);
     setShowAddModal(false);
     setNewTitle("");
     setNewBrand("");
     setNewSku("");
   };
 
-  const handleDeleteStage = (id: string) => {
-    if (onDeleteStage) {
-      onDeleteStage(id);
-    } else {
-      setFallbackStages((prev) => prev.filter((s) => s.id !== id));
-    }
+  const handleDeleteStage = (stageId: string) => {
+    onDeleteStage(stageId);
   };
+
+  const readinessPercent = stages.length > 0 ? Math.round((completedCount / stages.length) * 100) : 0;
+  const spentPercent = totalPlanned > 0 ? Math.min(100, Math.round((totalSpent / totalPlanned) * 100)) : 0;
+  const remainingBudget = Math.max(0, totalPlanned - totalSpent);
+  void readinessPercent; void spentPercent; void remainingBudget;
 
   return (
     <div className="space-y-5 pb-12">
@@ -385,7 +319,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
               </div>
             ) : (
               stages.map((stage) => {
-                const isInstalled = stage.status === "installed";
+                const isInstalled = stage.status === "completed";
                 const isInProgress = stage.status === "in_progress";
 
                 // Highlighting logic based on selected metric
@@ -431,8 +365,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                             {isInstalled ? "Установлено" : isInProgress ? "В работе" : "Запланировано"}
                           </span>
                           <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md font-medium">
-                            {stage.stageName}
-                          </span>
+                            {stage.stageName}                          </span>
                           {stage.brand && (
                             <span className="text-[11px] text-neutral-600 font-medium">
                               Бренд: <strong className="text-neutral-800">{stage.brand}</strong>
@@ -462,14 +395,16 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                             {isInstalled ? "Потрачено" : "План"}
                           </div>
                           <div className="text-sm sm:text-base font-extrabold text-neutral-900">
-                            {(stage.actualCost || stage.plannedCost).toLocaleString("ru-RU")} ₽
+                            {(stage.actualCost || stage.estimatedBudget).toLocaleString("ru-RU")} ₽
                           </div>
                         </div>
 
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus(stage.id)}
+                            onClick={() => handleToggleStatus(stage)}
+
+
                             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0 ${
                               isInstalled
                                 ? "bg-emerald-600 text-white hover:bg-emerald-500"
@@ -487,6 +422,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDeleteStage(stage.id)}
+
                             className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
                             title="Удалить доработку"
                           >

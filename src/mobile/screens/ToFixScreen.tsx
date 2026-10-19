@@ -39,31 +39,31 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
   });
 
   return (
-    <div className="flex flex-col w-full pb-8 bg-neutral-100 text-neutral-900 select-none">
+    <div className="flex flex-col w-full pb-8 text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
-            План ремонта (To-Fix)
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-neutral-800/80">
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">
+            To-Fix Проблемы
           </h2>
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
+          <p className="text-xs text-neutral-400">
             {carTasks.filter((t) => t.status !== "completed").length} неисправностей в очереди
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenAiDiagnostic}
-            className="h-9 px-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 border border-amber-500/30 text-xs font-bold inline-flex items-center justify-center gap-1 transition cursor-pointer shrink-0"
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
           >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <Sparkles className="w-3.5 h-3.5" />
             <span>AI</span>
           </button>
           <button
             onClick={onAddTask}
-            className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Проблема</span>
           </button>
         </div>
@@ -73,17 +73,17 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
       <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar">
         {[
           { id: "all", label: "Все" },
-          { id: "high", label: "Срочно" },
-          { id: "medium", label: "Средний" },
-          { id: "low", label: "Наблюдение" },
+          { id: "high", label: "CRITICAL / HIGH" },
+          { id: "medium", label: "MEDIUM" },
+          { id: "low", label: "LOW / WATCH" },
         ].map((f) => (
           <button
             key={f.id}
             onClick={() => setFilterPriority(f.id as any)}
-            className={`h-8 px-3 rounded-xl text-xs font-bold whitespace-nowrap inline-flex items-center justify-center transition cursor-pointer shrink-0 ${
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               filterPriority === f.id
-                ? "bg-red-600 text-white shadow-xs"
-                : "bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900"
+                ? "bg-red-600 text-white shadow-sm"
+                : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:text-white"
             }`}
           >
             {f.label}
@@ -94,12 +94,12 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
       {/* Tasks List */}
       <div className="px-4 space-y-3">
         {filtered.length === 0 ? (
-          <div className="p-8 rounded-3xl bg-white border border-neutral-200 text-center flex flex-col items-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-2" />
-            <div className="text-sm font-bold text-neutral-900 mb-1">
+          <div className="p-8 rounded-3xl bg-neutral-900 border border-neutral-800 text-center flex flex-col items-center">
+            <CheckCircle2 className="w-10 h-10 text-emerald-400 mb-2" />
+            <div className="text-sm font-bold text-white mb-1">
               Отлично! Нет активных проблем
             </div>
-            <p className="text-xs text-neutral-500 max-w-xs">
+            <p className="text-xs text-neutral-400 max-w-xs">
               GarageHub не обнаружил незакрытых замечаний для {vehicle.make} {vehicle.model}.
             </p>
           </div>

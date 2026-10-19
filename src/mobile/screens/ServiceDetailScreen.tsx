@@ -9,8 +9,6 @@ import {
   DollarSign,
   Building2,
   Trash2,
-  Copy,
-  Check,
 } from "lucide-react";
 import { ServiceRecord, Vehicle } from "../../types";
 
@@ -27,14 +25,6 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
   onBack,
   onDelete,
 }) => {
-  const [copiedSku, setCopiedSku] = React.useState<string | null>(null);
-
-  const handleCopySku = (sku: string) => {
-    navigator.clipboard?.writeText(sku).catch(() => {});
-    setCopiedSku(sku);
-    setTimeout(() => setCopiedSku(null), 1800);
-  };
-
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
@@ -155,19 +145,9 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
                     <div className="text-xs font-bold text-neutral-900">
                       {part.brand} {part.name}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleCopySku(part.partNumber)}
-                      className="text-[10px] font-mono text-neutral-500 hover:text-red-600 mt-0.5 inline-flex items-center gap-1 cursor-pointer transition"
-                      title="Скопировать артикул"
-                    >
-                      <span>SKU: {part.partNumber} • {part.quantity} шт.</span>
-                      {copiedSku === part.partNumber ? (
-                        <Check className="w-3 h-3 text-emerald-600" />
-                      ) : (
-                        <Copy className="w-3 h-3 opacity-60" />
-                      )}
-                    </button>
+                    <div className="text-[10px] font-mono text-neutral-500 mt-0.5">
+                      SKU: {part.partNumber} • {part.quantity} шт.
+                    </div>
                   </div>
                   <div className="text-xs font-mono font-bold text-neutral-900">
                     {(part.quantity * part.unitPrice).toLocaleString("ru-RU")} ₽

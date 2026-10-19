@@ -216,10 +216,10 @@ html:not(.dark) .light-car-header {
 /* Workshop UI: shared interaction rules; layout exceptions stay component-scoped. */
 html { color-scheme: light; scroll-padding-top: 130px; }
 html.dark { color-scheme: dark; }
-body { margin: 0; font-family: var(--font-sans); line-height: 1.5; }
+body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; line-height: 1.5; }
 .connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: #ffedbf; color: #5c3900; font-size: 14px; text-align: center; }
-button { transition-property: color, background-color, border-color, opacity, transform; transition-duration: 160ms; transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
-td, th, .font-mono, .tabular-nums { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+button { transition-property: color, background-color, border-color, opacity, transform; }
+td, .font-mono { font-variant-numeric: tabular-nums; }
 .license-plate, .dark .license-plate { background: #fff !important; color: #17212b !important; border-color: #17212b !important; }
 .license-plate span, .dark .license-plate span { color: #17212b !important; }
 .dark .license-plate .bg-white { background: #fff !important; }
@@ -243,7 +243,7 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .app-navigation > div { flex-wrap: nowrap; max-width: 1280px; }
 .app-navigation > div > div { min-width: 0; flex-wrap: nowrap; }
 .app-navigation > div > div:first-child { flex: 1 1 auto; }
-.app-navigation-actions { flex: 0 1 auto; overflow: visible; }
+.app-navigation-actions { flex: 0 1 auto; overflow: hidden; }
 .app-navigation-actions button { padding-left: 8px; padding-right: 8px; }
 .app-nav-item,
 .app-nav-utility,
@@ -412,84 +412,6 @@ html:not(.dark) .light-bottom-nav {
   border-color: #e2e8f0 !important;
   color: #64748b !important;
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Hide scrollbars cleanly on mobile containers and horizontal carousels */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-/* Mobile App Shell — Cohesive Obsidian Cockpit Dark Mode & Crisp Geometry */
-.mobile-app-shell,
-.mobile-preview-controls {
-  font-family: var(--font-sans);
-}
-.mobile-app-shell button,
-.mobile-app-shell [role="button"],
-.mobile-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-.mobile-app-shell select,
-.mobile-preview-controls button {
-  min-width: 0;
-  min-height: 0;
-}
-.mobile-app-shell .font-mono {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-}
-html.dark .mobile-app-shell .bg-neutral-100 {
-  background-color: #0d131d !important;
-  color: #f8fafc !important;
-}
-html.dark .mobile-app-shell .bg-white {
-  background-color: #151e2d !important;
-  color: #f8fafc !important;
-}
-html.dark .mobile-app-shell .bg-white\/90,
-html.dark .mobile-app-shell .bg-white\/95 {
-  background-color: rgba(13, 19, 29, 0.92) !important;
-  color: #f8fafc !important;
-}
-html.dark .mobile-app-shell .bg-neutral-50 {
-  background-color: #0f1726 !important;
-  color: #e2e8f0 !important;
-}
-html.dark .mobile-app-shell .bg-neutral-200\/70,
-html.dark .mobile-app-shell .bg-neutral-200,
-html.dark .mobile-app-shell .bg-neutral-100\/80 {
-  background-color: #1b2638 !important;
-  color: #cbd5e1 !important;
-}
-html.dark .mobile-app-shell .border-neutral-200,
-html.dark .mobile-app-shell .border-neutral-200\/90,
-html.dark .mobile-app-shell .border-neutral-200\/80,
-html.dark .mobile-app-shell .border-neutral-200\/70,
-html.dark .mobile-app-shell .border-neutral-200\/60,
-html.dark .mobile-app-shell .border-neutral-100,
-html.dark .mobile-app-shell .border-neutral-300 {
-  border-color: #243044 !important;
-}
-html.dark .mobile-app-shell .divide-neutral-100 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #1e293b !important;
-}
-html.dark .mobile-app-shell .text-neutral-900,
-html.dark .mobile-app-shell .text-neutral-800 {
-  color: #f8fafc !important;
-}
-html.dark .mobile-app-shell .text-neutral-700,
-html.dark .mobile-app-shell .text-neutral-600 {
-  color: #cbd5e1 !important;
-}
-html.dark .mobile-app-shell .text-neutral-500 {
-  color: #94a3b8 !important;
-}
-html.dark .mobile-app-shell .hover\:bg-neutral-50:hover,
-html.dark .mobile-app-shell .hover\:bg-neutral-100:hover,
-html.dark .mobile-app-shell .hover\:bg-neutral-100\/90:hover {
-  background-color: #1e293b !important;
 }
 
 /* =========================================

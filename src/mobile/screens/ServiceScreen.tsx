@@ -73,23 +73,23 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-8 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
+        <div>
+          <h2 className="text-xl font-black text-neutral-900 tracking-tight">
             Сервис и ТО
           </h2>
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
-            {vehicle.make} {vehicle.model} · {vehicle.currentMileage.toLocaleString("ru-RU")} км
+          <p className="text-xs text-neutral-500">
+            {vehicle.make} {vehicle.model} • {vehicle.currentMileage.toLocaleString("ru-RU")} км
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => {
               if (onExportPdf) onExportPdf();
               else exportServiceBookToPdf(vehicle, carRecords);
             }}
-            className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 inline-flex items-center justify-center transition cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition cursor-pointer"
             title="Экспорт сервисной книжки в PDF"
           >
             <FileDown className="w-4 h-4 text-red-600" />
@@ -97,7 +97,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           {onOpenScanBarcode && (
             <button
               onClick={onOpenScanBarcode}
-              className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 inline-flex items-center justify-center transition cursor-pointer shrink-0"
+              className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition cursor-pointer"
               title="Сканировать штрихкод детали или VIN"
             >
               <ScanBarcode className="w-4 h-4 text-neutral-700" />
@@ -105,16 +105,16 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           )}
           <button
             onClick={onOpenScanReceipt}
-            className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 inline-flex items-center justify-center transition cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition cursor-pointer"
             title="Сканировать чек"
           >
             <ScanLine className="w-4 h-4" />
           </button>
           <button
             onClick={onOpenAddService}
-            className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95 shrink-0"
+            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Запись</span>
           </button>
         </div>
@@ -122,10 +122,10 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
 
       {/* Segmented Tab Controller (UPCOMING / HISTORY) */}
       <div className="px-4 py-3">
-        <div className="grid grid-cols-2 gap-1 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
+        <div className="flex p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
           <button
             onClick={() => setActiveTab("upcoming")}
-            className={`h-9 px-2.5 text-xs font-bold rounded-xl transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "upcoming"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"
@@ -133,13 +133,13 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           >
             <span>Ближайшие ТО</span>
             {(criticalCount > 0 || dueSoonCount > 0) && (
-              <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-red-600" />
             )}
           </button>
 
           <button
             onClick={() => setActiveTab("history")}
-            className={`h-9 px-2.5 text-xs font-bold rounded-xl transition inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "history"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"

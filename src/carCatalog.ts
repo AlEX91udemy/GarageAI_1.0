@@ -1,21 +1,3 @@
-import {
-  ADDITIONAL_MAKES_CATALOG,
-  ADDITIONAL_MODELS_BY_MAKE,
-  MAKE_ALIASES,
-  RUSSIA_TOP_100_MODELS,
-  findPopularCarEntry,
-  type PopularityMetricType,
-  type RussiaPopularCarEntry,
-} from "./catalog/russiaPopularCatalogExpansion";
-
-export {
-  RUSSIA_TOP_100_MODELS,
-  findPopularCarEntry,
-  MAKE_ALIASES,
-  type PopularityMetricType,
-  type RussiaPopularCarEntry,
-};
-
 export type CarBodyType =
   | "suv" | "sedan" | "hatchback" | "coupe"
   | "wagon" | "convertible" | "minivan" | "pickup"
@@ -65,7 +47,7 @@ export const BODY_TYPE_LABELS: Record<CarBodyType, string> = {
   "crossover-coupe": "Кросс-купе (Crossover-coupe)",
 };
 
-const BASE_CAR_CATALOG: CarMakeInfo[] = [
+export const CAR_CATALOG: CarMakeInfo[] = [
   {
     name: "Nissan",
     country: "Япония",
@@ -118,10 +100,10 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2015,
             bodyTypes: [{ type: "suv", label: "Кроссовер / SUV 5 дв." }],
             defaultBodyType: "suv",
-            engineSuggestions: ["2.0L MR20DD (144 л.с.)", "2.5L QR25DE (171 л.с.)", "1.6d R9M (130 л.с.)"],
+            engineSuggestions: ["2.0L MR20DD (144 л.с.)", "2.5L QR25DE (171 л.с.)"],
             transmissionSuggestions: ["Вариатор Xtronic CVT", "МКПП 6-ст"],
             driveTypeSuggestions: ["Полный привод (All-Mode 4x4-i)", "Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)", "Дизель"],
+            fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
             name: "T30 (2000–2007)",
@@ -350,18 +332,6 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95)", "Дизель"],
           },
           {
-            name: "XA40 (2012–2015)",
-            yearRange: [2012, 2015],
-            yearLabel: "2012–2015",
-            defaultYear: 2014,
-            bodyTypes: [{ type: "suv", label: "Кроссовер / SUV 5 дв." }],
-            defaultBodyType: "suv",
-            engineSuggestions: ["2.0L 3ZR-FAE (146 л.с.)", "2.5L 2AR-FE (180 л.с.)", "2.2d 2AD-FTV (150 л.с.)"],
-            transmissionSuggestions: ["Вариатор Multidrive S", "АКПП 6-ст", "МКПП 6-ст"],
-            driveTypeSuggestions: ["Полный привод AWD", "Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)", "Дизель"],
-          },
-          {
             name: "XA30 (2005–2013)",
             yearRange: [2005, 2013],
             yearLabel: "2005–2013",
@@ -404,26 +374,14 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
-            name: "XV50 Рестайлинг (2014–2017)",
-            yearRange: [2014, 2017],
-            yearLabel: "2014–2017",
-            defaultYear: 2016,
+            name: "XV50 / XV55 (2011–2017)",
+            yearRange: [2011, 2017],
+            yearLabel: "2011–2017",
+            defaultYear: 2015,
             bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0L 6AR-FSE (150 л.с.)", "2.5L 2AR-FE (181 л.с.)", "3.5L V6 2GR-FE (249 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст Aisin"],
-            driveTypeSuggestions: ["Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "XV50 (2011–2014)",
-            yearRange: [2011, 2014],
-            yearLabel: "2011–2014",
-            defaultYear: 2013,
-            bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
-            defaultBodyType: "sedan",
-            engineSuggestions: ["2.0L 1AZ-FE (148 л.с.)", "2.5L 2AR-FE (181 л.с.)", "3.5L V6 2GR-FE (277 л.с.)"],
-            transmissionSuggestions: ["АКПП 4-ст", "АКПП 6-ст Aisin"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
@@ -453,7 +411,6 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
               { type: "hatchback", label: "Хэтчбек 5 дв." },
-              { type: "wagon", label: "Универсал Touring Sports 5 дв." },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L 1ZR-FE (122 л.с.)", "1.8L Hybrid 2ZR-FXE (122 л.с.)"],
@@ -462,41 +419,23 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95)", "Гибрид"],
           },
           {
-            name: "E180 / E170 (2013–2019)",
+            name: "E160 / E170 (2013–2019)",
             yearRange: [2013, 2019],
             yearLabel: "2013–2019",
             defaultYear: 2016,
             bodyTypes: [{ type: "sedan", label: "Седан 4 дв." }],
             defaultBodyType: "sedan",
-            engineSuggestions: ["1.6L 1ZR-FE (122 л.с.)", "1.8L 2ZR-FE (140 л.с.)", "1.33L 1NR-FE (99 л.с.)"],
+            engineSuggestions: ["1.6L 1ZR-FE (122 л.с.)", "1.8L 2ZR-FE (140 л.с.)", "1.33L (99 л.с.)"],
             transmissionSuggestions: ["Вариатор Multidrive S", "МКПП 6-ст"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
-            name: "E160 Axio / Fielder (2012–н.в.)",
-            yearRange: [2012, null],
-            yearLabel: "2012–н.в.",
-            defaultYear: 2017,
-            bodyTypes: [
-              { type: "sedan", label: "Седан Corolla Axio (JDM)" },
-              { type: "wagon", label: "Универсал Corolla Fielder (JDM)" },
-            ],
-            defaultBodyType: "wagon",
-            engineSuggestions: ["1.5L 1NZ-FE (109 л.с.)", "1.5L Hybrid 1NZ-FXE (74 л.с.)", "1.8L 2ZR-FAE (140 л.с.)"],
-            transmissionSuggestions: ["Вариатор Super CVT-i", "E-CVT", "МКПП 5-ст"],
-            driveTypeSuggestions: ["Передний привод", "Полный привод 4WD"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)", "Гибрид"],
-          },
-          {
-            name: "E150 / E140 (2006–2013)",
+            name: "E150 (2006–2013)",
             yearRange: [2006, 2013],
             yearLabel: "2006–2013",
             defaultYear: 2010,
-            bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (E150)" },
-              { type: "wagon", label: "Универсал Fielder 5 дв. (E140)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L 1ZR-FE (124 л.с.)", "1.4L 4ZZ-FE (97 л.с.)"],
             transmissionSuggestions: ["АКПП 4-ст", "Робот M-MT", "МКПП 5-ст/6-ст"],
@@ -559,13 +498,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "sedan",
         generations: [
           {
-            name: "G20 / G21 (2018–н.в.)",
+            name: "G20 (2018–н.в.)",
             yearRange: [2018, null],
             yearLabel: "2018–н.в.",
             defaultYear: 2021,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (G20)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (G21)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "coupe", label: "4-Series Coupe (G22)" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d B47 (190 л.с. 320d)", "2.0T B48 (184 л.с. 320i)", "2.0T B48 (258 л.с. 330i)", "3.0T B58 (374 л.с. M340i)"],
@@ -577,11 +516,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             name: "F30 LCI Рестайлинг (2015–2019)",
             yearRange: [2015, 2019],
             yearLabel: "2015–2019",
-            defaultYear: 2017,
+            defaultYear: 2016,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (F30 LCI)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (F31 LCI)" },
-              { type: "coupe", label: "Лифтбек Gran Turismo GT 5 дв. (F34)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "hatchback", label: "Гран Туризмо GT 5 дв." },
+              { type: "coupe", label: "4-Series Купе" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d B47D20 (190 л.с. 320d)", "2.0T B48B20 (184 л.с. 320i)", "2.0T B48B20 (249 л.с. 330i)"],
@@ -590,31 +529,28 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
           },
           {
-            name: "F30 / F31 / F34 (2011–2015)",
+            name: "F30 (2011–2015)",
             yearRange: [2011, 2015],
             yearLabel: "2011–2015",
             defaultYear: 2013,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (F30)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (F31)" },
-              { type: "coupe", label: "Лифтбек Gran Turismo GT 5 дв. (F34)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "coupe", label: "Купе 2 дв." },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d N47D20 (184 л.с. 320d)", "2.0T N20B20 (184 л.с. 320i)", "2.0T N20B20 (245 л.с. 328i)"],
-            transmissionSuggestions: ["АКПП 8-ст ZF 8HP", "МКПП 6-ст"],
+            transmissionSuggestions: ["АКПП 8-ст ZF 8HP"],
             driveTypeSuggestions: ["Полный привод xDrive", "Задний привод"],
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
           },
           {
-            name: "E90 / E91 / E92 / E93 (2005–2013)",
+            name: "E90 / E92 (2005–2013)",
             yearRange: [2005, 2013],
             yearLabel: "2005–2013",
             defaultYear: 2008,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв. (E90)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (E91)" },
               { type: "coupe", label: "Купе 2 дв. (E92)" },
-              { type: "convertible", label: "Кабриолет 2 дв. (E93)" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0L N46B20 (156 л.с.)", "2.5L N52B25 (218 л.с.)", "3.0T N54/N55 (306 л.с. 335i)"],
@@ -629,16 +565,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2003,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "wagon", label: "Универсал Touring 5 дв." },
               { type: "coupe", label: "Купе 2 дв." },
-              { type: "hatchback", label: "Хэтчбек Compact 3 дв." },
-              { type: "convertible", label: "Кабриолет 2 дв." },
             ],
             defaultBodyType: "sedan",
-            engineSuggestions: ["2.2L M54B22 (170 л.с.)", "2.5L M54B25 (192 л.с.)", "3.0L M54B30 (231 л.с.)"],
+            engineSuggestions: ["2.0L M54B22 (170 л.с.)", "2.5L M54B25 (192 л.с.)", "3.0L M54B30 (231 л.с.)"],
             transmissionSuggestions: ["АКПП 5-ст", "МКПП 5-ст"],
-            driveTypeSuggestions: ["Задний привод", "Полный привод xi"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)", "Дизель"],
+            driveTypeSuggestions: ["Задний привод"],
+            fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
         ],
       },
@@ -647,14 +580,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "sedan",
         generations: [
           {
-            name: "G30 / G31 Рестайлинг (2020–2023)",
+            name: "G30 Рестайлинг (2020–2023)",
             yearRange: [2020, 2023],
             yearLabel: "2020–2023",
             defaultYear: 2021,
-            bodyTypes: [
-              { type: "sedan", label: "Бизнес-седан 4 дв. (G30)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (G31)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d B47 (190 л.с. 520d)", "2.0T B48 (184 л.с. 520i)", "3.0d B57 (249 л.с. 530d)"],
             transmissionSuggestions: ["АКПП 8-ст ZF"],
@@ -662,14 +592,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-98/100)"],
           },
           {
-            name: "G30 / G31 (2017–2020)",
+            name: "G30 (2017–2020)",
             yearRange: [2017, 2020],
             yearLabel: "2017–2020",
             defaultYear: 2018,
-            bodyTypes: [
-              { type: "sedan", label: "Бизнес-седан 4 дв. (G30)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (G31)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d B47 (190 л.с. 520d)", "2.0T B48 (184 л.с. 520i)", "3.0d B57 (249 л.с. 530d)"],
             transmissionSuggestions: ["АКПП 8-ст ZF"],
@@ -677,15 +604,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
           },
           {
-            name: "F10 / F11 / F07 (2010–2017)",
+            name: "F10 (2010–2017)",
             yearRange: [2010, 2017],
             yearLabel: "2010–2017",
             defaultYear: 2014,
-            bodyTypes: [
-              { type: "sedan", label: "Бизнес-седан 4 дв. (F10)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (F11)" },
-              { type: "coupe", label: "Лифтбек Gran Turismo GT 5 дв. (F07)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0d N47/B47 (184-190 л.с.)", "2.0T N20B20 (184 л.с. 520i)", "3.0d N57 (245-258 л.с. 530d)"],
             transmissionSuggestions: ["АКПП 8-ст ZF"],
@@ -693,14 +616,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
           },
           {
-            name: "E60 / E61 (2003–2010)",
+            name: "E60 (2003–2010)",
             yearRange: [2003, 2010],
             yearLabel: "2003–2010",
             defaultYear: 2007,
-            bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (E60)" },
-              { type: "wagon", label: "Универсал Touring 5 дв. (E61)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.5L N52B25 (218 л.с.)", "3.0L N52B30 (258 л.с.)", "3.0d M57 (235 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст ZF", "МКПП 6-ст"],
@@ -793,15 +713,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "sedan",
         generations: [
           {
-            name: "W205 / S205 / C205 / A205 (2014–2021)",
+            name: "W205 (2014–2021)",
             yearRange: [2014, 2021],
             yearLabel: "2014–2021",
             defaultYear: 2017,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (W205)" },
-              { type: "wagon", label: "Универсал T-Modell 5 дв. (S205)" },
-              { type: "coupe", label: "Купе 2 дв. (C205)" },
-              { type: "convertible", label: "Кабриолет 2 дв. (A205)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "coupe", label: "Купе 2 дв." },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6T M274 (150 л.с. C180)", "2.0T M274 (184 л.с. C200)", "2.1d OM651 (170 л.с. C220d)"],
@@ -810,20 +728,19 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95/98)", "Дизель"],
           },
           {
-            name: "W204 / S204 / C204 (2007–2014)",
+            name: "W204 (2007–2014)",
             yearRange: [2007, 2014],
             yearLabel: "2007–2014",
             defaultYear: 2011,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (W204)" },
-              { type: "wagon", label: "Универсал T-Modell 5 дв. (S204)" },
-              { type: "coupe", label: "Купе 2 дв. (C204)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "coupe", label: "Купе 2 дв." },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.8T M271 (156 л.с. C180)", "1.8T M271 (184-204 л.с. C200/C250)", "3.5L V6 M276 (249-306 л.с.)"],
             transmissionSuggestions: ["АКПП 5G-Tronic", "АКПП 7G-Tronic Plus"],
             driveTypeSuggestions: ["Задний привод", "Полный привод 4MATIC"],
-            fuelTypeSuggestions: ["Бензин (АИ-95/98)", "Дизель"],
+            fuelTypeSuggestions: ["Бензин (АИ-95/98)"],
           },
         ],
       },
@@ -832,15 +749,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "sedan",
         generations: [
           {
-            name: "W213 / S213 / C238 / A238 (2016–2023)",
+            name: "W213 (2016–2023)",
             yearRange: [2016, 2023],
             yearLabel: "2016–2023",
             defaultYear: 2019,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (W213)" },
-              { type: "wagon", label: "Универсал T-Modell / All-Terrain (S213)" },
+              { type: "sedan", label: "Седан 4 дв." },
               { type: "coupe", label: "Купе E-Coupe (C238)" },
-              { type: "convertible", label: "Кабриолет E-Cabrio (A238)" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0T M274/M264 (197 л.с. E200)", "2.0d OM654 (194 л.с. E220d)", "3.0T M256 (367 л.с. E450)"],
@@ -849,15 +764,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95/98)", "Дизель"],
           },
           {
-            name: "W212 / S212 / C207 / A207 (2009–2016)",
+            name: "W212 (2009–2016)",
             yearRange: [2009, 2016],
             yearLabel: "2009–2016",
             defaultYear: 2013,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (W212)" },
-              { type: "wagon", label: "Универсал T-Modell 5 дв. (S212)" },
+              { type: "sedan", label: "Седан 4 дв." },
               { type: "coupe", label: "Купе E-Coupe (C207)" },
-              { type: "convertible", label: "Кабриолет E-Cabrio (A207)" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.8T/2.0T (184 л.с. E200)", "3.5L V6 M276 (249 л.с. E300)", "2.1d OM651 (170-204 л.с.)"],
@@ -872,13 +785,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "suv",
         generations: [
           {
-            name: "V167 / C167 (2018–н.в.)",
+            name: "V167 (2018–н.в.)",
             yearRange: [2018, null],
             yearLabel: "2018–н.в.",
             defaultYear: 2021,
             bodyTypes: [
-              { type: "suv", label: "Внедорожник SUV (V167)" },
-              { type: "coupe", label: "Купе-кроссовер GLE Coupe (C167)" },
+              { type: "suv", label: "Внедорожник SUV" },
+              { type: "coupe", label: "GLE Coupe (C167)" },
             ],
             defaultBodyType: "suv",
             engineSuggestions: ["2.0d OM654 (245 л.с. GLE 300d)", "2.9d OM656 (249-330 л.с. GLE 350d/400d)", "3.0T (367 л.с. GLE 450)"],
@@ -887,31 +800,17 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-98/100)"],
           },
           {
-            name: "W166 Рестайлинг / GLE & C292 (2015–2018)",
-            yearRange: [2015, 2018],
-            yearLabel: "2015–2018",
-            defaultYear: 2016,
+            name: "W166 / GLE (2011–2018)",
+            yearRange: [2011, 2018],
+            yearLabel: "2011–2018",
+            defaultYear: 2015,
             bodyTypes: [
-              { type: "suv", label: "Внедорожник GLE (W166)" },
-              { type: "coupe", label: "Купе-кроссовер GLE Coupe (C292)" },
+              { type: "suv", label: "Внедорожник SUV" },
+              { type: "coupe", label: "GLE Coupe (C292)" },
             ],
             defaultBodyType: "suv",
-            engineSuggestions: ["3.0d V6 OM642 (249 л.с. GLE 350d)", "3.5L V6 M276 (249-306 л.с. GLE 300/350)", "3.0T V6 M276 (333 л.с. GLE 400)"],
-            transmissionSuggestions: ["АКПП 9G-Tronic", "АКПП 7G-Tronic Plus"],
-            driveTypeSuggestions: ["Полный привод 4MATIC"],
-            fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
-          },
-          {
-            name: "W166 ML-Class (2011–2015)",
-            yearRange: [2011, 2015],
-            yearLabel: "2011–2015",
-            defaultYear: 2013,
-            bodyTypes: [
-              { type: "suv", label: "Внедорожник ML-Class (W166)" },
-            ],
-            defaultBodyType: "suv",
-            engineSuggestions: ["3.0d V6 OM642 (249-258 л.с. ML 350 BlueTEC)", "3.5L V6 M276 (249-306 л.с. ML 300/350)"],
-            transmissionSuggestions: ["АКПП 7G-Tronic Plus"],
+            engineSuggestions: ["3.0d V6 OM642 (249 л.с. ML/GLE 350d)", "3.5L V6 M276 (249-306 л.с. ML/GLE 300/350)", "3.0T V6 (333 л.с. GLE 400)"],
+            transmissionSuggestions: ["АКПП 7G-Tronic Plus", "АКПП 9G-Tronic"],
             driveTypeSuggestions: ["Полный привод 4MATIC"],
             fuelTypeSuggestions: ["Дизель", "Бензин (АИ-95/98)"],
           },
@@ -934,12 +833,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             yearLabel: "2022–н.в.",
             defaultYear: 2024,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (вкл. Vesta Cross)" },
-              { type: "wagon", label: "Универсал 5 дв. (SW / SW Cross)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "suv", label: "Кросс-универсал SW Cross" },
+              { type: "hatchback", label: "Универсал SW" },
             ],
-            defaultBodyType: "sedan",
+            defaultBodyType: "suv",
             engineSuggestions: ["1.8 EVO (122 л.с.)", "1.6L ВАЗ-21129 (106 л.с.)", "1.6L ВАЗ-11182 (90 л.с.)"],
-            transmissionSuggestions: ["МКПП 5-ст ВАЗ", "Вариатор CVT WLY", "МКПП 6-ст"],
+            transmissionSuggestions: ["Вариатор CVT WLY", "МКПП 5-ст ВАЗ", "МКПП 6-ст"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
@@ -949,8 +849,9 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             yearLabel: "2015–2022",
             defaultYear: 2019,
             bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (вкл. Vesta Cross)" },
-              { type: "wagon", label: "Универсал 5 дв. (SW / SW Cross)" },
+              { type: "sedan", label: "Седан 4 дв." },
+              { type: "suv", label: "Кросс-универсал SW Cross" },
+              { type: "hatchback", label: "Универсал SW" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L H4M / HR16DE (113 л.с.)", "1.6L ВАЗ-21129 (106 л.с.)", "1.8L ВАЗ-21179 (122 л.с.)"],
@@ -971,27 +872,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2022,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "hatchback", label: "Хэтчбек 5 дв." },
-              { type: "wagon", label: "Универсал 5 дв. (вкл. Granta Cross)" },
+              { type: "hatchback", label: "Хэтчбек / Лифтбек 5 дв." },
+              { type: "suv", label: "Кросс Cross 5 дв." },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L ВАЗ-11182 (90 л.с.)", "1.6L ВАЗ-21127 (106 л.с.)", "1.6L ВАЗ-21126 (98 л.с.)"],
-            transmissionSuggestions: ["МКПП 5-ст ВАЗ", "АКПП 4-ст Jatco", "АМТ Робот"],
-            driveTypeSuggestions: ["Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "I Поколение (2011–2018)",
-            yearRange: [2011, 2018],
-            yearLabel: "2011–2018",
-            defaultYear: 2015,
-            bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв." },
-              { type: "coupe", label: "Лифтбек 5 дв. (с 2014 г.)" },
-            ],
-            defaultBodyType: "sedan",
-            engineSuggestions: ["1.6L ВАЗ-11186 (87 л.с.)", "1.6L ВАЗ-21127 (106 л.с.)", "1.6L ВАЗ-21126 (98 л.с.)"],
             transmissionSuggestions: ["МКПП 5-ст ВАЗ", "АКПП 4-ст Jatco", "АМТ Робот"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
@@ -1003,11 +888,11 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "suv",
         generations: [
           {
-            name: "Legend 2121 / 2131 (1977–н.в.)",
-            yearRange: [1977, null],
-            yearLabel: "1977–н.в.",
+            name: "Legend 2121 / 3-дв (2020–н.в.)",
+            yearRange: [2020, null],
+            yearLabel: "2020–н.в.",
             defaultYear: 2023,
-            bodyTypes: [{ type: "suv", label: "Внедорожник 3/5 дв. (несущий кузов)" }],
+            bodyTypes: [{ type: "suv", label: "Рамный внедорожник 3 дв." }],
             defaultBodyType: "suv",
             engineSuggestions: ["1.7L ВАЗ-21214 (83 л.с.)"],
             transmissionSuggestions: ["МКПП 5-ст + Раздаточная коробка 2-ст"],
@@ -1015,22 +900,10 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
-            name: "Travel 2123 Рестайлинг (2021–н.в.)",
-            yearRange: [2021, null],
-            yearLabel: "2021–н.в.",
+            name: "Travel 2123 / 5-дв (2020–н.в.)",
+            yearRange: [2020, null],
+            yearLabel: "2020–н.в.",
             defaultYear: 2023,
-            bodyTypes: [{ type: "suv", label: "Внедорожник SUV 5 дв." }],
-            defaultBodyType: "suv",
-            engineSuggestions: ["1.7L ВАЗ-2123 (80 л.с.)"],
-            transmissionSuggestions: ["МКПП 5-ст + Раздатка"],
-            driveTypeSuggestions: ["Постоянный полный привод 4x4"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "2123 Дорестайлинг (2002–2020)",
-            yearRange: [2002, 2020],
-            yearLabel: "2002–2020",
-            defaultYear: 2016,
             bodyTypes: [{ type: "suv", label: "Внедорожник SUV 5 дв." }],
             defaultBodyType: "suv",
             engineSuggestions: ["1.7L ВАЗ-2123 (80 л.с.)"],
@@ -1163,33 +1036,17 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
         defaultBodyType: "hatchback",
         generations: [
           {
-            name: "III CD (2018–н.в.)",
+            name: "CD (2018–н.в.)",
             yearRange: [2018, null],
             yearLabel: "2018–н.в.",
             defaultYear: 2020,
             bodyTypes: [
               { type: "hatchback", label: "Хэтчбек 5 дв." },
-              { type: "wagon", label: "Универсал Ceed SW / ProCeed 5 дв." },
-              { type: "suv", label: "Кросс-хэтчбек XCeed 5 дв." },
+              { type: "suv", label: "Кроссовер XCeed" },
             ],
             defaultBodyType: "hatchback",
             engineSuggestions: ["1.6L G4FG (128 л.с.)", "1.4 T-GDI (140 л.с.)", "1.5 T-GDI (150 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст", "Робот 7DCT"],
-            driveTypeSuggestions: ["Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "II JD (2012–2018)",
-            yearRange: [2012, 2018],
-            yearLabel: "2012–2018",
-            defaultYear: 2015,
-            bodyTypes: [
-              { type: "hatchback", label: "Хэтчбек 3/5 дв. (вкл. pro_cee'd)" },
-              { type: "wagon", label: "Универсал cee'd_sw 5 дв." },
-            ],
-            defaultBodyType: "hatchback",
-            engineSuggestions: ["1.6L G4FG (129-135 л.с.)", "1.4L G4FA (100 л.с.)"],
-            transmissionSuggestions: ["АКПП 6-ст", "Робот 6DCT", "МКПП 6-ст"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
@@ -1567,24 +1424,21 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             yearLabel: "2020–н.в.",
             defaultYear: 2021,
             bodyTypes: [
-              { type: "coupe", label: "Лифтбек 5 дв. (РФ/СНГ)" },
-              { type: "hatchback", label: "Хэтчбек 5 дв. (Европа AW)" },
+              { type: "sedan", label: "Лифтбек 5 дв." },
+              { type: "hatchback", label: "Хэтчбек 5 дв." },
             ],
-            defaultBodyType: "coupe",
+            defaultBodyType: "sedan",
             engineSuggestions: ["1.6L MPI CWVA (110 л.с.)", "1.6L MPI CWVB (90 л.с.)", "1.4 TSI CZCA (125 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст Aisin", "МКПП 5-ст", "РКПП 7-ст DSG DQ200"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
-            name: "V 6R / 6C (2010–2020)",
+            name: "V Седан (2010–2020)",
             yearRange: [2010, 2020],
             yearLabel: "2010–2020",
             defaultYear: 2016,
-            bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв. (Polo Sedan)" },
-              { type: "hatchback", label: "Хэтчбек 3/5 дв. (6R/6C)" },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L CWVA (110 л.с.)", "1.6L CFNA (105 л.с.)", "1.4 TSI (125 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст", "МКПП 5-ст", "РКПП 7-ст DSG"],
@@ -1644,65 +1498,35 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
     models: [
       {
         name: "Octavia",
-        defaultBodyType: "coupe",
+        defaultBodyType: "sedan",
         generations: [
           {
-            name: "A8 NX (2019–н.в.)",
+            name: "A8 (2019–н.в.)",
             yearRange: [2019, null],
             yearLabel: "2019–н.в.",
             defaultYear: 2021,
             bodyTypes: [
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "wagon", label: "Универсал Combi 5 дв." },
+              { type: "sedan", label: "Лифтбек 5 дв." },
+              { type: "hatchback", label: "Универсал Combi" },
             ],
-            defaultBodyType: "coupe",
+            defaultBodyType: "sedan",
             engineSuggestions: ["1.4 TSI DJKA (150 л.с.)", "1.6 MPI (110 л.с.)", "2.0 TSI (190 л.с.)"],
             transmissionSuggestions: ["АКПП 8-ст Aisin", "РКПП 7-ст DSG DQ381", "МКПП 5-ст"],
             driveTypeSuggestions: ["Передний привод", "Полный привод 4x4"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
           {
-            name: "A7 Рестайлинг 5E (2017–2020)",
+            name: "A7 Рестайлинг (2017–2020)",
             yearRange: [2017, 2020],
             yearLabel: "2017–2020",
             defaultYear: 2018,
             bodyTypes: [
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "wagon", label: "Универсал Combi 5 дв." },
+              { type: "sedan", label: "Лифтбек 5 дв." },
+              { type: "hatchback", label: "Универсал Combi" },
             ],
-            defaultBodyType: "coupe",
+            defaultBodyType: "sedan",
             engineSuggestions: ["1.6 MPI CWVA (110 л.с.)", "1.4 TSI CZDA (150 л.с.)", "1.8 TSI CJSA (180 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст Aisin", "РКПП 7-ст DSG DQ200", "МКПП 5/6-ст"],
-            driveTypeSuggestions: ["Передний привод", "Полный привод 4x4"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "A7 5E (2013–2017)",
-            yearRange: [2013, 2017],
-            yearLabel: "2013–2017",
-            defaultYear: 2015,
-            bodyTypes: [
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "wagon", label: "Универсал Combi 5 дв." },
-            ],
-            defaultBodyType: "coupe",
-            engineSuggestions: ["1.6 MPI CWVA (110 л.с.)", "1.4 TSI CHPA/CZDA (140-150 л.с.)", "1.8 TSI CJSA (180 л.с.)"],
-            transmissionSuggestions: ["АКПП 6-ст Aisin", "РКПП 7-ст DSG DQ200", "МКПП 5/6-ст"],
-            driveTypeSuggestions: ["Передний привод", "Полный привод 4x4"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "A5 1Z (2004–2013)",
-            yearRange: [2004, 2013],
-            yearLabel: "2004–2013",
-            defaultYear: 2011,
-            bodyTypes: [
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "wagon", label: "Универсал Combi / Scout 5 дв." },
-            ],
-            defaultBodyType: "coupe",
-            engineSuggestions: ["1.6 MPI BSE (102 л.с.)", "1.8 TSI CDAB (152 л.с.)", "1.4 TSI CAXA (122 л.с.)"],
-            transmissionSuggestions: ["АКПП 6-ст Aisin", "РКПП 7-ст DSG", "МКПП 5/6-ст"],
             driveTypeSuggestions: ["Передний привод", "Полный привод 4x4"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
@@ -1827,29 +1651,10 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             yearRange: [2012, 2024],
             yearLabel: "2012–2024",
             defaultYear: 2019,
-            bodyTypes: [
-              { type: "sedan", label: "Бизнес-седан 4 дв." },
-              { type: "wagon", label: "Универсал Wagon 5 дв." },
-            ],
+            bodyTypes: [{ type: "sedan", label: "Бизнес-седан 4 дв." }],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0L SkyActiv-G (150 л.с.)", "2.5L SkyActiv-G (194 л.с.)", "2.5T Turbo (231 л.с.)"],
             transmissionSuggestions: ["АКПП 6-ст SkyActiv-Drive"],
-            driveTypeSuggestions: ["Передний привод"],
-            fuelTypeSuggestions: ["Бензин (АИ-95)"],
-          },
-          {
-            name: "GH (2007–2012)",
-            yearRange: [2007, 2012],
-            yearLabel: "2007–2012",
-            defaultYear: 2010,
-            bodyTypes: [
-              { type: "sedan", label: "Седан 4 дв." },
-              { type: "coupe", label: "Лифтбек 5 дв." },
-              { type: "wagon", label: "Универсал Wagon 5 дв." },
-            ],
-            defaultBodyType: "sedan",
-            engineSuggestions: ["2.0L MZR LF (147 л.с.)", "2.5L MZR L5 (170 л.с.)", "1.8L MZR L8 (120 л.с.)"],
-            transmissionSuggestions: ["АКПП 5-ст", "МКПП 6-ст"],
             driveTypeSuggestions: ["Передний привод"],
             fuelTypeSuggestions: ["Бензин (АИ-95)"],
           },
@@ -1964,7 +1769,7 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2018,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "wagon", label: "Универсал Avant / allroad 5 дв." },
+              { type: "hatchback", label: "Универсал Avant" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0 TFSI (150/190/249 л.с.)", "2.0 TDI (190 л.с.)"],
@@ -1979,7 +1784,7 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2012,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "wagon", label: "Универсал Avant / allroad 5 дв." },
+              { type: "hatchback", label: "Универсал Avant" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.8 TFSI (120/160/170 л.с.)", "2.0 TFSI (211/225 л.с.)", "2.0 TDI (143/177 л.с.)"],
@@ -2000,27 +1805,13 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2019,
             bodyTypes: [
               { type: "suv", label: "Кроссовер / SUV 5 дв." },
-              { type: "coupe", label: "Купе-кроссовер Q5 Sportback" },
+              { type: "coupe", label: "Q5 Sportback (Купе)" },
             ],
             defaultBodyType: "suv",
             engineSuggestions: ["2.0 TFSI (249 л.с.)", "2.0 TDI (190 л.с.)", "3.0 TDI (286 л.с.)"],
             transmissionSuggestions: ["РКПП 7-ст S-tronic", "АКПП 8-ст Tiptronic"],
             driveTypeSuggestions: ["Полный привод quattro ultra", "Постоянный quattro"],
             fuelTypeSuggestions: ["Бензин (АИ-98/100)", "Дизель"],
-          },
-          {
-            name: "8R (2008–2017)",
-            yearRange: [2008, 2017],
-            yearLabel: "2008–2017",
-            defaultYear: 2013,
-            bodyTypes: [
-              { type: "suv", label: "Кроссовер / SUV 5 дв." },
-            ],
-            defaultBodyType: "suv",
-            engineSuggestions: ["2.0 TFSI CDNC/CNCD (211-225 л.с.)", "2.0 TDI (170-177 л.с.)", "3.0 TDI (240-245 л.с.)"],
-            transmissionSuggestions: ["АКПП 8-ст Tiptronic ZF", "РКПП 7-ст S-tronic"],
-            driveTypeSuggestions: ["Постоянный полный привод quattro"],
-            fuelTypeSuggestions: ["Бензин (АИ-95/98)", "Дизель"],
           },
         ],
       },
@@ -2094,17 +1885,15 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
       },
       {
         name: "UNI-K",
-        defaultBodyType: "suv",
+        defaultBodyType: "coupe",
         generations: [
           {
             name: "I (2021–н.в.)",
             yearRange: [2021, null],
             yearLabel: "2021–н.в.",
             defaultYear: 2023,
-            bodyTypes: [
-              { type: "suv", label: "Среднеразмерный кроссовер / SUV 5 дв." },
-            ],
-            defaultBodyType: "suv",
+            bodyTypes: [{ type: "coupe", label: "Кросс-купе / SUV" }],
+            defaultBodyType: "coupe",
             engineSuggestions: ["2.0T BlueCore JL486ZQ5 (226 л.с.)"],
             transmissionSuggestions: ["АКПП 8-ст Aisin"],
             driveTypeSuggestions: ["Полный привод AWD (BorgWarner)", "Передний привод"],
@@ -2121,17 +1910,15 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
     models: [
       {
         name: "C5",
-        defaultBodyType: "suv",
+        defaultBodyType: "coupe",
         generations: [
           {
             name: "I (2022–н.в.)",
             yearRange: [2022, null],
             yearLabel: "2022–н.в.",
             defaultYear: 2023,
-            bodyTypes: [
-              { type: "suv", label: "Фастбэк-кроссовер / SUV 5 дв." },
-            ],
-            defaultBodyType: "suv",
+            bodyTypes: [{ type: "coupe", label: "Фастбэк-кроссовер / Купе" }],
+            defaultBodyType: "coupe",
             engineSuggestions: ["1.5T SQRE4T15C (147 л.с.)", "1.6 TGDI SQRF4J16 (150 л.с.)"],
             transmissionSuggestions: ["Вариатор CVT25", "РКПП 7DCT"],
             driveTypeSuggestions: ["Передний привод FWD", "Полный привод AWD"],
@@ -2143,48 +1930,20 @@ const BASE_CAR_CATALOG: CarMakeInfo[] = [
   },
 ];
 
-export const CAR_CATALOG: CarMakeInfo[] = [
-  ...BASE_CAR_CATALOG.map((make) => {
-    const existingNames = new Set(make.models.map((m) => m.name.toLowerCase()));
-    const extraModels = (ADDITIONAL_MODELS_BY_MAKE[make.name] || []).filter(
-      (m) => !existingNames.has(m.name.toLowerCase())
-    );
-    return {
-      ...make,
-      models: [...make.models, ...extraModels],
-    };
-  }),
-  ...ADDITIONAL_MAKES_CATALOG,
-];
-
 // Helper functions for easy lookup
 export function findMake(makeName: string): CarMakeInfo | undefined {
   if (!makeName) return undefined;
-  const rawClean = makeName.trim().toLowerCase();
-  const canonical = (MAKE_ALIASES[rawClean] || rawClean).toLowerCase();
-  return CAR_CATALOG.find((m) => m.name.toLowerCase() === canonical || m.name.toLowerCase() === rawClean);
+  const clean = makeName.trim().toLowerCase();
+  return CAR_CATALOG.find((m) => m.name.toLowerCase() === clean);
 }
 
 export function findModel(makeName: string, modelName: string): CarModelInfo | undefined {
   const make = findMake(makeName);
   if (!make || !modelName) return undefined;
   const clean = modelName.trim().toLowerCase();
-  // 1. Exact match first (prevents "Corolla" from colliding with "Corolla Cross")
-  const exact = make.models.find((m) => m.name.toLowerCase() === clean);
-  if (exact) return exact;
-
-  // 2. Match slash-separated model aliases (e.g. "F7" or "F7x" in "F7 / F7x", "GLE" or "ML" in "GLE / ML")
-  const aliasMatch = make.models.find((m) =>
-    m.name
-      .toLowerCase()
-      .split(/\s*\/\s*/)
-      .some((part) => part.trim() === clean)
+  return make.models.find(
+    (m) => m.name.toLowerCase() === clean || clean.includes(m.name.toLowerCase()) || m.name.toLowerCase().includes(clean)
   );
-  if (aliasMatch) return aliasMatch;
-
-  // 3. Match when input starts with model name + space, checking longest model name first
-  const byLengthDesc = [...make.models].sort((a, b) => b.name.length - a.name.length);
-  return byLengthDesc.find((m) => clean.startsWith(m.name.toLowerCase() + " "));
 }
 
 export function findGeneration(
@@ -2195,22 +1954,7 @@ export function findGeneration(
   const model = findModel(makeName, modelName);
   if (!model || !genName) return undefined;
   const clean = genName.trim().toLowerCase();
-
-  // 1. Exact match on full generation label
-  const exact = model.generations.find((g) => g.name.toLowerCase() === clean);
-  if (exact) return exact;
-
-  // 2. Exact match on generation title without year range in parentheses
-  const withoutYears = (str: string) => str.replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase();
-  const cleanNoYears = withoutYears(clean);
-  const titleMatch = model.generations.find((g) => withoutYears(g.name) === cleanNoYears);
-  if (titleMatch) return titleMatch;
-
-  // 3. Match slash-separated chassis codes in generation title (e.g., "E90", "G20", "F30 LCI")
-  const codeMatch = model.generations.find((g) => {
-    const base = withoutYears(g.name);
-    const parts = base.split(/\s*\/\s*/).map((p) => p.trim());
-    return parts.includes(cleanNoYears) || base.startsWith(cleanNoYears + " ");
-  });
-  return codeMatch;
+  return model.generations.find(
+    (g) => g.name.toLowerCase() === clean || clean.includes(g.name.toLowerCase()) || g.name.toLowerCase().includes(clean)
+  );
 }

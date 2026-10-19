@@ -7,8 +7,7 @@ import {
   ToFixTask,
   TuningStage,
   DiagnosticResult,
-} from "./types";
-import type { Brand, Model, Generation, Modification, KnowledgeChunk } from "./catalog/types";
+} from "./types";import type { Brand, Model, Generation, Modification, KnowledgeChunk } from "./catalog/types";
 
 export interface FullGarageData {
   vehicles: Vehicle[];
@@ -387,6 +386,44 @@ export async function requestPartLookupAi(payload: {
     throw new Error(err.error || "Не удалось подобрать кроссы детали");
   }
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Tuning Stage APIs
+// ---------------------------------------------------------------------------
+
+export async function createTuningStage(stage: Partial<TuningStage>): Promise<TuningStage> {
+  const res = await fetch("/api/tuning", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(stage),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось создать этап тюнинга");
+  }
+  return res.json();
+}
+
+export async function updateTuningStage(id: string, updates: Partial<TuningStage>): Promise<TuningStage> {
+  const res = await fetch(`/api/tuning/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось обновить этап тюнинга");
+  }
+  return res.json();
+}
+
+export async function deleteTuningStage(id: string): Promise<void> {
+  const res = await fetch(`/api/tuning/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось удалить этап тюнинга");
+  }
 }
 
 // ---------------------------------------------------------------------------
