@@ -16,7 +16,7 @@ import {
   ArrowRight,
   Lightbulb,
 } from "lucide-react";
-import { Vehicle, ServiceRecord, ToFixTask } from "../types";
+import { Vehicle, ServiceRecord, ToFixTask, DiagnosticResult } from "../types";
 
 interface AiMechanicModalProps {
   vehicle: Vehicle;
@@ -33,7 +33,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
 }) => {
   const [symptomInput, setSymptomInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
+  const [diagnosticResult, setDiagnosticResult] = useState<DiagnosticResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [taskAdded, setTaskAdded] = useState(false);
 
@@ -135,14 +135,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
   };
 
   const dialogRef = useModalFocus(onClose);
-  // Close on Escape key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   return (
     <div
@@ -294,7 +286,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                     Возможные причины:
                   </div>
                   <div className="space-y-1.5">
-                    {diagnosticResult.likelyCauses.map((c: any, i: number) => (
+                    {diagnosticResult.likelyCauses.map((c, i) => (
                       <div
                         key={i}
                         className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-neutral-200/80"
@@ -316,7 +308,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                     Пошаговая проверка механика:
                   </div>
                   <ul className="space-y-1 text-xs text-neutral-700 list-disc list-inside bg-white p-3 rounded-xl border border-neutral-200/80">
-                    {diagnosticResult.diagnosticSteps.map((step: string, i: number) => (
+                    {diagnosticResult.diagnosticSteps.map((step, i) => (
                       <li key={i} className="leading-relaxed">
                         {step}
                       </li>
@@ -333,7 +325,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                     <span>Рекомендуемые запчасти и проверенные бренды:</span>
                   </div>
                   <div className="space-y-1 text-xs">
-                    {diagnosticResult.recommendedParts.map((part: any, i: number) => (
+                    {diagnosticResult.recommendedParts.map((part, i) => (
                       <div
                         key={i}
                         className="bg-white p-2 rounded-xl border border-neutral-200/80 flex items-center justify-between"

@@ -16,12 +16,10 @@ import {
   Lock,
   ChevronDown,
 } from "lucide-react";
-import { Vehicle, CAR_PAINT_PRESETS } from "../types";
+import { Vehicle } from "../types";
 import { LicensePlateBadge } from "./LicensePlateBadge";
 import { CarCascadeSelector } from "./CarCascadeSelector";
 import { CarBodyType, findGeneration } from "../carCatalog";
-import { VehicleModelRenderer } from "./VehicleModelRenderer";
-import { paintPresetToAssetColor } from "../mobile/vehicleVisuals";
 
 const STANDARD_VEHICLE_COLOR = "#dc2626";
 
@@ -54,12 +52,12 @@ const PRESETS: Array<{
   {
     make: "Nissan",
     model: "X-Trail",
-    generation: "T31 Дорестайлинг (2007–2011)",
+    generation: "T31 Рестайлинг",
     bodyType: "suv",
     year: 2008,
     engine: "2.0L MR20DE (141 л.с.)",
     fuelType: "Бензин (АИ-95)",
-    transmission: "Вариатор CVT Jatco JF011E",
+    transmission: "Вариатор Jatco JF011E",
     driveType: "Полный привод (All-Mode 4x4-i)",
     mileage: 206000,
     colorHex: STANDARD_VEHICLE_COLOR,
@@ -69,9 +67,9 @@ const PRESETS: Array<{
   {
     make: "Toyota",
     model: "Corolla Cross",
-    generation: "XG10 (2020–н.в.)",
+    generation: "XG10",
     bodyType: "suv",
-    year: 2024,
+    year: 2025,
     engine: "2.0L Dynamic Force Hybrid (196 л.с.)",
     fuelType: "Бензин / Гибрид",
     transmission: "E-CVT",
@@ -83,11 +81,11 @@ const PRESETS: Array<{
   },
   {
     make: "BMW",
-    model: "3 Series",
-    generation: "F30 LCI Рестайлинг (2015–2019)",
+    model: "3 Series 320d",
+    generation: "F30 LCI",
     bodyType: "sedan",
     year: 2017,
-    engine: "2.0d B47D20 (190 л.с. 320d)",
+    engine: "2.0d B47D20 (190 л.с.)",
     fuelType: "Дизель",
     transmission: "АКПП 8-ст ZF 8HP",
     driveType: "Полный привод xDrive",
@@ -99,13 +97,13 @@ const PRESETS: Array<{
   {
     make: "Chery",
     model: "Tiggo 7 Pro Max",
-    generation: "I Рестайлинг (2023–н.в.)",
+    generation: "I Рестайлинг",
     bodyType: "suv",
     year: 2023,
     engine: "1.6 TGDI SQRF4J16 (150 л.с.)",
     fuelType: "Бензин (АИ-92/95)",
     transmission: "РКПП 7DCT300",
-    driveType: "Полный привод AWD",
+    driveType: "AWD",
     mileage: 38000,
     colorHex: STANDARD_VEHICLE_COLOR,
     licensePlate: "Е821ТН 790",
@@ -113,9 +111,9 @@ const PRESETS: Array<{
   },
   {
     make: "Lada",
-    model: "Vesta",
-    generation: "NG Новое поколение (2022–н.в.)",
-    bodyType: "wagon",
+    model: "Vesta SW Cross",
+    generation: "NG (Новое поколение)",
+    bodyType: "suv",
     year: 2024,
     engine: "1.8 EVO (122 л.с.)",
     fuelType: "Бензин (АИ-95)",
@@ -258,9 +256,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     "Электричество",
   ]);
   const [mileage, setMileage] = useState(mode === "add" ? 25000 : (currentVehicle?.currentMileage || 0));
-  const [colorHex, setColorHex] = useState(
-    mode === "add" ? STANDARD_VEHICLE_COLOR : (currentVehicle?.colorHex || STANDARD_VEHICLE_COLOR)
-  );
+  const colorHex = STANDARD_VEHICLE_COLOR;
   const [licensePlate, setLicensePlate] = useState(mode === "add" ? "" : (currentVehicle?.licensePlate || ""));
   const [vin, setVin] = useState(mode === "add" ? "" : (currentVehicle?.vin || ""));
 
@@ -294,7 +290,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     setTransmission(p.transmission);
     setDriveType(p.driveType);
     setMileage(p.mileage);
-    setColorHex(p.colorHex || STANDARD_VEHICLE_COLOR);
     setLicensePlate(p.licensePlate);
     setVin(p.vin);
   };
@@ -311,7 +306,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     setTransmission("Автомат / Вариатор");
     setDriveType("Полный привод");
     setMileage(20000);
-    setColorHex(STANDARD_VEHICLE_COLOR);
     setLicensePlate("");
     setVin("");
   };
@@ -333,7 +327,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         transmission: transmission.trim(),
         driveType: driveType.trim(),
         currentMileage: Number(mileage),
-        colorHex: colorHex || currentVehicle.colorHex || STANDARD_VEHICLE_COLOR,
+        colorHex: currentVehicle.colorHex || STANDARD_VEHICLE_COLOR,
         licensePlate: currentVehicle?.licensePlate, // Locked upon creation
         vin: vin.trim().toUpperCase() || undefined,
         photoUrl: undefined,
@@ -342,7 +336,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
       onSaveVehicle(updated);
     } else {
       const newV: Vehicle = {
-        id: "car-" + Date.now(),
+        id: "car-" + crypto.randomUUID(),
         make: make.trim(),
         model: model.trim(),
         generation: generation.trim() || undefined,
@@ -365,14 +359,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   };
 
   const dialogRef = useModalFocus(onClose);
-  // Close on Escape key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   return (
     <div
@@ -425,7 +411,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                   setTransmission(currentVehicle.transmission || "Автомат / Вариатор");
                   setDriveType(currentVehicle.driveType || "Передний привод");
                   setMileage(currentVehicle.currentMileage || 0);
-                  setColorHex(currentVehicle.colorHex || STANDARD_VEHICLE_COLOR);
                   setLicensePlate(currentVehicle.licensePlate || "");
                   setVin(currentVehicle.vin || "");
                 }
@@ -486,57 +471,27 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
 
       {/* Scrollable Form Body */}
       <div className="overflow-y-auto p-4 sm:p-6 flex-1 space-y-4">
-        {/* Vehicle Preview Card with Live Body & Color Selector */}
-        <div className="mt-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-16 h-11 rounded-xl overflow-hidden bg-neutral-900 border border-neutral-200 shrink-0">
-                <VehicleModelRenderer
-                  key={`${previewVehicle.bodyType}-${previewVehicle.colorHex}`}
-                  vehicle={previewVehicle}
-                />
+        {/* Vehicle Preview Card with Car Icon */}
+        <div className="mt-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center border border-neutral-200 shadow-sm"
+              style={{ backgroundColor: colorHex ? `${colorHex}18` : "#f5f5f5" }}
+            >
+              <Car className="w-6 h-6" style={{ color: colorHex || "#dc2626" }} />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-neutral-900">
+                {make || "Марка"} {model || "Модель"} {year ? `(${year})` : ""}
               </div>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-neutral-900 truncate">
-                  {make || "Марка"} {model || "Модель"} {year ? `(${year})` : ""}
-                </div>
-                <div className="text-[11px] text-neutral-500 truncate">
-                  {generation || bodyType ? `${generation || ""} • ${bodyType || ""}` : "Параметры авто"}
-                </div>
+              <div className="text-[11px] text-neutral-500">
+                {generation || bodyType ? `${generation || ""} • ${bodyType || ""}` : "Параметры авто"}
               </div>
             </div>
-            {licensePlate && (
-              <LicensePlateBadge plate={licensePlate} size="sm" />
-            )}
           </div>
-          <div className="pt-2 border-t border-neutral-200/80 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700">
-              <Palette className="w-3.5 h-3.5 text-red-600" />
-              <span>Цвет кузова:</span>
-            </div>
-            <div className="flex items-center gap-1.5" role="group" aria-label="Цвет кузова">
-              {CAR_PAINT_PRESETS.map((preset) => {
-                const isSelected =
-                  paintPresetToAssetColor(colorHex) === paintPresetToAssetColor(preset.hex);
-                return (
-                  <button
-                    key={preset.hex}
-                    type="button"
-                    onClick={() => setColorHex(preset.hex)}
-                    title={preset.name}
-                    aria-label={`Цвет кузова: ${preset.name}`}
-                    aria-pressed={isSelected}
-                    className={`!w-5 !h-5 !min-w-0 !min-h-0 !p-0 rounded-full border-2 transition cursor-pointer ${
-                      isSelected
-                        ? "border-neutral-900 ring-2 ring-red-500 scale-110"
-                        : "border-black/20 opacity-85 hover:opacity-100"
-                    }`}
-                    style={{ backgroundColor: preset.hex }}
-                  />
-                );
-              })}
-            </div>
-          </div>
+          {licensePlate && (
+            <LicensePlateBadge plate={licensePlate} size="sm" />
+          )}
         </div>
 
         {/* Quick Presets row when in add mode or switching */}

@@ -18,8 +18,6 @@ import {
   Moon,
   Download,
   Monitor,
-  Search,
-  ChevronDown,
 } from "lucide-react";
 import {
   Vehicle,
@@ -80,7 +78,6 @@ import { VehicleModal } from "./components/VehicleModal";
 import { RemindersModal } from "./components/RemindersModal";
 import { DataSyncBackupModal } from "./components/DataSyncBackupModal";
 import { InstallPcModal } from "./components/InstallPcModal";
-import { CommandPaletteModal } from "./components/CommandPaletteModal";
 import { Smartphone } from "lucide-react";
 
 type ActiveView =
@@ -136,20 +133,18 @@ export default function App() {
     }
   }, [theme]);
 
-  // Mobile vs Web view mode (Defaulting to Mobile per user focus)
+  // Mobile vs Web view mode (Defaulting to Web per user requirement)
   const [appPlatform, setAppPlatform] = useState<"mobile" | "web">(() => {
     try {
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get("view") === "web") return "web";
         if (urlParams.get("view") === "mobile") return "mobile";
-        const saved = localStorage.getItem("garagehub_platform_mode");
-        if (saved === "web" || saved === "mobile") return saved;
+        if (urlParams.get("view") === "web") return "web";
       }
     } catch {
       // fallback
     }
-    return "mobile";
+    return "web";
   });
 
   const handleSetPlatform = (mode: "mobile" | "web") => {
@@ -209,8 +204,6 @@ export default function App() {
   const [vehicleModalMode, setVehicleModalMode] = useState<"edit" | "add">("edit");
   const [showRemindersModal, setShowRemindersModal] = useState(false);
   const [showInstallPcModal, setShowInstallPcModal] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
@@ -224,20 +217,9 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setShowCommandPalette((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handleGlobalKeyDown);
-    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
-  }, []);
-
   // Pre-fill data for AddServiceModal
   const [serviceModalInitialData, setServiceModalInitialData] = useState<
-    (Partial<ServiceRecord> & { completedTaskId?: string }) | undefined
+    Partial<ServiceRecord> | undefined
   >(undefined);
 
   // Fetch full dataset from backend on load
@@ -356,31 +338,27 @@ export default function App() {
       );
     }
 
-    // Mark garage parts installed if used (matching vehicleId + non-empty partNumber or explicit usedPartIds)
-    const usedIdsSet = new Set(usedPartIds || []);
-    const partNumbers = newRecord.parts
-      .map((p) => (p.partNumber || "").trim().toLowerCase())
-      .filter(Boolean);
-    if (partNumbers.length > 0 || usedIdsSet.size > 0) {
+    // Mark garage parts installed if used
+    // Сверяем не только артикул, но и привязку детали к автомобилю, а при
+    // наличии нескольких экземпляров — списываем одну штуку вместо установки.
+    if (newRecord.parts.length > 0) {
+      const partNumbers = newRecord.parts.map((p) => p.partNumber.toLowerCase());
       setGarageParts((prev) =>
         prev.map((gp) => {
-          const gpSku = (gp.partNumber || "").trim().toLowerCase();
-          const matchesVehicle = gp.vehicleId === newRecord.vehicleId || gp.vehicleId === "all";
-          if (
-            usedIdsSet.has(gp.id) ||
-            (matchesVehicle && gpSku.length > 0 && partNumbers.includes(gpSku))
-          ) {
-            return { ...gp, status: "installed" };
+          if (!partNumbers.includes(gp.partNumber.toLowerCase())) return gp;
+          if (gp.vehicleId !== newRecord.vehicleId && gp.vehicleId !== "all") return gp;
+          if (gp.quantity > 1) {
+            return { ...gp, quantity: gp.quantity - 1 };
           }
-          return gp;
+          return { ...gp, status: "installed" as const };
         })
       );
     }
 
     // Keep edit and create operations separate so editing never duplicates a record.
-    const saveRequest = serviceRecords.some((record) => record.id === newRecord.id)
+    const saveRequest = currentRecords.some((record) => record.id === newRecord.id)
       ? apiUpdateServiceRecord(newRecord.id, newRecord)
-      : apiCreateServiceRecord({ ...newRecord, completedTaskId, installedPartIds: usedPartIds } as any);
+      : apiCreateServiceRecord({ ...newRecord, completedTaskId });
     saveRequest.catch(console.error);
 
     setShowAddServiceModal(false);
@@ -431,7 +409,11 @@ export default function App() {
     setShowAddServiceModal(true);
   };
 
-  // When installing a garage part in service
+  // When installing a garage part in service.
+  // NOTE: the modal strips the leading "gp-" prefix to recover the original
+  // garage part id, so we must use exactly one "gp-" prefix here. If part.id
+  // already starts with "gp-", the resulting id is "gp-gp-<suffix>", which the
+  // modal safely reduces back to the original "gp-<suffix>".
   const handleInstallPartInService = (part: GaragePart) => {
     setServiceModalInitialData({
       category: part.category,
@@ -439,7 +421,7 @@ export default function App() {
       description: `Установка детали со склада гаража: ${part.brand} ${part.name} (${part.partNumber})`,
       parts: [
         {
-          id: "gp-used-" + part.id,
+          id: "gp-" + part.id,
           name: part.name,
           brand: part.brand,
           partNumber: part.partNumber,
@@ -467,13 +449,12 @@ export default function App() {
   };
 
   // Quick update vehicle color
-  const handleUpdateVehicleColor = (newColor: string, targetVehicleId?: string) => {
+  const handleUpdateVehicleColor = (newColor: string) => {
     if (!/^#[0-9a-f]{6}$/i.test(newColor)) return;
-    const idToUpdate = targetVehicleId || currentVehicle.id;
     setVehicles((prev) =>
-      prev.map((v) => (v.id === idToUpdate ? { ...v, colorHex: newColor } : v))
+      prev.map((v) => (v.id === currentVehicle.id ? { ...v, colorHex: newColor } : v))
     );
-    apiUpdateVehicle(idToUpdate, { colorHex: newColor }).catch(console.error);
+    apiUpdateVehicle(currentVehicle.id, { colorHex: newColor }).catch(console.error);
   };
 
   // Quick update vehicle 3D model
@@ -525,7 +506,6 @@ export default function App() {
     setOemSchedules(data.oemSchedules);
     setGarageParts(data.garageParts);
     setToFixTasks(data.toFixTasks);
-    if (data.tuningStages) setTuningStages(data.tuningStages);
   };
 
   const handleAddServiceRecord = (record: ServiceRecord) => {
@@ -553,6 +533,21 @@ export default function App() {
     }
   };
 
+  const handleCreateTuningStage = (stage: TuningStage) => {
+    setTuningStages((prev) => [stage, ...prev]);
+    apiCreateTuningStage(stage).catch(console.error);
+  };
+
+  const handleUpdateTuningStage = (stage: TuningStage) => {
+    setTuningStages((prev) => prev.map((s) => (s.id === stage.id ? stage : s)));
+    apiUpdateTuningStage(stage.id, stage).catch(console.error);
+  };
+
+  const handleDeleteTuningStage = (stageId: string) => {
+    setTuningStages((prev) => prev.filter((s) => s.id !== stageId));
+    apiDeleteTuningStage(stageId).catch(console.error);
+  };
+
   const handleCreateToFixTask = (task: ToFixTask) => {
     setToFixTasks((prev) => [task, ...prev]);
     apiCreateToFixTask(task).catch(console.error);
@@ -568,21 +563,6 @@ export default function App() {
     } else {
       apiUpdateToFixTask(id, { status: nextStatus as ToFixTask["status"] }).catch(console.error);
     }
-  };
-
-  const handleAddTuningStage = (stage: TuningStage) => {
-    setTuningStages((prev) => [...prev, stage]);
-    apiCreateTuningStage(stage).catch(console.error);
-  };
-
-  const handleUpdateTuningStage = (stage: TuningStage) => {
-    setTuningStages((prev) => prev.map((s) => (s.id === stage.id ? stage : s)));
-    apiUpdateTuningStage(stage.id, stage).catch(console.error);
-  };
-
-  const handleDeleteTuningStage = (id: string) => {
-    setTuningStages((prev) => prev.filter((s) => s.id !== id));
-    apiDeleteTuningStage(id).catch(console.error);
   };
 
   if (appPlatform === "mobile") {
@@ -624,11 +604,7 @@ export default function App() {
             setServiceModalInitialData(data);
             setShowAddServiceModal(true);
           }}
-          onUpdateVehicleColor={(vehicleId, color) => handleUpdateVehicleColor(color, vehicleId)}
-          onOpenCommandPalette={() => setShowCommandPalette(true)}
-          onMarkOemDone={handleMarkOemDone}
-          tuningStages={tuningStages}
-          onAddTuningStage={handleAddTuningStage}
+          onUpdateVehicleColor={(_vehicleId, color) => handleUpdateVehicleColor(color)}
         />
 
         {/* Full Parity Modals accessible from Mobile App */}
@@ -656,7 +632,7 @@ export default function App() {
             }}
             onApplyFuel={(fuelData) => {
               handleAddFuelRecord({
-                id: "fuel-" + Date.now(),
+                id: "fuel-" + crypto.randomUUID(),
                 vehicleId: currentVehicle.id,
                 date: fuelData.date || new Date().toISOString().split("T")[0],
                 mileage: fuelData.mileage || currentVehicle.currentMileage,
@@ -677,6 +653,8 @@ export default function App() {
             serviceRecords={serviceRecords}
             onClose={() => setShowAiMechanicModal(false)}
             onAddTaskToFix={(task) => {
+              // Сохраняем задачу на сервере (не только в локальном состоянии),
+              // иначе она теряется после перезагрузки страницы.
               handleCreateToFixTask(task);
               setShowAiMechanicModal(false);
             }}
@@ -732,29 +710,6 @@ export default function App() {
             onInstallSuccess={() => setShowInstallPcModal(false)}
           />
         )}
-
-        <CommandPaletteModal
-          isOpen={showCommandPalette}
-          onClose={() => setShowCommandPalette(false)}
-          vehicles={vehicles}
-          currentVehicle={currentVehicle}
-          serviceRecords={serviceRecords}
-          garageParts={garageParts}
-          toFixTasks={toFixTasks}
-          oemSchedules={oemSchedules}
-          onSelectVehicle={(v) => setActiveVehicleId(v.id)}
-          onNavigateView={() => {}}
-          onOpenAddService={() => {
-            setServiceModalInitialData(undefined);
-            setShowAddServiceModal(true);
-          }}
-          onOpenScanReceipt={() => setShowScanReceiptModal(true)}
-          onOpenAiMechanic={() => setShowAiMechanicModal(true)}
-          onOpenServiceBook={() => setShowServiceBookModal(true)}
-          onOpenBackupModal={() => setShowBackupModal(true)}
-          onToggleTheme={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-          theme={theme}
-        />
       </Suspense>
     );
   }
@@ -768,317 +723,271 @@ export default function App() {
       }`}
     >
       <a href="#main-content" className="skip-link">Перейти к содержимому</a>
-      {/* 3-Zone Top Application Bar (Cockpit Header Contract) */}
+      {/* Top Application Bar with Navigation for Desktop */}
       <nav
-        className={`app-navigation sticky top-0 z-40 px-3 sm:px-6 py-2.5 border-b transition-colors duration-150 ${
+        className={`app-navigation sticky top-0 z-40 backdrop-blur-md px-3 sm:px-6 py-2 shadow-md transition-colors duration-200 ${
           theme === "light"
-            ? "bg-white border-slate-200 text-slate-900"
-            : "bg-[#111827] border-[#1f2937] text-white"
+            ? "bg-white/95 border-b border-slate-200 text-slate-900"
+            : "bg-[#0b1018]/95 border-b border-[#243044] text-white"
         }`}
       >
-        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-4 sm:gap-8">
-          {/* Zone 1: Single-line Brand Wordmark */}
-          <button
-            type="button"
-            aria-label="GarageHub — главная"
-            aria-current={activeView === "dashboard" ? "page" : undefined}
-            onClick={() => setActiveView("dashboard")}
-            className="text-base sm:text-lg font-extrabold tracking-tight whitespace-nowrap shrink-0 cursor-pointer flex items-center gap-2"
-          >
-            <span className="text-red-600 dark:text-red-500">Garage</span>
-            <span className={theme === "light" ? "text-slate-900" : "text-white"}>Hub</span>
-          </button>
-
-          {/* Zone 2: Clean Single-Line Navigation Links */}
-          <div className="hidden md:flex items-center gap-1 lg:gap-2 overflow-x-auto no-scrollbar">
-            <button
-              aria-current={activeView === "dashboard" ? "page" : undefined}
-              onClick={() => setActiveView("dashboard")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "dashboard"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
+        <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            {/* Brand Logo & Name */}
+            <button type="button" aria-label="GarageHub — главная"
+              aria-current={activeView === "dashboard" ? "page" : undefined} onClick={() => setActiveView("dashboard")}
+              className="flex items-center gap-2 cursor-pointer group"
             >
-              <span>Главная</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white font-black text-xs shadow-sm shadow-red-600/30 group-hover:scale-105 transition-transform">
+                GH
+              </div>
+              <div>
+                <span className={`font-extrabold text-sm tracking-tight leading-none ${
+                  theme === "light" ? "text-slate-900" : "text-white"
+                }`}>
+                  GarageHub
+                </span>
+              </div>
             </button>
 
-            <button
-              aria-current={activeView === "service_log" ? "page" : undefined}
-              onClick={() => setActiveView("service_log")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "service_log"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
+            {/* Desktop Navigation Links */}
+            <div
+              className={`hidden md:flex items-center gap-1 pl-2.5 border-l text-xs font-medium ${
+                theme === "light" ? "border-slate-200" : "border-neutral-800"
               }`}
             >
-              <span>Журнал · {currentRecords.length}</span>
-            </button>
-
-            <button
-              aria-current={activeView === "oem_schedule" ? "page" : undefined}
-              onClick={() => setActiveView("oem_schedule")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "oem_schedule"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>Регламент ТО</span>
-            </button>
-
-            <button
-              aria-current={activeView === "expenses" ? "page" : undefined}
-              onClick={() => setActiveView("expenses")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "expenses"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>Расходы</span>
-            </button>
-
-            <button
-              aria-current={activeView === "garage_inventory" ? "page" : undefined}
-              onClick={() => setActiveView("garage_inventory")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "garage_inventory"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>Склад</span>
-            </button>
-
-            <button
-              aria-current={activeView === "tuning" ? "page" : undefined}
-              onClick={() => setActiveView("tuning")}
-              className={`app-nav-item px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition cursor-pointer ${
-                activeView === "tuning"
-                  ? theme === "light"
-                    ? "text-slate-950 font-bold"
-                    : "text-white font-bold"
-                  : theme === "light"
-                  ? "text-slate-600 hover:text-slate-950"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>Тюнинг</span>
-            </button>
+              <button
+                aria-current={activeView === "dashboard" ? "page" : undefined} onClick={() => setActiveView("dashboard")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  activeView === "dashboard"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <Home aria-hidden="true" />
+                <span>Главная</span>
+              </button>
+              <button
+                aria-current={activeView === "service_log" ? "page" : undefined} onClick={() => setActiveView("service_log")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                  activeView === "service_log"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <BookOpen aria-hidden="true" />
+                <span>Журнал</span>
+                <span className="text-[10px] bg-red-500/20 text-red-500 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                  {currentRecords.length}
+                </span>
+              </button>
+              <button
+                aria-current={activeView === "oem_schedule" ? "page" : undefined} onClick={() => setActiveView("oem_schedule")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  activeView === "oem_schedule"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <ClipboardCheck aria-hidden="true" />
+                <span>Регламент ТО</span>
+              </button>
+              <button
+                aria-current={activeView === "expenses" ? "page" : undefined} onClick={() => setActiveView("expenses")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  activeView === "expenses"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <Wallet aria-hidden="true" />
+                <span>Расходы</span>
+              </button>
+              <button
+                aria-current={activeView === "garage_inventory" ? "page" : undefined} onClick={() => setActiveView("garage_inventory")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  activeView === "garage_inventory"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <Layers aria-hidden="true" />
+                <span>Склад</span>
+              </button>
+              <button
+                aria-current={activeView === "tuning" ? "page" : undefined} onClick={() => setActiveView("tuning")}
+                className={`app-nav-item px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  activeView === "tuning"
+                    ? theme === "light"
+                      ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
+                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                    : theme === "light"
+                    ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-400 hover:text-white hover:bg-[#17202e]"
+                }`}
+              >
+                <Paintbrush aria-hidden="true" />
+                <span>Тюнинг</span>
+              </button>
+            </div>
           </div>
 
-          {/* Zone 3: Global Search (Cmd+K), Tools Menu, Theme Switcher & Primary Action */}
-          <div className="app-navigation-actions flex items-center gap-2 shrink-0 relative">
-            {/* Global Search / Command Palette Trigger */}
+          {/* Quick Utility Action Buttons & Theme Switcher */}
+          <div className="app-navigation-actions flex items-center gap-1.5 shrink-0">
+            {/* Server Sync & Database status indicator */}
             <button
-              type="button"
-              onClick={() => setShowCommandPalette(true)}
-              className={`app-nav-utility px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-2 cursor-pointer border whitespace-nowrap shrink-0 ${
+              onClick={() => setShowBackupModal(true)}
+              className={`app-nav-utility p-1 sm:px-2.5 sm:py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer shadow-xs border ${
                 theme === "light"
-                  ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
-                  : "bg-[#161f30] hover:bg-[#1f2937] text-slate-300 border-[#1f2937]"
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
-              title="Глобальный поиск по артикулам, запчастям, работам и командам (Ctrl+K / ⌘K)"
+              title="Статус сервера базы данных и резервное копирование"
             >
-              <Search aria-hidden="true" className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Поиск</span>
-              <span className="hidden lg:inline font-mono text-[11px] opacity-60">⌘K</span>
-            </button>
-
-            {/* Consolidated Tools Popover Menu */}
-            <div className="relative">
-              <button
-                type="button"
-                aria-expanded={showToolsMenu}
-                onClick={() => setShowToolsMenu((prev) => !prev)}
-                className={`app-nav-utility px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer border whitespace-nowrap shrink-0 ${
-                  theme === "light"
-                    ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
-                    : "bg-[#161f30] hover:bg-[#1f2937] text-slate-200 border-[#1f2937]"
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  isOnline
+                    ? "bg-emerald-500 shadow-sm shadow-emerald-500/80 animate-pulse"
+                    : "bg-amber-500"
                 }`}
-                title="Сервисные инструменты, AI-диагностика, сканер чеков и бэкап"
-              >
-                <span>Инструменты</span>
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
+              />
+              <Database aria-hidden="true" />
+              <span className="hidden xl:inline text-xs">БД</span>
+            </button>
 
-              {showToolsMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowToolsMenu(false)}
-                  />
-                  <div
-                    className={`absolute right-0 top-full mt-2 w-64 rounded-xl p-1.5 shadow-2xl z-50 border ${
-                      theme === "light"
-                        ? "bg-white border-slate-200 text-slate-900"
-                        : "bg-[#111827] border-[#1f2937] text-white"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        setShowAiMechanicModal(true);
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-                      <div>
-                        <div>AI-диагностика</div>
-                        <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
-                          Разбор симптомов по истории ТО
-                        </div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        setShowScanReceiptModal(true);
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <ScanLine className="w-4 h-4 text-red-500 shrink-0" />
-                      <div>
-                        <div>Сканер чеков (OCR)</div>
-                        <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
-                          Распознавание заказ-нарядов и АЗС
-                        </div>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        setShowServiceBookModal(true);
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div>
-                        <div>Сервисная книжка (PDF)</div>
-                        <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
-                          Официальная выписка и печать
-                        </div>
-                      </div>
-                    </button>
-
-                    <div className="my-1 border-t border-slate-100 dark:border-[#1f2937]" />
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        setShowBackupModal(true);
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Database className="w-4 h-4 text-emerald-500 shrink-0" />
-                        <span>База данных и бэкап</span>
-                      </div>
-                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                        {isOnline ? "Онлайн" : "Локально"}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        handleSetPlatform("mobile");
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <Smartphone className="w-4 h-4 text-slate-500 shrink-0" />
-                      <span>Мобильное приложение</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowToolsMenu(false);
-                        if (deferredInstallPrompt) {
-                          deferredInstallPrompt.prompt();
-                        } else {
-                          setShowInstallPcModal(true);
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold flex items-center gap-2.5 hover:bg-slate-100 dark:hover:bg-[#161f30] transition cursor-pointer"
-                    >
-                      <Download className="w-4 h-4 text-red-500 shrink-0" />
-                      <span>Установить на ПК (PWA)</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Single-Click Theme Switcher */}
+            {/* AI Rev Assistant shortcut */}
             <button
-              id={theme === "light" ? "theme-toggle-dark" : "theme-toggle-light"}
-              type="button"
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-              className={`app-nav-utility px-2.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer border whitespace-nowrap shrink-0 ${
+              onClick={() => setShowAiMechanicModal(true)}
+              className={`app-nav-utility app-nav-ai px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
                 theme === "light"
-                  ? "bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
-                  : "bg-[#161f30] hover:bg-[#1f2937] text-slate-200 border-[#1f2937]"
+                  ? "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200"
+                  : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30"
               }`}
-              title={
-                theme === "light"
-                  ? "Переключить на тёмную тему (Obsidian Cockpit)"
-                  : "Переключить на светлую тему (Daylight Studio)"
-              }
+              title="Диагностический AI-ассистент"
             >
-              {theme === "light" ? (
-                <>
-                  <Moon aria-hidden="true" className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Тёмная</span>
-                </>
-              ) : (
-                <>
-                  <Sun aria-hidden="true" className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Светлая</span>
-                </>
-              )}
+              <Sparkles aria-hidden="true" />
+              <span className="hidden sm:inline">AI-диагностика</span>
+              <span className="sm:hidden">AI</span>
             </button>
 
-            {/* Primary CTA: Log Service */}
+            {/* Receipt scanner shortcut */}
             <button
-              type="button"
-              onClick={() => {
-                setServiceModalInitialData(undefined);
-                setShowAddServiceModal(true);
-              }}
-              className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              onClick={() => setShowScanReceiptModal(true)}
+              className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
+                theme === "light"
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+              }`}
+              title="Сканировать чек или заказ-наряд"
             >
-              <Plus aria-hidden="true" className="w-3.5 h-3.5" />
-              <span>Записать ТО</span>
+              <ScanLine aria-hidden="true" />
+              <span className="hidden sm:inline">Сканер чеков</span>
             </button>
+
+            {/* Service book official passport */}
+            <button
+              onClick={() => setShowServiceBookModal(true)}
+              className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
+                theme === "light"
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+              }`}
+              title="Электронная сервисная книжка"
+            >
+              <FileText aria-hidden="true" />
+              <span className="nav-secondary-label hidden md:inline">Сервисная книжка</span>
+            </button>
+
+            {/* Switch to Mobile App preview */}
+            <button
+              onClick={() => handleSetPlatform("mobile")}
+              className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
+                theme === "light"
+                  ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
+                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+              }`}
+              title="Переключить в режим мобильного приложения (iOS / Android)"
+            >
+              <Smartphone aria-hidden="true" />
+              <span className="nav-secondary-label hidden lg:inline">Мобильное приложение</span>
+            </button>
+
+            {/* Install on PC / Download Desktop App */}
+            <button
+              onClick={() => {
+                if (deferredInstallPrompt) {
+                  deferredInstallPrompt.prompt();
+                } else {
+                  setShowInstallPcModal(true);
+                }
+              }}
+              className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border shadow-xs ${
+                theme === "light"
+                  ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                  : "bg-red-600/15 hover:bg-red-600/25 text-red-300 border-red-500/30"
+              }`}
+              title="Установить GarageHub на компьютер (ПК) / Скачать как отдельное приложение"
+            >
+              <Download aria-hidden="true" className="w-3.5 h-3.5 text-red-500" />
+              <span className="hidden sm:inline">Установить на ПК</span>
+              <span className="sm:hidden">ПК</span>
+            </button>
+
+            {/* Theme Toggle Button: Светлая / Тёмная */}
+            <div
+              className={`flex items-center p-0.5 rounded-xl border text-xs shadow-xs transition-colors ${
+                theme === "light"
+                  ? "bg-slate-100 border-slate-300"
+                  : "bg-[#131b26] border-[#243044]"
+              }`}
+            >
+              <button
+                id="theme-toggle-light" aria-pressed={theme === "light"}
+                onClick={() => setTheme("light")}
+                className={`app-theme-option px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                  theme === "light"
+                    ? "bg-white text-slate-950 shadow-sm border border-slate-200"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Переключить на светлую тему"
+              >
+                <Sun aria-hidden="true" />
+                <span className="hidden sm:inline">Светлая</span>
+              </button>
+              <button
+                id="theme-toggle-dark" aria-pressed={theme === "dark"}
+                onClick={() => setTheme("dark")}
+                className={`app-theme-option px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                  theme === "dark"
+                    ? "bg-red-600 text-white shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+                title="Переключить на тёмную тему"
+              >
+                <Moon aria-hidden="true" />
+                <span className="hidden sm:inline">Тёмная</span>
+              </button>
+            </div>
           </div>
         </div>
       </nav>
@@ -1129,8 +1038,6 @@ export default function App() {
               onOpenOemSchedule={() => setActiveView("oem_schedule")}
               onOpenInventoryToFix={() => setActiveView("garage_inventory")}
               onOpenServiceBook={() => setShowServiceBookModal(true)}
-              onMarkOemDone={handleMarkOemDone}
-              onOpenCommandPalette={() => setShowCommandPalette(true)}
             />
           )}
 
@@ -1153,19 +1060,14 @@ export default function App() {
               schedules={oemSchedules}
               onMarkDone={handleMarkOemDone}
               onAddScheduleItem={(item) => {
-                setOemSchedules((prev) => {
-                  const next = [...prev, item];
-                  const vehicleItems = next.filter((s) => s.vehicleId === currentVehicle.id);
-                  apiSaveOemScheduleItems(currentVehicle.id, vehicleItems).catch(console.error);
-                  return next;
-                });
+                setOemSchedules((prev) => [...prev, item]);
+                // Сохраняем на сервер полный список для текущего авто,
+                // чтобы добавленный пункт не пропал после перезагрузки.
+                apiSaveOemScheduleItems(currentVehicle.id, [...oemSchedules.filter((s) => s.vehicleId === currentVehicle.id), item]).catch(console.error);
               }}
               onUpdateSchedules={(items) => {
-                setOemSchedules((prev) => {
-                  const others = prev.filter((s) => s.vehicleId !== currentVehicle.id);
-                  return [...others, ...items];
-                });
-                apiSaveOemScheduleItems(currentVehicle.id, items).catch(console.error);
+                setOemSchedules(items);
+                apiSaveOemScheduleItems(currentVehicle.id, items.filter((s) => s.vehicleId === currentVehicle.id)).catch(console.error);
               }}
             />
           )}
@@ -1198,8 +1100,6 @@ export default function App() {
                 );
                 if (status === "installed") {
                   apiInstallGaragePart(partId).catch(console.error);
-                } else {
-                  apiUpdateGaragePart(partId, { status }).catch(console.error);
                 }
               }}
               onAddTask={(task) => {
@@ -1214,7 +1114,6 @@ export default function App() {
                     title: task.title,
                     description: task.description || task.title,
                     mileage: currentVehicle.currentMileage,
-                    completedTaskId: task.id,
                   });
                   setShowAddServiceModal(true);
                 }
@@ -1226,8 +1125,8 @@ export default function App() {
           {activeView === "tuning" && (
             <TuningProjectView
               vehicle={currentVehicle}
-              tuningStages={tuningStages}
-              onAddStage={handleAddTuningStage}
+              stages={tuningStages}
+              onCreateStage={handleCreateTuningStage}
               onUpdateStage={handleUpdateTuningStage}
               onDeleteStage={handleDeleteTuningStage}
             />
@@ -1346,7 +1245,7 @@ export default function App() {
           }}
           onApplyFuel={(fuelData) => {
             handleAddFuelRecord({
-              id: "fuel-" + Date.now(),
+              id: "fuel-" + crypto.randomUUID(),
               vehicleId: currentVehicle.id,
               date: fuelData.date || new Date().toISOString().split("T")[0],
               mileage: fuelData.mileage || currentVehicle.currentMileage,
@@ -1368,6 +1267,8 @@ export default function App() {
           serviceRecords={serviceRecords}
           onClose={() => setShowAiMechanicModal(false)}
           onAddTaskToFix={(task) => {
+            // Сохраняем задачу на сервере (не только в локальном состоянии),
+            // иначе она теряется после перезагрузки страницы.
             handleCreateToFixTask(task);
             setActiveView("garage_inventory");
             setShowAiMechanicModal(false);
@@ -1428,31 +1329,6 @@ export default function App() {
           deferredPrompt={deferredInstallPrompt}
           onClose={() => setShowInstallPcModal(false)}
           onInstallSuccess={() => setShowInstallPcModal(false)}
-        />
-      )}
-
-      {showCommandPalette && (
-        <CommandPaletteModal
-          isOpen={showCommandPalette}
-          onClose={() => setShowCommandPalette(false)}
-          vehicles={vehicles}
-          currentVehicle={currentVehicle}
-          onSelectVehicle={(v) => setActiveVehicleId(v.id)}
-          serviceRecords={serviceRecords}
-          garageParts={garageParts}
-          toFixTasks={toFixTasks}
-          oemSchedules={oemSchedules}
-          onNavigateView={(view) => setActiveView(view)}
-          onOpenAddService={() => {
-            setServiceModalInitialData(undefined);
-            setShowAddServiceModal(true);
-          }}
-          onOpenScanReceipt={() => setShowScanReceiptModal(true)}
-          onOpenAiMechanic={() => setShowAiMechanicModal(true)}
-          onOpenServiceBook={() => setShowServiceBookModal(true)}
-          onOpenBackupModal={() => setShowBackupModal(true)}
-          onToggleTheme={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-          theme={theme}
         />
       )}
     </div>

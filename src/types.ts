@@ -135,6 +135,10 @@ export interface TuningStage {
   id: string;
   vehicleId: string;
   title: string;
+  /** Категория проекта / этап (например "Подвеска и клиренс") */
+  stageName?: string;
+  brand?: string;
+  sku?: string;
   description: string;
   status: "planned" | "in_progress" | "completed";
   estimatedBudget: number;
@@ -142,20 +146,37 @@ export interface TuningStage {
   parts: PartItem[];
 }
 
+/**
+ * Схема ответа POST /api/ai/diagnose (см. промпт в server.ts).
+ * Поля опциональны, т.к. модель может вернуть не все ключи —
+ * клиент обязан предусматривать fallback-значения.
+ */
 export interface DiagnosticResult {
-  summary: string;
-  urgency: "Критично - не эксплуатировать" | "Внимание - проверить в ближайшие дни" | "Плановое наблюдение";
-  safetyAssessment: string;
-  possibleCauses: Array<{
+  primaryDiagnosis?: string;
+  summary?: string;
+  confidence?: number;
+  urgency?: "high" | "medium" | "low";
+  safetyAssessment?: string;
+  likelyCauses?: Array<{
     cause: string;
-    probability: "Высокая" | "Средняя" | "Низкая";
+    probability: number;
+  }>;
+  possibleCauses?: Array<{
+    cause: string;
+    probability: number;
     explanation: string;
     checkMethod: string;
   }>;
-  diagnosticSteps: string[];
-  estimatedCost: string;
-  recommendedParts: string[];
-  proTip: string;
+  diagnosticSteps?: string[];
+  estimatedCostRange?: string;
+  estimatedCost?: string;
+  recommendedParts?: Array<{
+    name: string;
+    partNumber?: string;
+    brand?: string;
+  }>;
+  mechanicTip?: string;
+  proTip?: string;
 }
 
 export const CAR_PAINT_PRESETS = [

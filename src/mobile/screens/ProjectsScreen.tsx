@@ -41,23 +41,23 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
   onAddProject,
 }) => {
   return (
-    <div className="flex flex-col w-full pb-8 bg-neutral-100 text-neutral-900 select-none">
+    <div className="flex flex-col w-full pb-8 text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between border-b border-neutral-800/80">
+        <div>
+          <h2 className="text-xl font-black text-white tracking-tight">
             Тюнинг-проекты
           </h2>
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
-            Доработки и этапы {vehicle.make} {vehicle.model}
+          <p className="text-xs text-neutral-400">
+            Доработки, этапы Stage и кастом {vehicle.make} {vehicle.model}
           </p>
         </div>
 
         <button
           onClick={onAddProject}
-          className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95 shrink-0"
+          className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
         >
-          <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Проект</span>
         </button>
       </div>

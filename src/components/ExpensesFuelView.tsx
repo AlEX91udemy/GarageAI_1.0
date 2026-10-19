@@ -235,7 +235,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
     }
 
     const newFuelRecord: FuelRecord = {
-      id: "fuel-" + Date.now(),
+      id: "fuel-" + crypto.randomUUID(),
       vehicleId: vehicle.id,
       date: fuelDate,
       mileage: Number(fuelMileage),

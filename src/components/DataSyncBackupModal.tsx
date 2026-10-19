@@ -110,7 +110,8 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       loadStats();
       setStatusMessage({ type: "success", text: "Доступ администратора успешно подтвержден!" });
     } else {
-      setAuthError(result.error || "Неверный пароль или ключ администратора.");
+      // Подсказка пароля намеренно не добавляется — секрет хранится только на сервере (ADMIN_SECRET).
+      setAuthError(result.error || "Неверный пароль администратора.");
     }
   };
 
@@ -190,14 +191,6 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     }
   };
 
-  // Close on Escape key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   if (!isOpen) return null;
   return (
@@ -323,12 +316,11 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-neutral-500 pt-1">
-                  <span>Ключ задаётся переменной окружения сервера:</span>
-                  <code className="px-2 py-0.5 bg-neutral-100 text-neutral-700 font-mono font-bold rounded-md text-[10px]">
-                    ADMIN_SECRET
-                  </code>
-                </div>
+                {/* Security note: the master key is configured on the server
+                    via the ADMIN_SECRET environment variable. */}
+                <p className="text-[11px] text-neutral-500 pt-1">
+                  Мастер-ключ задаётся на сервере через переменную окружения ADMIN_SECRET.
+                </p>
 
                 <button
                   type="submit"

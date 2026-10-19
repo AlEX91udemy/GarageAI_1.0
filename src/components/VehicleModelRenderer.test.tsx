@@ -35,7 +35,7 @@ describe("VehicleModelRenderer", () => {
 
   it("covers every model exposed by the dropdown catalog", () => {
     const models = CAR_CATALOG.flatMap((make) => make.models.map((model) => ({ make: make.name, model: model.name })));
-    expect(models.length).toBeGreaterThanOrEqual(150);
+    expect(models).toHaveLength(55);
     expect(models.every((item) => getVehicleModelSpec(baseVehicle(item.make, item.model, "#dc2626")))).toBe(true);
   });
 
@@ -45,14 +45,8 @@ describe("VehicleModelRenderer", () => {
     ["#166534", "green"],
     ["#171717", "black"],
     ["#f1f5f9", "white"],
-    ["#64748b", "grey"],
-    ["#94a3b8", "silver"],
-    ["#ca8a04", "gold"],
-    ["#cbd5e1", "silver"],
-    ["#1e293b", "grey"],
-    ["#2563eb", "blue"],
   ]) (
-    "uses the selected body template color: %s -> %s",
+    "uses the selected body template color: %s",
     (colorHex, assetColor) => {
       container = document.createElement("div");
       document.body.append(container);

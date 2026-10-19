@@ -6,7 +6,6 @@ import {
   OemScheduleItem,
   ToFixTask,
   GaragePart,
-  TuningStage,
 } from "../types";
 import { MobileTab, MobileScreenId, QuickActionType } from "./types";
 import { ThemeMode } from "./theme";
@@ -42,7 +41,7 @@ import { SettingsScreen } from "./screens/SettingsScreen";
 import { PrefilledScanData } from "./types";
 
 // Web modals we can trigger if needed or re-use
-import { Smartphone, Monitor, Search, Sun, Moon } from "lucide-react";
+import { Smartphone, Monitor, Sparkles } from "lucide-react";
 
 interface MobileAppProps {
   vehicles: Vehicle[];
@@ -72,10 +71,6 @@ interface MobileAppProps {
   onOpenAddServiceModal?: (data?: Partial<ServiceRecord>) => void;
   onOpenEditVehicleModal?: () => void;
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
-  onOpenCommandPalette?: () => void;
-  onMarkOemDone?: (item: OemScheduleItem) => void;
-  tuningStages?: TuningStage[];
-  onAddTuningStage?: (stage: TuningStage) => void;
 }
 
 export const MobileApp: React.FC<MobileAppProps> = ({
@@ -106,10 +101,6 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onOpenAddServiceModal,
   onOpenEditVehicleModal,
   onUpdateVehicleColor,
-  onOpenCommandPalette,
-  onMarkOemDone,
-  tuningStages,
-  onAddTuningStage,
 }) => {
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
@@ -318,33 +309,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setInitialQuickActionType("service");
               setCurrentScreen("add_event");
             }}
-            onOpenSearch={onOpenCommandPalette}
-            onMarkOemDone={(item) => {
-              if (onMarkOemDone) {
-                onMarkOemDone(item);
-              } else {
-                onAddServiceRecord?.({
-                  id: `srv-${Date.now()}`,
-                  vehicleId: currentVehicle.id,
-                  date: new Date().toISOString().slice(0, 10),
-                  mileage: currentVehicle.currentMileage,
-                  title: item.title,
-                  category: (item.category as any) || "ТО и замена жидкостей",
-                  totalCost: 4500,
-                  laborCost: 1500,
-                  description: `Выполнен плановый регламент: ${item.title}.`,
-                  serviceCenter: "Гараж",
-                  parts: [],
-                });
-              }
-            }}
             themeMode={themeMode}
             onToggleTheme={toggleTheme}
-            onUpdateColor={(color) => {
-              if (typeof onUpdateVehicleColor === "function") {
-                onUpdateVehicleColor(currentVehicle.id, color);
-              }
-            }}
           />
         );
 
@@ -408,23 +374,19 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             vehicle={currentVehicle}
             schedules={oemSchedules}
             onMarkDone={(item) => {
-              if (onMarkOemDone) {
-                onMarkOemDone(item);
-              } else {
-                onAddServiceRecord?.({
-                  id: `srv-${Date.now()}`,
-                  vehicleId: currentVehicle.id,
-                  date: new Date().toISOString().slice(0, 10),
-                  mileage: currentVehicle.currentMileage,
-                  title: item.title,
-                  category: (item.category as any) || "ТО и замена жидкостей",
-                  totalCost: 4500,
-                  laborCost: 1500,
-                  description: `Выполнен регламент ОЕМ: ${item.title}.`,
-                  serviceCenter: "Гараж",
-                  parts: [],
-                });
-              }
+              onAddServiceRecord?.({
+                id: `srv-${Date.now()}`,
+                vehicleId: currentVehicle.id,
+                date: new Date().toISOString().slice(0, 10),
+                mileage: currentVehicle.currentMileage,
+                title: item.title,
+                category: (item.category as any) || "ТО и замена жидкостей",
+                totalCost: 4500,
+                laborCost: 1500,
+                description: `Выполнен регламент ОЕМ: ${item.title}.`,
+                serviceCenter: "Гараж",
+                parts: [],
+              });
             }}
             onAddScheduleItem={() => {
               setInitialQuickActionType("service");
@@ -517,23 +479,19 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setCurrentScreen("scan_barcode");
             }}
             onMarkOemDone={(item) => {
-              if (onMarkOemDone) {
-                onMarkOemDone(item);
-              } else {
-                onAddServiceRecord?.({
-                  id: `srv-${Date.now()}`,
-                  vehicleId: currentVehicle.id,
-                  date: new Date().toISOString().slice(0, 10),
-                  mileage: currentVehicle.currentMileage,
-                  title: item.title,
-                  category: "ТО и замена жидкостей",
-                  totalCost: 4500,
-                  laborCost: 1500,
-                  description: `Выполнен плановый регламент: ${item.title}. ОЕМ запчасти: ${item.oemPartHint || "Оригинал"}`,
-                  serviceCenter: "Гараж",
-                  parts: [],
-                });
-              }
+              onAddServiceRecord?.({
+                id: `srv-${Date.now()}`,
+                vehicleId: currentVehicle.id,
+                date: new Date().toISOString().slice(0, 10),
+                mileage: currentVehicle.currentMileage,
+                title: item.title,
+                category: "ТО и замена жидкостей",
+                totalCost: 4500,
+                laborCost: 1500,
+                description: `Выполнен плановый регламент: ${item.title}. ОЕМ запчасти: ${item.oemPartHint || "Оригинал"}`,
+                serviceCenter: "Гараж",
+                parts: [],
+              });
             }}
           />
         );
@@ -669,68 +627,36 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           <div className="p-8 text-center text-white">Запчасть не найдена</div>
         );
 
-      case "projects": {
-        const vehicleStages = (tuningStages || []).filter((s) => s.vehicleId === currentVehicle.id);
-        const mappedStageProjects: TuningProject[] = vehicleStages.map((s) => ({
-          id: s.id,
-          vehicleId: s.vehicleId,
-          title: s.title,
-          category: s.parts?.[0]?.name || "Тюнинг",
-          status: s.status === "completed" ? "completed" : s.status === "in_progress" ? "in_progress" : "planning",
-          progressPct: s.status === "completed" ? 100 : s.status === "in_progress" ? 55 : 15,
-          spent: s.actualCost || 0,
-          budget: s.estimatedBudget || 0,
-          stagesCount: Math.max(1, s.parts?.length || 1),
-          completedStages: s.status === "completed" ? Math.max(1, s.parts?.length || 1) : 0,
-          description: s.description || "Запланированы работы по дооснащению.",
-          updatedAt: new Date().toISOString().slice(0, 10),
-        }));
-        const localVehicleProjects = projects.filter(
-          (p) => p.vehicleId === currentVehicle.id && !mappedStageProjects.some((m) => m.id === p.id)
-        );
-        const visibleProjects = [...mappedStageProjects, ...localVehicleProjects];
-
+      case "projects":
         return (
           <ProjectsScreen
             vehicle={currentVehicle}
-            projects={visibleProjects}
+            projects={projects}
             onSelectProject={(p) => {
               setSelectedProject(p);
               setCurrentScreen("project_detail");
             }}
             onAddProject={() => {
-              const newId = `proj-${Date.now()}`;
               const newProj: TuningProject = {
-                id: newId,
+                id: `proj-${Date.now()}`,
                 vehicleId: currentVehicle.id,
                 title: "Новый проект доработки",
                 category: "Тюнинг",
                 status: "planning",
-                progressPct: 15,
+                progressPct: 10,
                 spent: 0,
                 budget: 50000,
-                stagesCount: 1,
+                stagesCount: 3,
                 completedStages: 0,
                 description: "Запланированы работы по дооснащению.",
                 updatedAt: new Date().toISOString().slice(0, 10),
               };
               setProjects((prev) => [newProj, ...prev]);
-              onAddTuningStage?.({
-                id: newId,
-                vehicleId: currentVehicle.id,
-                title: newProj.title,
-                description: newProj.description,
-                status: "planned",
-                estimatedBudget: newProj.budget,
-                actualCost: 0,
-                parts: [],
-              });
               setSelectedProject(newProj);
               setCurrentScreen("project_detail");
             }}
           />
         );
-      }
 
       case "project_detail":
         return (
@@ -796,7 +722,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
                 totalCost: f.totalCost || 2650,
                 fuelType: f.fuelType || "АИ-95",
                 station: f.station || "Газпромнефть",
-                calculatedConsumption: f.calculatedConsumption,
+                calculatedConsumption: 10.4,
                 isFullTank: true,
               });
             }}
@@ -904,51 +830,26 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   return (
     <div className="h-[100dvh] w-full bg-neutral-950 text-neutral-100 flex flex-col items-center justify-start p-0 sm:py-6 overflow-hidden">
       {/* Top Floating Control Bar (Desktop/Preview mode toggle) */}
-      <header className="mobile-preview-controls w-full max-w-[430px] shrink-0 px-3 py-1.5 flex items-center justify-between gap-2 z-40 bg-neutral-900/95 backdrop-blur-md sm:rounded-2xl sm:mb-2.5 border-b sm:border border-neutral-800 text-xs shadow-xl">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-[10px] text-white shadow-sm shadow-red-600/40 shrink-0">
+      <header className="mobile-preview-controls w-full max-w-[430px] shrink-0 px-3 sm:px-4 py-2 flex items-center justify-between z-40 bg-neutral-900/90 backdrop-blur-md rounded-2xl mb-2 sm:mb-3 border border-neutral-800 text-xs shadow-xl">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-[10px] text-white shadow-sm shadow-red-600/40">
             GH
           </div>
-          <span className="font-bold text-white tracking-tight text-xs whitespace-nowrap truncate">
-            GarageHub
-          </span>
-          <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded whitespace-nowrap hidden sm:inline-block">
-            Mobile
+          <span className="font-bold text-white tracking-tight text-xs">GarageHub Mobile</span>
+          <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded hidden xs:inline">
+            iOS / Android
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {onOpenCommandPalette && (
-            <button
-              onClick={onOpenCommandPalette}
-              className="h-7 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px] inline-flex items-center justify-center gap-1 whitespace-nowrap"
-              title="Глобальный поиск (Cmd+K)"
-            >
-              <Search className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-              <span>Поиск</span>
-            </button>
-          )}
-
-          <button
-            onClick={toggleTheme}
-            className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer inline-flex items-center justify-center shrink-0"
-            title="Переключить тему"
-          >
-            {themeMode === "dark" ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-neutral-300" />
-            )}
-          </button>
-
+        <div className="flex items-center gap-1.5">
           {/* Switch to Web view if available */}
           {onSwitchToWebView && (
             <button
               onClick={onSwitchToWebView}
-              className="h-7 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px] inline-flex items-center justify-center gap-1 whitespace-nowrap"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px]"
               title="Переключиться на Web-версию"
             >
-              <Monitor className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+              <Monitor className="w-3.5 h-3.5 text-neutral-400" />
               <span>Web</span>
             </button>
           )}
@@ -958,10 +859,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onClick={() =>
               setDeviceFrameMode(deviceFrameMode === "frame" ? "full" : "frame")
             }
-            className="h-7 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px] hidden sm:inline-flex items-center justify-center gap-1 whitespace-nowrap"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px]"
             title="Переключить рамку смартфона"
           >
-            <Smartphone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            <Smartphone className="w-3.5 h-3.5 text-neutral-400" />
             <span>{deviceFrameMode === "frame" ? "Без рамки" : "В рамке"}</span>
           </button>
         </div>
@@ -969,7 +870,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
       {/* Main Mobile Device Container (Matches 360-430px mobile specs) */}
       <div
-        className={`mobile-app-shell w-full max-w-[430px] mx-auto relative flex flex-1 min-h-0 flex-col justify-between overflow-hidden shadow-2xl transition-all ${
+        className={`w-full max-w-[430px] mx-auto relative flex flex-1 min-h-0 flex-col justify-between overflow-hidden shadow-2xl transition-all ${
           themeMode === "dark"
             ? "bg-[#0d131d] text-white"
             : "bg-[#F4F5F8] text-[#0F172A]"
@@ -993,7 +894,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           {/* Dynamic Island pill */}
           <div className="w-24 h-5 rounded-full bg-black border border-neutral-800/80 flex items-center justify-center gap-2 px-2 shadow-inner">
             <span className="w-2 h-2 rounded-full bg-neutral-900 border border-neutral-700" />
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <div className="flex items-center gap-1.5 text-[11px] font-mono opacity-80">
             <span>5G</span>
@@ -1056,7 +957,6 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           onClose={() => setIsQuickActionOpen(false)}
           onSelectAction={handleSelectQuickAction}
           carName={`${currentVehicle.make} ${currentVehicle.model}`}
-          themeMode={themeMode}
         />
       </div>
     </div>

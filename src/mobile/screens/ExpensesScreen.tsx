@@ -133,74 +133,77 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
-              Расходы и топливо
+      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+              <span>Расходы</span>
+              <span className="text-xs font-mono text-neutral-500 bg-neutral-100 border border-neutral-200 px-2 py-0.5 rounded-lg">
+                Финансы & Топливо
+              </span>
             </h2>
-            <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5 truncate">
-              <Car className="w-3.5 h-3.5 text-red-600 shrink-0" />
-              <span className="truncate">{vehicle.make} {vehicle.model}</span>
+            <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
+              <Car className="w-3.5 h-3.5 text-red-600" />
+              <span>{vehicle.make} {vehicle.model}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5">
             {onScanReceipt && (
               <button
                 onClick={onScanReceipt}
-                className="w-9 h-9 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-red-600 border border-neutral-200 inline-flex items-center justify-center transition cursor-pointer active:scale-95 shrink-0"
+                className="p-2 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-red-600 border border-neutral-200 transition cursor-pointer"
                 title="Сканировать чек"
               >
                 <ScanLine className="w-4 h-4" />
               </button>
             )}
+            <button
+              onClick={onAddFuel}
+              className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Заправка</span>
+            </button>
             {onAddExpense && (
               <button
                 type="button"
                 onClick={onAddExpense}
-                className="h-9 px-2.5 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer active:scale-95 text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0"
+                className="px-2.5 py-1.5 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer active:scale-95 text-xs font-bold flex items-center gap-1.5"
                 title="Добавить расход"
                 aria-label="Добавить расход"
               >
-                <Wallet className="w-3.5 h-3.5 shrink-0" />
+                <Wallet className="w-4 h-4" />
                 <span>Расход</span>
               </button>
             )}
-            <button
-              onClick={onAddFuel}
-              className="h-9 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold inline-flex items-center justify-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95 shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
-              <span>Заправка</span>
-            </button>
           </div>
         </div>
 
         {/* 2 Tabs: Сводка расходов vs Дневник заправок */}
-        <div className="mt-3 grid grid-cols-2 gap-1 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
+        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
           <button
             onClick={() => setActiveTab("summary")}
-            className={`h-9 px-2.5 rounded-xl font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTab === "summary"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <PieChart className="w-3.5 h-3.5 shrink-0" />
+            <PieChart className="w-3.5 h-3.5" />
             <span>Анализ расходов</span>
           </button>
 
           <button
             onClick={() => setActiveTab("fuel_log")}
-            className={`h-9 px-2.5 rounded-xl font-bold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition cursor-pointer ${
+            className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTab === "fuel_log"
                 ? "bg-white text-neutral-900 shadow-xs"
                 : "text-neutral-500 hover:text-neutral-900"
             }`}
           >
-            <Fuel className="w-3.5 h-3.5 shrink-0" />
-            <span>Заправки ({vehicleFuel.length})</span>
+            <Fuel className="w-3.5 h-3.5" />
+            <span>Дневник заправок ({vehicleFuel.length})</span>
           </button>
         </div>
       </div>

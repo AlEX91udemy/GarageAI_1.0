@@ -42,21 +42,21 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="px-4 pt-3.5 pb-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-black text-neutral-900 tracking-tight leading-tight truncate">
-            Топливо и расход
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
+        <div>
+          <h2 className="text-xl font-black text-neutral-900 tracking-tight">
+            Топливо и Расход
           </h2>
-          <p className="text-xs text-neutral-500 truncate mt-0.5">
-            {vehicle.make} {vehicle.model} · {carFuel.length} заправок
+          <p className="text-xs text-neutral-500">
+            {vehicle.make} {vehicle.model} • {carFuel.length} заправок
           </p>
         </div>
 
         <button
           onClick={onOpenQuickFuel}
-          className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-600/20 transition cursor-pointer shrink-0"
+          className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition cursor-pointer"
         >
-          <Plus className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Заправка</span>
         </button>
       </div>

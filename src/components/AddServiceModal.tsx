@@ -29,7 +29,7 @@ interface AddServiceModalProps {
   toFixTasks: ToFixTask[];
   onClose: () => void;
   onSave: (record: ServiceRecord, usedPartIds?: string[], completedTaskId?: string) => void;
-  initialData?: Partial<ServiceRecord> & { completedTaskId?: string };
+  initialData?: Partial<ServiceRecord>;
 }
 
 export const AddServiceModal: React.FC<AddServiceModalProps> = ({
@@ -63,7 +63,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
   const [parts, setParts] = useState<PartItem[]>(
     initialData?.parts || [
       {
-        id: "p-" + Date.now(),
+        id: "p-" + crypto.randomUUID(),
         name: "",
         brand: "",
         partNumber: "",
@@ -74,9 +74,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
   );
 
   // Optional link to To-Fix and Garage parts
-  const [selectedToFixId, setSelectedToFixId] = useState<string>(
-    initialData?.completedTaskId || ""
-  );
+  const [selectedToFixId, setSelectedToFixId] = useState<string>("");
   const [selectedGaragePartId, setSelectedGaragePartId] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -92,7 +90,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
     setParts((prev) => [
       ...prev,
       {
-        id: "p-" + Date.now() + Math.random().toString(36).substring(2, 5),
+        id: "p-" + crypto.randomUUID(),
         name: "",
         brand: "",
         partNumber: "",
@@ -166,8 +164,15 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
 
     const cleanParts = parts.filter((p) => p.name.trim() !== "");
 
+    // Recover the original garage part ids from parts that were added
+    // from the garage inventory (their ids carry exactly one "gp-" prefix,
+    // which we strip to get the real part id for the install API).
+    const usedGaragePartIds = cleanParts
+      .filter((p) => p.id.startsWith("gp-"))
+      .map((p) => p.id.replace(/^gp-/, ""));
+
     const newRecord: ServiceRecord = {
-      id: initialData?.id || "rec-" + Date.now(),
+      id: initialData?.id || `rec-${crypto.randomUUID()}`,
       vehicleId: vehicle.id,
       date,
       mileage: Number(mileage),
@@ -182,30 +187,14 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
       notes: "Запись сохранена в дневнике обслуживания.",
     };
 
-    const usedPartIds = cleanParts
-      .map((p) => {
-        if (p.id.startsWith("gp-used-")) return p.id.slice("gp-used-".length);
-        if (p.id.startsWith("gp-")) return p.id.slice("gp-".length);
-        return "";
-      })
-      .filter(Boolean);
-
     onSave(
       newRecord,
-      usedPartIds.length > 0 ? usedPartIds : undefined,
+      usedGaragePartIds.length > 0 ? usedGaragePartIds : undefined,
       selectedToFixId || undefined
     );
   };
 
   const dialogRef = useModalFocus(onClose);
-  // Close on Escape key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   return (
     <div

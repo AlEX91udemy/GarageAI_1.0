@@ -2,12 +2,15 @@ import React, { useState } from "react";
 import {
   Plus,
   History,
+  MessageSquareWarning,
   Wallet,
   ArrowUpRight,
   TrendingUp,
+  Fuel,
   Sparkles,
   Camera,
   CheckCircle2,
+  AlertCircle,
   Calendar,
   Layers,
   ChevronRight,
@@ -16,18 +19,8 @@ import {
   FileText,
   Wrench,
   Lightbulb,
-  Copy,
-  Check,
-  Search,
-  ShieldCheck,
 } from "lucide-react";
-import {
-  Vehicle,
-  ServiceRecord,
-  FuelRecord,
-  ToFixTask,
-  OemScheduleItem,
-} from "../types";
+import { Vehicle, ServiceRecord, FuelRecord, ToFixTask, OemScheduleItem } from "../types";
 import { getWorkHint } from "../workHints";
 
 interface DashboardProps {
@@ -44,8 +37,6 @@ interface DashboardProps {
   onOpenOemSchedule: () => void;
   onOpenInventoryToFix: () => void;
   onOpenServiceBook: () => void;
-  onMarkOemDone?: (item: OemScheduleItem) => void;
-  onOpenCommandPalette?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -62,9 +53,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenOemSchedule,
   onOpenInventoryToFix,
   onOpenServiceBook,
-  onMarkOemDone,
-  onOpenCommandPalette,
 }) => {
+  // Collapsible section visibility states
   const [isKilvoCollapsed, setIsKilvoCollapsed] = useState(false);
   const [isOemCollapsed, setIsOemCollapsed] = useState(false);
   const [isToFixCollapsed, setIsToFixCollapsed] = useState(false);
@@ -74,21 +64,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [selectedKilvoMetric, setSelectedKilvoMetric] = useState<
     "cost_per_km" | "fuel_cost_km" | "service_total" | "fuel_total" | null
   >(null);
-  const [copiedSku, setCopiedSku] = useState<string | null>(null);
-
-  const handleCopySku = async (sku: string) => {
-    if (!sku) return;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(sku);
-      }
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    } catch {
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    }
-  };
 
   const currentVehicleRecords = serviceRecords.filter(
     (r) => r.vehicleId === vehicle.id
@@ -135,8 +110,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Average fuel consumption computed strictly from verified logs
   const fuelsWithConsumption = currentFuelRecords.filter(
-    (f) =>
-      typeof f.calculatedConsumption === "number" && f.calculatedConsumption > 0
+    (f) => typeof f.calculatedConsumption === "number" && f.calculatedConsumption > 0
   );
   const avgConsumption =
     fuelsWithConsumption.length > 0
@@ -150,106 +124,206 @@ export const Dashboard: React.FC<DashboardProps> = ({
       ? "—"
       : "0.0";
 
-  // Recent 3 services
+  // Recent 2 services
   const recentServices = [...currentVehicleRecords]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 3);
 
   // Urgent pending tasks
-  const pendingTasks = toFixTasks.filter(
-    (t) => t.vehicleId === vehicle.id && t.status !== "completed"
-  );
-
-  // OEM Maintenance Health & Forecast calculations
-  const vehicleOemItems = oemSchedules
-    .filter((i) => i.vehicleId === vehicle.id)
-    .map((item) => {
-      const lastKm = item.lastDoneKm ?? 0;
-      const diffKm = Math.max(0, vehicle.currentMileage - lastKm);
-      const remainingKm = item.intervalKm - diffKm;
-      const wearPct = Math.min(
-        100,
-        Math.max(0, Math.round((diffKm / item.intervalKm) * 100))
-      );
-      const isOverdue = diffKm >= item.intervalKm;
-      const isSoon = !isOverdue && (wearPct >= 80 || remainingKm <= 2000);
-      return {
-        ...item,
-        diffKm,
-        remainingKm,
-        wearPct,
-        isOverdue,
-        isSoon,
-      };
-    })
-    .sort((a, b) => b.wearPct - a.wearPct);
-
-  const overdueOemCount = vehicleOemItems.filter((i) => i.isOverdue).length;
-  const soonOemCount = vehicleOemItems.filter((i) => i.isSoon).length;
-  const avgWearPct =
-    vehicleOemItems.length > 0
-      ? Math.round(
-          vehicleOemItems.reduce((s, i) => s + i.wearPct, 0) /
-            vehicleOemItems.length
-        )
-      : 20;
-  const healthIndexPct = Math.max(5, 100 - Math.round(avgWearPct * 0.65) - overdueOemCount * 12);
-
-  const pendingToFixCost = pendingTasks.reduce(
-    (s, t) => s + (t.estimatedCost || 0),
-    0
-  );
-  const estimatedDueOemCost = (overdueOemCount + soonOemCount) * 6500;
-  const upcomingServiceBudget = pendingToFixCost + estimatedDueOemCost;
+  const pendingTasks = toFixTasks
+    .filter((t) => t.vehicleId === vehicle.id && t.status !== "completed")
+    .slice(0, 3);
 
   return (
     <div className="dashboard space-y-6 pb-12">
-      {/* Section Header with Command Search Trigger */}
-      <div className="pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-slate-200 dark:border-[#1f2937] pb-3.5">
+      {/* Elevated Section Header with human, natural copywriting */}
+      <div className="pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-1 border-b border-neutral-200/60 dark:border-neutral-800/80 pb-3">
         <div>
-          <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Бортовой кокпит · {vehicle.make} {vehicle.model}
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+            Бортовой журнал
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-0.5">
-            Главное по автомобилю
+          <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white tracking-tight mt-0.5">
+            Главное по машине
           </h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+            Быстрые действия, история обслуживания и расходы на содержание
+          </p>
         </div>
-
-        {onOpenCommandPalette && (
-          <button
-            type="button"
-            onClick={onOpenCommandPalette}
-            className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-[#1f2937] bg-white dark:bg-[#111827] hover:border-slate-300 dark:hover:border-slate-700 text-xs text-slate-500 dark:text-slate-400 transition cursor-pointer w-full sm:w-auto"
-          >
-            <span className="flex items-center gap-2">
-              <Search className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
-              <span>Быстрый поиск по артикулам, ТО и задачам...</span>
-            </span>
-            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#161f30] text-slate-600 dark:text-slate-300">
-              ⌘K
-            </span>
-          </button>
-        )}
       </div>
 
-      {/* 4-Column Ownership Telemetry Strip (Tabular Numerals) */}
-      <div className="bg-white dark:bg-[#111827] rounded-2xl p-5 border border-slate-200 dark:border-[#1f2937] space-y-4">
-        <div className="flex items-center justify-between gap-2">
+      {/* Primary 4-Card Action Grid: Human-friendly automotive cards */}
+      <div className="dashboard-actions grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        {/* Card 1: Red vibrant card "Записать ремонт или ТО" */}
+        <button
+          onClick={onOpenAddService}
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-xl shadow-red-600/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group overflow-hidden border border-red-500/40"
+        >
+          {/* Subtle geometric background glow */}
+          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
+
+          <div className="flex items-start justify-between w-full relative z-10">
+            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+              <Plus className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[10px] font-bold bg-white/20 backdrop-blur-md text-white px-2.5 py-1 rounded-full flex items-center gap-1">
+              <span>+ Новая запись</span>
+              <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
+            </span>
+          </div>
+
+          <div className="relative z-10 mt-3">
+            <div className="text-lg font-black leading-tight tracking-tight">
+              Записать ремонт или ТО
+            </div>
+            <div className="text-xs text-red-100/90 mt-1 font-medium leading-snug">
+              Замена масла, колодок, запчасти и прикрепление чеков
+            </div>
+            <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-red-100/80">
+              <span>Внести с чеком или заказ-нарядом</span>
+              <span className="font-bold underline">Заполнить →</span>
+            </div>
+          </div>
+        </button>
+
+        {/* Card 2: History */}
+        <button
+          onClick={onOpenHistory}
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+        >
+          <div className="flex items-start justify-between w-full">
+            <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <History className="w-5 h-5" />
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition">
+              <span>Все заезды</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <div className="text-lg font-black leading-tight tracking-tight text-neutral-900 dark:text-white">
+              История обслуживания
+            </div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-medium leading-snug">
+              Что и когда меняли, пробеги, цены и контакты сервисов
+            </div>
+            <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+              <span>Всего в журнале:</span>
+              <span className="font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-md">
+                {currentVehicleRecords.length} {currentVehicleRecords.length === 1 ? "запись" : "записей"}
+              </span>
+            </div>
+          </div>
+        </button>
+
+        {/* Card 3: AI Assistant */}
+        <button
+          onClick={onOpenAiDiagnostic}
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+        >
+          <div className="flex items-start justify-between w-full">
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-500/20 border border-amber-300/50 dark:border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+              <span>Умный помощник</span>
+            </span>
+          </div>
+
+          <div className="mt-3">
+            <div className="text-lg font-black leading-tight tracking-tight text-neutral-900 dark:text-white flex items-center gap-2">
+              <span>Спросить о поломке</span>
+            </div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-medium leading-snug">
+              Опишите стук, ошибку или симптом — подскажет причину
+            </div>
+            <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+              <span>Учитывает историю авто:</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400">
+                По истории ТО
+              </span>
+            </div>
+          </div>
+        </button>
+
+        {/* Card 4: Expenses */}
+        <button
+          onClick={onOpenExpenses}
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+        >
+          <div className="flex items-start justify-between w-full">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <div className="flex items-center gap-1 text-xs font-semibold text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition">
+              <span>Подробнее</span>
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <div className="text-lg font-black leading-tight tracking-tight text-neutral-900 dark:text-white">
+              Расходы на авто
+            </div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 font-medium leading-snug">
+              Бензин, обслуживание, мойки и реальная цена 1 км пути
+            </div>
+            <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-[11px] font-mono">
+              <span className="text-neutral-500 dark:text-neutral-400">{costPerKm} ₽ за 1 км</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                {totalExpenses.toLocaleString("ru-RU")} ₽ всего
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {/* AI Quick Receipt Scanner Banner (OCR) */}
+      <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 text-white p-4 sm:p-5 rounded-3xl border border-neutral-800 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center justify-center shrink-0">
+            <Camera className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-sm sm:text-base font-bold flex items-center gap-2">
+              <span>Умный сканер чеков и заказ-нарядов</span>
+              <span className="text-[10px] bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">
+                OCR + AI
+              </span>
+            </div>
+            <p className="text-xs text-neutral-300 mt-0.5">
+              Сфотографируйте чек из сервиса или АЗС — нейросеть извлечёт сумму, список работ и запчастей с артикулами.
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={onOpenScanReceipt}
+          className="w-full sm:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-red-600/30 whitespace-nowrap active:scale-95"
+        >
+          Сканировать чек
+        </button>
+      </div>
+
+      {/* GarageHub Analytics Bar: Cost of 1 km, Fuel Consumption, Breakdown */}
+      <div className="bg-white dark:bg-[#17202e] rounded-3xl p-5 border border-neutral-200/80 dark:border-[#243044] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsKilvoCollapsed((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#161f30] text-slate-700 dark:text-slate-200 flex items-center justify-center transition shrink-0 cursor-pointer"
-              title={isKilvoCollapsed ? "Развернуть телеметрию" : "Свернуть телеметрию"}
+              className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              title={isKilvoCollapsed ? "Развернуть статистику" : "Скрыть список (оставить оглавление)"}
             >
-              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <TrendingUp className="w-4 h-4" />
             </button>
             <div>
-              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Экономика владения · отслеживается {mileageTracked.toLocaleString("ru-RU")} км
+              <div className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                Содержание автомобиля
               </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Телеметрия стоимости километра и затрат
+              <h3 className="text-base font-bold text-neutral-900 dark:text-white mt-0.5">
+                Сколько стоит 1 км пути и куда уходят деньги
               </h3>
             </div>
           </div>
@@ -259,213 +333,261 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowKilvoAllList((prev) => !prev)}
-                className="text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-semibold px-3 py-1.5 bg-slate-100 dark:bg-[#161f30] rounded-lg transition cursor-pointer hidden sm:inline-flex items-center gap-1"
+                className="text-xs text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white font-semibold px-2.5 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl transition cursor-pointer hidden sm:inline-flex items-center gap-1"
+                title="Показать / скрыть подробную структуру затрат"
               >
-                {showKilvoAllList ? "Скрыть детализацию" : "Детализация"}
+                {showKilvoAllList ? "Скрыть список" : "Весь список"}
               </button>
             )}
             <button
-              type="button"
               onClick={onOpenExpenses}
-              className="text-xs text-red-600 dark:text-red-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold flex items-center gap-1 cursor-pointer"
             >
-              <span>Все расходы</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              Все отчёты <ChevronRight className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setIsKilvoCollapsed((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#161f30] text-slate-600 dark:text-slate-300 flex items-center justify-center transition cursor-pointer"
-              title={isKilvoCollapsed ? "Развернуть" : "Свернуть"}
+              className="w-7 h-7 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-600 dark:text-neutral-300 flex items-center justify-center transition cursor-pointer"
+              title={isKilvoCollapsed ? "Развернуть" : "Скрыть список (оставить оглавление)"}
             >
-              {isKilvoCollapsed ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronUp className="w-4 h-4" />
-              )}
+              {isKilvoCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {!isKilvoCollapsed && (
           <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Metric 1: Total Cost per 1 km */}
+            {/* Interactive Selectable Metric Buttons (Styled like OEM Schedule) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              {/* 1. Полная стоимость 1 км */}
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedKilvoMetric((prev) =>
-                    prev === "cost_per_km" ? null : "cost_per_km"
-                  );
+                  setSelectedKilvoMetric((prev) => (prev === "cost_per_km" ? null : "cost_per_km"));
                   setShowKilvoAllList(true);
                 }}
-                className={`rounded-xl p-3.5 border text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`rounded-2xl p-3.5 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                   selectedKilvoMetric === "cost_per_km"
-                    ? "bg-slate-900 text-white border-slate-900 dark:bg-red-600/20 dark:border-red-500"
-                    : "bg-slate-50 dark:bg-[#161f30] hover:border-slate-300 dark:hover:border-slate-700 border-slate-200 dark:border-[#1f2937]"
+                    ? "bg-neutral-900 text-white border-neutral-900 ring-2 ring-neutral-700 shadow-md scale-[1.01]"
+                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-neutral-300"
                 }`}
+                title="Нажмите, чтобы выделить полную стоимость 1 км"
               >
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                  Полная стоимость 1 км
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span className={`text-[11px] font-semibold truncate ${selectedKilvoMetric === "cost_per_km" ? "text-neutral-300" : "text-neutral-600"}`}>
+                    Полная стоимость 1 км
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
+                      selectedKilvoMetric === "cost_per_km"
+                        ? "bg-neutral-700 text-white"
+                        : "bg-neutral-200/80 text-neutral-600"
+                    }`}
+                  >
+                    {selectedKilvoMetric === "cost_per_km" ? "Активен ✓" : "Фильтр"}
+                  </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-extrabold font-mono tabular-nums mt-1.5 text-slate-900 dark:text-white">
+                <div className={`text-lg sm:text-xl font-extrabold font-mono mt-1.5 ${selectedKilvoMetric === "cost_per_km" ? "text-white" : "text-neutral-900"}`}>
                   {costPerKm} ₽
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate font-mono tabular-nums">
-                  {totalExpenses.toLocaleString("ru-RU")} ₽ суммарно
+                <div className={`text-[10px] mt-0.5 truncate ${selectedKilvoMetric === "cost_per_km" ? "text-neutral-400" : "text-neutral-400"}`}>
+                  за {mileageTracked.toLocaleString("ru-RU")} км пробега
                 </div>
               </button>
 
-              {/* Metric 2: Fuel Cost per 1 km */}
+              {/* 2. Стоимость топлива на 1 км */}
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedKilvoMetric((prev) =>
-                    prev === "fuel_cost_km" ? null : "fuel_cost_km"
-                  );
+                  setSelectedKilvoMetric((prev) => (prev === "fuel_cost_km" ? null : "fuel_cost_km"));
                   setShowKilvoAllList(true);
                 }}
-                className={`rounded-xl p-3.5 border text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`rounded-2xl p-3.5 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                   selectedKilvoMetric === "fuel_cost_km"
-                    ? "bg-emerald-50 border-emerald-500 dark:bg-emerald-500/15 dark:border-emerald-500"
-                    : "bg-slate-50 dark:bg-[#161f30] hover:border-slate-300 dark:hover:border-slate-700 border-slate-200 dark:border-[#1f2937]"
+                    ? "bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.01]"
+                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-emerald-200"
                 }`}
+                title="Нажмите, чтобы выделить стоимость топлива на 1 км"
               >
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                  Топливо на 1 км пути
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span className="text-[11px] font-semibold text-neutral-600 truncate">
+                    Стоимость топлива на 1 км
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
+                      selectedKilvoMetric === "fuel_cost_km"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-emerald-100 text-emerald-800"
+                    }`}
+                  >
+                    {selectedKilvoMetric === "fuel_cost_km" ? "Активен ✓" : "Топливо"}
+                  </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums mt-1.5">
+                <div className="text-lg sm:text-xl font-extrabold text-emerald-600 font-mono mt-1.5">
                   {fuelCostPerKm} ₽
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate font-mono tabular-nums">
-                  средний расход ~{avgConsumption} л/100км
+                <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
+                  расход ~{avgConsumption} л/100км
                 </div>
               </button>
 
-              {/* Metric 3: Total Service & Repairs */}
+              {/* 3. Сумма ремонтов и ТО */}
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedKilvoMetric((prev) =>
-                    prev === "service_total" ? null : "service_total"
-                  );
+                  setSelectedKilvoMetric((prev) => (prev === "service_total" ? null : "service_total"));
                   setShowKilvoAllList(true);
                 }}
-                className={`rounded-xl p-3.5 border text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`rounded-2xl p-3.5 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                   selectedKilvoMetric === "service_total"
-                    ? "bg-red-50 border-red-500 dark:bg-red-500/15 dark:border-red-500"
-                    : "bg-slate-50 dark:bg-[#161f30] hover:border-slate-300 dark:hover:border-slate-700 border-slate-200 dark:border-[#1f2937]"
+                    ? "bg-red-50/90 border-red-400 ring-2 ring-red-500 shadow-md scale-[1.01]"
+                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-red-200"
                 }`}
+                title="Нажмите, чтобы выделить сумму ремонтов и ТО"
               >
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                  Затраты на ТО и ремонт
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span className="text-[11px] font-semibold text-neutral-600 truncate">
+                    Сумма ремонтов и ТО
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
+                      selectedKilvoMetric === "service_total"
+                        ? "bg-red-600 text-white"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {selectedKilvoMetric === "service_total" ? "Активен ✓" : "Ремонты"}
+                  </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-extrabold text-red-600 dark:text-red-400 font-mono tabular-nums mt-1.5">
+                <div className="text-lg sm:text-xl font-extrabold text-red-600 font-mono mt-1.5">
                   {totalServiceCost.toLocaleString("ru-RU")} ₽
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate font-mono tabular-nums">
-                  {currentVehicleRecords.length} записей в журнале
+                <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
+                  {currentVehicleRecords.length} записей в сервисной книге
                 </div>
               </button>
 
-              {/* Metric 4: Total Fuel Refueled */}
+              {/* 4. Всего заправлено */}
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedKilvoMetric((prev) =>
-                    prev === "fuel_total" ? null : "fuel_total"
-                  );
+                  setSelectedKilvoMetric((prev) => (prev === "fuel_total" ? null : "fuel_total"));
                   setShowKilvoAllList(true);
                 }}
-                className={`rounded-xl p-3.5 border text-left transition cursor-pointer flex flex-col justify-between ${
+                className={`rounded-2xl p-3.5 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                   selectedKilvoMetric === "fuel_total"
-                    ? "bg-emerald-50 border-emerald-500 dark:bg-emerald-500/15 dark:border-emerald-500"
-                    : "bg-slate-50 dark:bg-[#161f30] hover:border-slate-300 dark:hover:border-slate-700 border-slate-200 dark:border-[#1f2937]"
+                    ? "bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.01]"
+                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-emerald-200"
                 }`}
+                title="Нажмите, чтобы выделить данные по заправкам"
               >
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
-                  Затраты на топливо
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <span className="text-[11px] font-semibold text-neutral-600 truncate">
+                    Всего заправлено
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
+                      selectedKilvoMetric === "fuel_total"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-emerald-100 text-emerald-800"
+                    }`}
+                  >
+                    {selectedKilvoMetric === "fuel_total" ? "Активен ✓" : "Топливо"}
+                  </span>
                 </div>
-                <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-mono tabular-nums mt-1.5">
-                  {totalFuelCost.toLocaleString("ru-RU")} ₽
+                <div className="text-lg sm:text-xl font-extrabold text-emerald-600 font-mono mt-1.5">
+                  {totalFuelLiters.toLocaleString("ru-RU")} л
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate font-mono tabular-nums">
-                  {totalFuelLiters.toLocaleString("ru-RU")} л · {currentFuelRecords.length} АЗС
+                <div className="text-[10px] text-emerald-700 font-medium mt-0.5 truncate">
+                  {totalFuelCost.toLocaleString("ru-RU")} ₽ на {currentFuelRecords.length} заправках
                 </div>
               </button>
             </div>
 
+            {/* Expandable full list of expense records and breakdown */}
             {showKilvoAllList && (
-              <div className="pt-3 border-t border-slate-200 dark:border-[#1f2937] space-y-2.5">
+              <div className="pt-3 border-t border-neutral-100 space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      Последние операции по выбранной метрике
-                    </span>
+                    <span className="font-bold text-neutral-800">Структура затрат и последние расходы:</span>
                     {selectedKilvoMetric && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedKilvoMetric(null)}
-                        className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
-                      >
-                        Сбросить фильтр ×
-                      </button>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-neutral-900 text-white flex items-center gap-1.5">
+                        <span>
+                          {selectedKilvoMetric === "cost_per_km" && "Выделено: Полная стоимость 1 км"}
+                          {selectedKilvoMetric === "fuel_cost_km" && "Выделено: Топливо на 1 км"}
+                          {selectedKilvoMetric === "service_total" && "Выделено: Ремонты и ТО"}
+                          {selectedKilvoMetric === "fuel_total" && "Выделено: Всего заправлено"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedKilvoMetric(null)}
+                          className="hover:text-red-300 ml-1 font-bold text-xs cursor-pointer"
+                          title="Сбросить выделение"
+                        >
+                          ×
+                        </button>
+                      </span>
                     )}
                   </div>
                   <button
-                    type="button"
                     onClick={onOpenExpenses}
-                    className="text-red-600 dark:text-red-400 hover:underline font-semibold cursor-pointer"
+                    className="text-red-600 hover:text-red-700 font-semibold cursor-pointer"
                   >
-                    Открыть аналитику расходов →
+                    Подробная аналитика →
                   </button>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
-                  {(selectedKilvoMetric !== "fuel_cost_km" &&
-                  selectedKilvoMetric !== "fuel_total"
-                    ? currentVehicleRecords.slice(0, 4)
-                    : []
-                  ).map((rec) => (
-                    <div
-                      key={rec.id}
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-[#1f2937] bg-slate-50 dark:bg-[#161f30] flex items-center justify-between text-xs"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-900 dark:text-white truncate">
-                          {rec.title}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {/* Service expenses */}
+                  {currentVehicleRecords.slice(0, 4).map((rec) => {
+                    const isServiceSelected = selectedKilvoMetric === "service_total" || selectedKilvoMetric === "cost_per_km";
+                    return (
+                      <div
+                        key={rec.id}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                          isServiceSelected
+                            ? "bg-purple-50/70 border-purple-300 ring-1 ring-purple-400/50"
+                            : "bg-neutral-50 border-neutral-100"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-neutral-800 truncate">{rec.title}</div>
+                          <div className="text-[10px] text-neutral-400 font-mono">
+                            {rec.date} • {rec.category}
+                          </div>
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                          {rec.date} · {rec.category}
-                        </div>
-                      </div>
-                      <div className="font-mono tabular-nums font-bold text-slate-900 dark:text-white shrink-0 ml-2">
-                        {rec.totalCost.toLocaleString("ru-RU")} ₽
-                      </div>
-                    </div>
-                  ))}
-
-                  {(selectedKilvoMetric !== "service_total"
-                    ? currentFuelRecords.slice(0, 4)
-                    : []
-                  ).map((fuel) => (
-                    <div
-                      key={fuel.id}
-                      className="p-2.5 rounded-xl border border-slate-200 dark:border-[#1f2937] bg-slate-50 dark:bg-[#161f30] flex items-center justify-between text-xs"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-900 dark:text-white truncate">
-                          АЗС {fuel.station || "Заправка"} · {fuel.liters} л
-                        </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                          {fuel.date} · {fuel.fuelType}
+                        <div className="font-mono font-bold text-neutral-900 shrink-0 ml-2">
+                          {rec.totalCost.toLocaleString("ru-RU")} ₽
                         </div>
                       </div>
-                      <div className="font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400 shrink-0 ml-2">
-                        {fuel.totalCost.toLocaleString("ru-RU")} ₽
+                    );
+                  })}
+                  {/* Fuel expenses */}
+                  {currentFuelRecords.slice(0, 4).map((fuel) => {
+                    const isFuelSelected = selectedKilvoMetric === "fuel_cost_km" || selectedKilvoMetric === "fuel_total" || selectedKilvoMetric === "cost_per_km";
+                    return (
+                      <div
+                        key={fuel.id}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                          isFuelSelected
+                            ? "bg-emerald-100/70 border-emerald-400 ring-1 ring-emerald-500/50"
+                            : "bg-emerald-50/50 border-emerald-100"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-semibold text-emerald-950 truncate">
+                            Заправка: {fuel.station || "АЗС"} ({fuel.liters} л)
+                          </div>
+                          <div className="text-[10px] text-emerald-700 font-mono">
+                            {fuel.date} • {fuel.fuelType}
+                          </div>
+                        </div>
+                        <div className="font-mono font-bold text-emerald-900 shrink-0 ml-2">
+                          {fuel.totalCost.toLocaleString("ru-RU")} ₽
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -473,324 +595,211 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* Focused 4-Card Quick Action Grid */}
-      <div className="dashboard-actions grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Action 1: Primary Add Service Record */}
-        <button
-          type="button"
-          onClick={onOpenAddService}
-          className="text-left p-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white transition cursor-pointer flex flex-col justify-between min-h-[140px] group border border-red-500"
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Plus className="w-5 h-5 text-white" />
-            </div>
-            <ArrowUpRight className="w-4 h-4 opacity-80 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition" />
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold leading-snug">
-              Записать ремонт или ТО
-            </div>
-            <div className="text-xs text-red-100 mt-1 leading-snug">
-              Работы, запчасти с артикулами и чеки
-            </div>
-          </div>
-        </button>
-
-        {/* Action 2: OCR Receipt Scanner */}
-        <button
-          type="button"
-          onClick={onOpenScanReceipt}
-          className="text-left p-4 rounded-2xl bg-white dark:bg-[#111827] hover:border-red-500 border border-slate-200 dark:border-[#1f2937] text-slate-900 dark:text-white transition cursor-pointer flex flex-col justify-between min-h-[140px] group"
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400 flex items-center justify-center">
-              <Camera className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-mono text-slate-400">OCR · AI</span>
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold leading-snug">
-              Сканер чеков и заказ-нарядов
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-              Распознавание сумм, работ и OEM-номеров по фото
-            </div>
-          </div>
-        </button>
-
-        {/* Action 3: AI Diagnostic Assistant */}
-        <button
-          type="button"
-          onClick={onOpenAiDiagnostic}
-          className="text-left p-4 rounded-2xl bg-white dark:bg-[#111827] hover:border-amber-500 border border-slate-200 dark:border-[#1f2937] text-slate-900 dark:text-white transition cursor-pointer flex flex-col justify-between min-h-[140px] group"
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">
-              По истории авто
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold leading-snug">
-              AI-диагностика поломки
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-              Опишите стук, ошибку или симптом для разбора
-            </div>
-          </div>
-        </button>
-
-        {/* Action 4: Official Service Book & History */}
-        <button
-          type="button"
-          onClick={onOpenServiceBook}
-          className="text-left p-4 rounded-2xl bg-white dark:bg-[#111827] hover:border-slate-400 border border-slate-200 dark:border-[#1f2937] text-slate-900 dark:text-white transition cursor-pointer flex flex-col justify-between min-h-[140px] group"
-        >
-          <div className="flex items-center justify-between w-full">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#161f30] text-slate-700 dark:text-slate-300 flex items-center justify-center">
-              <FileText className="w-5 h-5" />
-            </div>
-            <span className="text-xs font-mono tabular-nums text-slate-500">
-              {currentVehicleRecords.length} ТО · PDF
-            </span>
-          </div>
-          <div className="mt-3">
-            <div className="text-base font-bold leading-snug">
-              Сервисная книжка и PDF
-            </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-snug">
-              Официальная выписка для печати или продажи авто
-            </div>
-          </div>
-        </button>
-      </div>
-
-      {/* Two Columns: Wear & Next Service Forecast + To-Fix Priority Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-        {/* Column 1: Wear & Next Service Forecast (OEM Schedule) */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl p-5 border border-slate-200 dark:border-[#1f2937] flex flex-col justify-between h-full">
+      {/* Two Columns: Upcoming OEM Maintenance & To-Fix Tasks (Equal Height in Open State) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+        {/* Column 1: OEM Maintenance Checklist */}
+        <div className="bg-white rounded-3xl p-5 border border-neutral-200/80 hover:border-emerald-200 shadow-sm transition-all duration-200 flex flex-col justify-between h-full">
           <div className="flex-1 flex flex-col">
-            <div className="flex items-start justify-between gap-2 mb-3.5">
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsOemCollapsed((prev) => !prev)}
-                  className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition shrink-0 cursor-pointer"
-                  title={isOemCollapsed ? "Развернуть регламент" : "Свернуть регламент"}
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                </button>
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span>Индекс ресурса узлов</span>
-                    <span>·</span>
-                    <span className="font-mono tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
-                      {healthIndexPct}%
-                    </span>
-                  </div>
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                    Шкала ресурса и регламент ТО
-                  </h4>
-                </div>
-              </div>
-
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={onOpenOemSchedule}
-                  className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer whitespace-nowrap"
+                  onClick={() => setIsOemCollapsed((prev) => !prev)}
+                  className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                  title={isOemCollapsed ? "Развернуть регламент" : "Скрыть список (оставить оглавление)"}
                 >
-                  Весь регламент
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                </button>
+                <div>
+                  <h4 className="text-sm font-bold text-neutral-900">
+                    Регламент ТО (Заводской план)
+                  </h4>
+                  <p className="text-[11px] text-neutral-500">
+                    Сроки замены по пробегу для {vehicle.model}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onOpenOemSchedule}
+                  className="text-xs text-emerald-600 font-semibold hover:underline cursor-pointer"
+                >
+                  Весь план
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOemCollapsed((prev) => !prev)}
-                  className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#161f30] text-slate-600 dark:text-slate-300 flex items-center justify-center transition cursor-pointer"
+                  className="w-7 h-7 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-600 flex items-center justify-center transition cursor-pointer"
+                  title={isOemCollapsed ? "Развернуть" : "Скрыть список"}
                 >
-                  {isOemCollapsed ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4" />
-                  )}
+                  {isOemCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             {!isOemCollapsed && (
-              <div className="space-y-2.5 flex-1">
-                {vehicleOemItems.slice(0, 4).map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl border border-slate-200 dark:border-[#1f2937] bg-slate-50 dark:bg-[#161f30]"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-bold text-slate-900 dark:text-white truncate">
-                        {item.title}
-                      </span>
-                      <span
-                        className={`font-mono tabular-nums font-semibold shrink-0 ${
-                          item.isOverdue
-                            ? "text-red-600 dark:text-red-400"
-                            : item.isSoon
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-emerald-600 dark:text-emerald-400"
+              <div className="space-y-2.5 flex-1 flex flex-col justify-between">
+                {oemSchedules
+                  .filter((i) => i.vehicleId === vehicle.id)
+                  .slice(0, 3)
+                  .map((item) => {
+                    const lastKm = item.lastDoneKm ?? 0;
+                    const diffKm = vehicle.currentMileage - lastKm;
+                    const percent = Math.min(100, Math.round((diffKm / item.intervalKm) * 100));
+                    const isOverdue = diffKm >= item.intervalKm;
+                    const isSoon = !isOverdue && diffKm >= item.intervalKm * 0.8;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-2.5 rounded-2xl border transition-all ${
+                          isOverdue
+                            ? "bg-red-50/40 border-red-200"
+                            : isSoon
+                            ? "bg-amber-50/40 border-amber-200"
+                            : "bg-emerald-50/30 border-emerald-200"
                         }`}
                       >
-                        {item.isOverdue
-                          ? `Просрочено (+${Math.abs(item.remainingKm).toLocaleString("ru-RU")} км)`
-                          : item.isSoon
-                          ? `Осталось ${item.remainingKm.toLocaleString("ru-RU")} км`
-                          : `Запас ${item.remainingKm.toLocaleString("ru-RU")} км`}
-                      </span>
-                    </div>
-
-                    {/* Wear Progress Bar */}
-                    <div className="w-full bg-slate-200 dark:bg-[#1f2937] rounded-full h-1.5 mt-2 overflow-hidden">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${
-                          item.isOverdue
-                            ? "bg-red-500"
-                            : item.isSoon
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
-                        }`}
-                        style={{ width: `${item.wearPct}%` }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1.5 font-mono tabular-nums">
-                      <span>
-                        Прошло {item.diffKm.toLocaleString("ru-RU")} из{" "}
-                        {item.intervalKm.toLocaleString("ru-RU")} км ({item.wearPct}%)
-                      </span>
-                      {onMarkOemDone && (item.isOverdue || item.isSoon) && (
-                        <button
-                          type="button"
-                          onClick={() => onMarkOemDone(item)}
-                          className="font-sans font-bold text-red-600 dark:text-red-400 hover:underline cursor-pointer"
-                        >
-                          Записать замену →
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-neutral-800 truncate">
+                            {item.title}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isOverdue
+                                ? "bg-red-100 text-red-700"
+                                : isSoon
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {isOverdue ? "Просрочено" : isSoon ? "Скоро" : "В норме"}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-neutral-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                          <div
+                            className={`h-1.5 rounded-full transition-all ${
+                              isOverdue
+                                ? "bg-red-500"
+                                : isSoon
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-neutral-400 mt-1 font-mono">
+                          <span>Прошло: {diffKm.toLocaleString("ru-RU")} км</span>
+                          <span>Регламент: {item.intervalKm.toLocaleString("ru-RU")} км</span>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </div>
 
           {!isOemCollapsed && (
-            <div className="pt-3 mt-3 border-t border-slate-200 dark:border-[#1f2937] flex items-center justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">
-                Двигатель: {vehicle.engine}
+            <div className="pt-3 mt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-xs text-neutral-500">
+                Подобрано для {vehicle.engine}
               </span>
               <button
-                type="button"
                 onClick={onOpenOemSchedule}
-                className="font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 cursor-pointer"
               >
-                Настроить интервалы →
+                Настроить регламент →
               </button>
             </div>
           )}
         </div>
 
-        {/* Column 2: To-Fix Priority Board & Upcoming Budget Forecast */}
-        <div className="bg-white dark:bg-[#111827] rounded-2xl p-5 border border-slate-200 dark:border-[#1f2937] flex flex-col justify-between h-full">
+        {/* Column 2: To-Fix Priority Board & Garage Inventory */}
+        <div className="bg-white rounded-3xl p-5 border border-neutral-200/80 hover:border-blue-200 shadow-sm transition-all duration-200 flex flex-col justify-between h-full">
           <div className="flex-1 flex flex-col">
-            <div className="flex items-start justify-between gap-2 mb-3.5">
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsToFixCollapsed((prev) => !prev)}
-                  className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center transition shrink-0 cursor-pointer"
-                  title={isToFixCollapsed ? "Развернуть план работ" : "Свернуть план работ"}
-                >
-                  <Layers className="w-4 h-4" />
-                </button>
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                    <span>Прогноз бюджета ТО</span>
-                    <span>·</span>
-                    <span className="font-mono tabular-nums font-bold text-slate-900 dark:text-white">
-                      ~{upcomingServiceBudget.toLocaleString("ru-RU")} ₽
-                    </span>
-                  </div>
-                  <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                    План работ To-Fix и склад гаража
-                  </h4>
-                </div>
-              </div>
-
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setIsToFixCollapsed((prev) => !prev)}
+                  className="w-8 h-8 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                  title={isToFixCollapsed ? "Развернуть задачи и склад" : "Скрыть список (оставить оглавление)"}
+                >
+                  <Layers className="w-4 h-4 text-blue-600" />
+                </button>
+                <div>
+                  <h4 className="text-sm font-bold text-neutral-900">
+                    Гараж: Склад запчастей и To-Fix
+                  </h4>
+                  <p className="text-[11px] text-neutral-500">
+                    Детали в наличии и план предстоящих работ
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
                   onClick={onOpenInventoryToFix}
-                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer whitespace-nowrap"
+                  className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer"
                 >
                   В гараж
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsToFixCollapsed((prev) => !prev)}
-                  className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#161f30] text-slate-600 dark:text-slate-300 flex items-center justify-center transition cursor-pointer"
+                  className="w-7 h-7 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-600 flex items-center justify-center transition cursor-pointer"
+                  title={isToFixCollapsed ? "Развернуть" : "Скрыть список"}
                 >
-                  {isToFixCollapsed ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4" />
-                  )}
+                  {isToFixCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             {!isToFixCollapsed && (
-              <div className="space-y-2.5 flex-1">
+              <div className="space-y-2.5 flex-1 flex flex-col justify-between">
                 {pendingTasks.length > 0 ? (
                   pendingTasks.slice(0, 3).map((task) => (
                     <div
                       key={task.id}
-                      className="p-3 rounded-xl bg-slate-50 dark:bg-[#161f30] border border-slate-200 dark:border-[#1f2937] flex flex-col gap-1.5"
+                      className="p-2.5 rounded-2xl bg-blue-50/40 border border-blue-200/80 hover:border-blue-300 transition-all flex flex-col gap-1.5"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                            <span className="font-bold text-slate-900 dark:text-white truncate">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full shrink-0 bg-blue-500" />
+                            <span className="text-xs font-semibold text-neutral-900 truncate">
                               {task.title}
                             </span>
-                            <span className="text-slate-400">·</span>
-                            <span className="text-slate-500 dark:text-slate-400">
-                              {task.category}
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono shrink-0">
+                              To-Fix
                             </span>
                           </div>
                           {task.description && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            <p className="text-[11px] text-neutral-500 truncate mt-0.5">
                               {task.description}
                             </p>
                           )}
                         </div>
 
                         {task.estimatedCost && (
-                          <span className="text-xs font-bold text-slate-900 dark:text-white font-mono tabular-nums shrink-0">
+                          <span className="text-xs font-bold text-neutral-900 font-mono shrink-0">
                             ~{task.estimatedCost.toLocaleString("ru-RU")} ₽
                           </span>
                         )}
                       </div>
 
-                      <div className="pt-1.5 border-t border-slate-200/70 dark:border-[#1f2937] flex items-start gap-1.5 text-xs text-slate-600 dark:text-slate-300">
-                        <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-                        <span className="line-clamp-2 leading-snug">
+                      {/* Work Hint Callout */}
+                      <div className="pt-1.5 border-t border-blue-200/50 flex items-start gap-1.5 text-[11px] text-blue-950 bg-blue-100/60 rounded-xl px-2 py-1.5">
+                        <Lightbulb className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2 leading-tight">
                           {task.workHint || getWorkHint(task.title, task.category)}
                         </span>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="p-6 rounded-xl bg-slate-50 dark:bg-[#161f30] border border-slate-200 dark:border-[#1f2937] text-center text-xs text-slate-500 flex-1 flex items-center justify-center">
-                    Все запланированные задачи To-Fix выполнены
+                  <div className="p-4 rounded-2xl bg-blue-50/20 border border-blue-100 text-center text-xs text-blue-600 flex-1 flex items-center justify-center">
+                    Все задачи To-Fix выполнены!
                   </div>
                 )}
               </div>
@@ -798,148 +807,123 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {!isToFixCollapsed && (
-            <div className="pt-3 mt-3 border-t border-slate-200 dark:border-[#1f2937] flex items-center justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">
-                Активных задач: {pendingTasks.length}
+            <div className="pt-3 mt-3 border-t border-neutral-100 flex items-center justify-between">
+              <span className="text-xs text-neutral-500">
+                Гаражные запасы готовы к ТО
               </span>
               <button
-                type="button"
                 onClick={onOpenInventoryToFix}
-                className="font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
               >
-                Открыть склад и задачи →
+                Склад и задачи →
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Recent Repairs Ledger with One-Click SKU Copy */}
-      <div className="bg-white dark:bg-[#111827] rounded-2xl p-5 border border-slate-200 dark:border-[#1f2937]">
-        <div className="flex items-center justify-between gap-2 mb-4">
+      {/* Recent Repairs Timeline */}
+      <div className="bg-white rounded-3xl p-5 border border-neutral-200/80 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsRecentCollapsed((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400 flex items-center justify-center transition shrink-0 cursor-pointer"
-              title={isRecentCollapsed ? "Развернуть журнал" : "Свернуть журнал"}
+              className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              title={isRecentCollapsed ? "Развернуть недавние работы" : "Скрыть список (оставить оглавление)"}
             >
-              <History className="w-4 h-4" />
+              <Wrench className="w-4 h-4" />
             </button>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Недавние записи в сервисном журнале
+              <h3 className="text-base font-bold text-neutral-900">
+                Недавние работы в журнале
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Хронология обслуживания, пробеги и установленные артикулы (нажмите на артикул для копирования)
+              <p className="text-xs text-neutral-500">
+                Фиксация дат, пробега, запчастей с артикулами и чеков
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={onOpenHistory}
-              className="text-xs text-red-600 dark:text-red-400 hover:underline font-semibold flex items-center gap-0.5 cursor-pointer whitespace-nowrap"
+              onClick={onOpenServiceBook}
+              className="text-xs font-semibold px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl transition cursor-pointer hidden sm:flex items-center gap-1.5"
             >
-              <span>Весь журнал ({currentVehicleRecords.length})</span>
-              <ChevronRight className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
+              <span>Сервисная книжка</span>
+            </button>
+            <button
+              onClick={onOpenHistory}
+              className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-0.5 cursor-pointer"
+            >
+              Все ({currentVehicleRecords.length}) <ChevronRight className="w-4 h-4" />
             </button>
             <button
               type="button"
               onClick={() => setIsRecentCollapsed((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-[#161f30] text-slate-600 dark:text-slate-300 flex items-center justify-center transition cursor-pointer"
+              className="w-7 h-7 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-600 flex items-center justify-center transition cursor-pointer"
+              title={isRecentCollapsed ? "Развернуть" : "Скрыть список (оставить оглавление)"}
             >
-              {isRecentCollapsed ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronUp className="w-4 h-4" />
-              )}
+              {isRecentCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {!isRecentCollapsed && (
           <>
-            <div className="divide-y divide-slate-200/80 dark:divide-[#1f2937]">
-              {(showAllRecentList ? currentVehicleRecords : recentServices).map(
-                (record) => (
-                  <div
-                    key={record.id}
-                    className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      {/* Unboxed Metadata Line */}
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        <span>{record.date}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {record.mileage.toLocaleString("ru-RU")} км
-                        </span>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-sans">{record.category}</span>
-                        {record.serviceCenter && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="font-sans">{record.serviceCenter}</span>
-                          </>
-                        )}
-                      </div>
-
-                      <div className="text-sm font-bold text-slate-900 dark:text-white mt-1">
-                        {record.title}
-                      </div>
-
-                      {record.parts.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          <span>Артикулы:</span>
-                          {record.parts.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => handleCopySku(p.partNumber || p.name)}
-                              className="inline-flex items-center gap-1 font-mono text-xs text-slate-700 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
-                              title="Скопировать артикул запчасти"
-                            >
-                              <span>{p.brand}</span>
-                              <span className="font-bold underline decoration-dotted underline-offset-2">
-                                {p.partNumber || p.name}
-                              </span>
-                              {copiedSku === (p.partNumber || p.name) ? (
-                                <Check className="w-3 h-3 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3 h-3 opacity-60" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+            <div className="divide-y divide-neutral-100">
+              {(showAllRecentList ? currentVehicleRecords : recentServices).map((record) => (
+                <div key={record.id} className="py-3 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-neutral-500 font-mono">
+                        {record.date}
+                      </span>
+                      <span className="text-neutral-300">•</span>
+                      <span className="text-[11px] font-semibold bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-md font-mono">
+                        {record.mileage.toLocaleString("ru-RU")} км
+                      </span>
+                      <span className="text-[10px] bg-red-50 text-red-700 font-medium px-2 py-0.5 rounded-md">
+                        {record.category}
+                      </span>
                     </div>
 
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between shrink-0 gap-1">
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white font-mono tabular-nums">
-                        {record.totalCost.toLocaleString("ru-RU")} ₽
-                      </div>
-                      {record.receiptImages && record.receiptImages.length > 0 && (
-                        <span className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Чек в архиве
-                        </span>
-                      )}
+                    <div className="text-xs sm:text-sm font-bold text-neutral-900 mt-1 truncate">
+                      {record.title}
                     </div>
+
+                    {record.parts.length > 0 && (
+                      <div className="text-[11px] text-neutral-500 mt-0.5 truncate">
+                        Запчасти:{" "}
+                        {record.parts
+                          .map((p) => `${p.brand} (${p.partNumber || p.name})`)
+                          .join(", ")}
+                      </div>
+                    )}
                   </div>
-                )
-              )}
+
+                  <div className="text-right shrink-0">
+                    <div className="text-xs sm:text-sm font-extrabold text-neutral-900 font-mono">
+                      {record.totalCost.toLocaleString("ru-RU")} ₽
+                    </div>
+                    {record.receiptImages && record.receiptImages.length > 0 && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-medium mt-0.5">
+                        <CheckCircle2 className="w-3 h-3" /> Чек прикреплен
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
 
             {currentVehicleRecords.length > 3 && (
-              <div className="pt-3 border-t border-slate-200 dark:border-[#1f2937] text-center">
+              <div className="pt-3 border-t border-neutral-100 text-center">
                 <button
                   type="button"
                   onClick={() => setShowAllRecentList((prev) => !prev)}
-                  className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                  className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 cursor-pointer"
                 >
                   {showAllRecentList
-                    ? "Свернуть до 3 последних записей"
+                    ? "Свернуть до 3 записей"
                     : `Показать все записи в журнале (${currentVehicleRecords.length})`}
                 </button>
               </div>

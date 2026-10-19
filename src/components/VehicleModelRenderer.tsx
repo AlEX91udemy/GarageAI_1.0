@@ -164,10 +164,6 @@ export function VehicleModelRenderer({ vehicle, className = "" }: { vehicle: Veh
   const [failed, setFailed] = useState(false);
   const color = /^#[0-9a-f]{6}$/i.test(vehicle.colorHex || "") ? vehicle.colorHex! : "#dc2626";
 
-  React.useEffect(() => {
-    setFailed(false);
-  }, [visual.src]);
-
   if (!spec) return <MissingVisual vehicle={vehicle} />;
   if (!visual.src) {
     return <GenericVehiclePlaceholder vehicle={vehicle} bodyType={spec.bodyType} color={color} />;
@@ -197,7 +193,6 @@ export function VehicleModelRenderer({ vehicle, className = "" }: { vehicle: Veh
           )}
         </defs>
         <image
-          key={visual.src}
           data-vehicle-layer="original"
           href={visual.src}
           x="0"

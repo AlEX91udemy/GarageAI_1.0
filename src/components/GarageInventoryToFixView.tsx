@@ -18,8 +18,6 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  Copy,
-  Check,
 } from "lucide-react";
 import { Vehicle, GaragePart, ToFixTask, MaintenanceCategory } from "../types";
 import { POPULAR_WORK_SUGGESTIONS, getWorkHint, WorkSuggestion } from "../workHints";
@@ -51,21 +49,6 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
   const [showRecommendedSection, setShowRecommendedSection] = useState(true);
   const [isToFixListCollapsed, setIsToFixListCollapsed] = useState(false);
   const [isInventoryListCollapsed, setIsInventoryListCollapsed] = useState(false);
-  const [copiedSku, setCopiedSku] = useState<string | null>(null);
-
-  const handleCopySku = async (sku: string) => {
-    if (!sku) return;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(sku);
-      }
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    } catch {
-      setCopiedSku(sku);
-      setTimeout(() => setCopiedSku(null), 1800);
-    }
-  };
 
   // New Part form
   const [partName, setPartName] = useState("");
@@ -108,7 +91,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
     if (!partName.trim()) return;
 
     const newPart: GaragePart = {
-      id: "gp-" + Date.now(),
+      id: "gp-" + crypto.randomUUID(),
       vehicleId: vehicle.id,
       name: partName.trim(),
       brand: partBrand.trim() || "OEM",
@@ -145,7 +128,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
     const finalHint = taskWorkHint.trim() || getWorkHint(taskTitle.trim(), taskCategory);
 
     const newTask: ToFixTask = {
-      id: "tf-" + Date.now(),
+      id: "tf-" + crypto.randomUUID(),
       vehicleId: vehicle.id,
       title: taskTitle.trim(),
       description: taskDesc.trim(),
@@ -167,7 +150,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
 
   const handleQuickAddSuggestion = (s: WorkSuggestion) => {
     const newTask: ToFixTask = {
-      id: "tf-" + Date.now(),
+      id: "tf-" + crypto.randomUUID(),
       vehicleId: vehicle.id,
       title: s.title,
       description: s.symptoms,
@@ -642,45 +625,32 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
                       }`}
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={`font-semibold ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                               isInStock
-                                ? "text-emerald-700"
-                                : "text-neutral-500"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-neutral-200 text-neutral-600"
                             }`}
                           >
-                            {isInStock ? "В наличии на складе" : "Установлено на авто"}
+                            {isInStock ? "В наличии" : "Установлено на авто"}
                           </span>
-                          <span aria-hidden="true" className="text-neutral-300">·</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopySku(part.partNumber)}
-                            className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-red-600 hover:underline cursor-pointer"
-                            title="Скопировать артикул (SKU)"
-                          >
-                            <span>{part.partNumber}</span>
-                            {copiedSku === part.partNumber ? (
-                              <span className="inline-flex items-center gap-0.5 text-emerald-600 font-sans text-[11px]">
-                                <Check className="w-3.5 h-3.5" /> Скопировано
-                              </span>
-                            ) : (
-                              <Copy className="w-3 h-3 opacity-60" />
-                            )}
-                          </button>
+                          <span className="text-xs font-mono font-bold text-red-600">
+                            {part.partNumber}
+                          </span>
                         </div>
 
                         <h4 className="text-base font-bold text-neutral-900 mt-1">
                           {part.brand} {part.name}
                         </h4>
 
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-500 mt-1">
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500 mt-1">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3.5 h-3.5 text-neutral-400" />
                             <span>{part.location || "В гараже"}</span>
                           </span>
-                          <span aria-hidden="true">·</span>
-                          <span className="font-mono tabular-nums">Куплено: {part.purchaseDate}</span>
+                          <span>•</span>
+                          <span>Куплено: {part.purchaseDate}</span>
                         </div>
                       </div>
 
