@@ -113,9 +113,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <h3 className="text-base font-black text-neutral-900 truncate">
               {isAuthenticated ? sessionUsername ?? username : "Гостевой профиль"}
             </h3>
-            <div className="text-xs text-neutral-500 font-mono truncate">
-              {isAuthenticated ? userEmail : "Войдите в аккаунт для синхронизации"}
-            </div>
+            {isAuthenticated && (
+              <div className="text-xs text-neutral-500 font-mono truncate">
+                {userEmail}
+              </div>
+            )}
             <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? "bg-emerald-500" : "bg-neutral-400"}`} />
               <span>{isAuthenticated ? "GarageHub PRO • Синхронизировано" : "Гостевой режим • Аккаунт не подключён"}</span>
@@ -134,13 +136,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           {!isAuthenticated ? (
             <form onSubmit={submitAuth} className="space-y-2">
               <div className="flex gap-2">
-                <button type="button" onClick={() => setAuthMode("login")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "login" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Войти</button>
+                <button type="button" onClick={() => setAuthMode("login")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "login" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Вход</button>
                 <button type="button" onClick={() => setAuthMode("register")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "register" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Регистрация</button>
               </div>
               <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Логин" autoComplete="username" className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" required />
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль от 8 символов" autoComplete={authMode === "login" ? "current-password" : "new-password"} className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" minLength={8} required />
               {authError && <p className="text-[11px] text-red-600">{authError}</p>}
-              <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти и синхронизировать" : "Создать аккаунт"}</button>
+              <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
             </form>
           ) : (
             <button type="button" onClick={() => { void logout().finally(() => { setIsAuthenticated(false); setSessionUsername(null); }); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
