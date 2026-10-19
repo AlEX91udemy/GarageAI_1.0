@@ -62,6 +62,7 @@
           "model3dUrl": "/models/bmw_3_e46.glb"
         }
       ],
+      "reminders": [],
       "serviceRecords": [
         {
           "id": "rec-1",
@@ -701,6 +702,18 @@
     "user-805706c8-1866-4c36-87f4-ab7dad1f9482": {
       "lastUpdated": "2026-10-19T20:50:52.786Z",
       "vehicles": [],
+      "reminders": [],
+      "serviceRecords": [],
+      "fuelRecords": [],
+      "oemSchedules": [],
+      "garageParts": [],
+      "toFixTasks": [],
+      "tuningStages": []
+    },
+    "user-ee70eb16-8a2b-479e-bbf5-f9dcdc311199": {
+      "lastUpdated": "2026-10-19T22:04:41.776Z",
+      "vehicles": [],
+      "reminders": [],
       "serviceRecords": [],
       "fuelRecords": [],
       "oemSchedules": [],

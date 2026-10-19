@@ -12,5 +12,12 @@
     "userId": "user-805706c8-1866-4c36-87f4-ab7dad1f9482",
     "createdAt": 1792443052788,
     "expiresAt": 1792486252788
+  },
+  {
+    "tokenHash": "d546c39f9e5f815b4c9f844b2b5e9c65d52caee83aa27a1b38e23510bcbc90af",
+    "csrfSecret": "n4FJrTS3N1vOpLGkraYAhlRbldJzaC00",
+    "userId": "user-ee70eb16-8a2b-479e-bbf5-f9dcdc311199",
+    "createdAt": 1792447481778,
+    "expiresAt": 1792490681778
   }
 ]
