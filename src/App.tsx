@@ -336,11 +336,16 @@ export default function App() {
       setToFixTasks((prev) =>
         prev.map((t) => (t.id === completedTaskId ? { ...t, status: "completed" } : t))
       );
+      // BUG FIX: Persist task completion to the backend, otherwise the status
+      // resets to "pending" after the next fetchGarageData() refresh.
+      apiCompleteToFixTask(completedTaskId).catch(console.error);
     }
 
     // Mark garage parts installed if used
     // Сверяем не только артикул, но и привязку детали к автомобилю, а при
     // наличии нескольких экземпляров — списываем одну штуку вместо установки.
+    // BUG FIX: also persist the deduction on the backend — previously the parts
+    // were only consumed in the local state and reappeared after page reload.
     if (newRecord.parts.length > 0) {
       const partNumbers = newRecord.parts.map((p) => p.partNumber.toLowerCase());
       setGarageParts((prev) =>
@@ -353,6 +358,16 @@ export default function App() {
           return { ...gp, status: "installed" as const };
         })
       );
+    }
+
+    // BUG FIX: explicitly sync the used garage parts with the server.
+    // The modal recovers the real part ids (with the "gp-" prefix) and passes
+    // them as usedPartIds — call the install endpoint for each of them so the
+    // server inventory matches the local state.
+    if (usedPartIds && usedPartIds.length > 0) {
+      usedPartIds.forEach((partId) => {
+        apiInstallGaragePart(partId).catch(console.error);
+      });
     }
 
     // Keep edit and create operations separate so editing never duplicates a record.
@@ -480,6 +495,7 @@ export default function App() {
     try {
       const data = JSON.parse(jsonString);
       if (data.vehicle) {
+        const vehicleExists = vehicles.some((v) => v.id === data.vehicle.id);
         setVehicles((prev) => {
           const exists = prev.some((v) => v.id === data.vehicle.id);
           return exists
@@ -487,9 +503,43 @@ export default function App() {
             : [...prev, data.vehicle];
         });
         setActiveVehicleId(data.vehicle.id);
+
+        // BUG FIX: persist the imported vehicle to the backend, otherwise the
+        // import is lost after the next page reload.
+        if (vehicleExists) {
+          apiUpdateVehicle(data.vehicle.id, data.vehicle).catch(console.error);
+        } else {
+          apiCreateVehicle(data.vehicle).catch(console.error);
+        }
       }
       if (data.serviceRecords && Array.isArray(data.serviceRecords)) {
-        setServiceRecords(data.serviceRecords);
+        // BUG FIX: the exported file holds records for ONE vehicle only, so
+        // blindly replacing the whole list would wipe out the records of all
+        // other vehicles. Merge instead: keep other vehicles' records and
+        // replace the imported vehicle's records with the imported set.
+        const targetVehicleId = data.vehicle?.id;
+        if (targetVehicleId) {
+          const existingForVehicle = serviceRecords.filter(
+            (r) => r.vehicleId === targetVehicleId
+          );
+
+          setServiceRecords((prev) => [
+            ...prev.filter((r) => r.vehicleId !== targetVehicleId),
+            ...data.serviceRecords,
+          ]);
+
+          // Sync every imported record with the backend: update records that
+          // already existed (they are likely persisted server-side too) and
+          // create the new ones.
+          data.serviceRecords.forEach((record: ServiceRecord) => {
+            const existsLocally = existingForVehicle.some((r) => r.id === record.id);
+            if (existsLocally) {
+              apiUpdateServiceRecord(record.id, record).catch(console.error);
+            } else {
+              apiCreateServiceRecord(record).catch(console.error);
+            }
+          });
+        }
       }
     } catch (e) {
       console.error(e);
