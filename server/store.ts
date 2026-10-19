@@ -168,8 +168,8 @@ export class GarageStore {
         createdAt: new Date().toISOString(),
       };
       this.state.users.push(created);
-      // Каждый новый аккаунт получает отдельную копию демо-данных.
-      this.state.garages[id] = this.seed();
+      // Новый аккаунт начинается с пустого гаража.
+      this.state.garages[id] = emptyGarage();
       this.persist();
       return created;
     });
