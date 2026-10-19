@@ -135,14 +135,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
           {!isAuthenticated ? (
             <form onSubmit={submitAuth} className="space-y-2">
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setAuthMode("login")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "login" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Вход</button>
-                <button type="button" onClick={() => setAuthMode("register")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "register" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Регистрация</button>
-              </div>
               <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Логин" autoComplete="username" className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" required />
               <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль от 8 символов" autoComplete={authMode === "login" ? "current-password" : "new-password"} className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" minLength={8} required />
               {authError && <p className="text-[11px] text-red-600">{authError}</p>}
               <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
+              <button type="button" onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                {authMode === "login" ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
+              </button>
             </form>
           ) : (
             <button type="button" onClick={() => { void logout().finally(() => { setIsAuthenticated(false); setSessionUsername(null); }); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
