@@ -28,8 +28,10 @@
 *   **Учёт запчастей:** Исправлена логика списания деталей со склада при проведении ТО (`AddServiceModal.tsx`, `App.tsx`).
 
 ### 3. Версии и коммиты
-*   **`fix(audit): fix Gemini model config, OEM schedule sync, garage part IDs, modal focus and mobile stats`** — Основной коммит с пакетом исправлений.
-*   *(Текущая работа)* — Реализация вызова `apiCompleteToFixTask` для завершения задач.
+*   `fix(audit): fix Gemini model config, OEM schedule sync, garage part IDs, modal focus and mobile stats` — Основной коммит с пакетом исправлений.
+*   `fix(app): sync garage part deduction and backup import with backend` — Списание запчастей со склада и импорт бэкапа теперь синхронизируются с бэкендом (без потери записей других авто).
+*   `chore: ignore AI Studio debug artifacts and temp media storage` — В `.gitignore` добавлены `artifacts/` и `.aistudio/`.
+*   `chore: strict TS mode, prod build minification, manual vendor chunks, windows-compatible clean script` — Включён строгий режим TypeScript, минификация прод-сборки, vendor-чанки для `three`/`react`, Windows-совместимый `clean`-скрипт.
 
 ## Запуск проекта
 
