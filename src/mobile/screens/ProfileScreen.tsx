@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, logout } from "../../api";
+import { login, register, logout, restoreSession } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -55,6 +55,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authBusy, setAuthBusy] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+
+  React.useEffect(() => {
+    restoreSession().then((session) => setIsAuthenticated(Boolean(session)));
+  }, []);
 
   const submitAuth = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -137,6 +141,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
         </div>
 
+        {isAuthenticated && (<>
         {/* Global Garage Statistics */}
         <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
           <h3 className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
@@ -173,7 +178,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
           </div>
         </div>
+        </>)}
 
+        {isAuthenticated && (<>
         {/* Quick Tools List */}
         <div className="rounded-3xl bg-white border border-neutral-200/90 shadow-xs overflow-hidden divide-y divide-neutral-100 text-xs">
           {onOpenAddVehicle && (
@@ -274,6 +281,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
           </button>
         </div>
+        </>)}
       </div>
     </div>
   );
