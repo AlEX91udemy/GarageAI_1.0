@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { Vehicle, TuningStage } from "../types";
 
@@ -379,12 +380,12 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                         </div>
 
                         <h4 className="text-base font-bold text-neutral-900 mt-1">
-                          {stage.partTitle}
+                          {stage.title}
                         </h4>
 
-                        {stage.notes && (
+                        {stage.description && (
                           <p className="text-xs text-neutral-600 mt-0.5">
-                            {stage.notes}
+                            {stage.description}
                           </p>
                         )}
                       </div>

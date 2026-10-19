@@ -287,32 +287,6 @@ export async function saveOemScheduleItems(vehicleId: string, items: Partial<Oem
   return res.json();
 }
 
-// Tuning APIs
-export async function createTuningStage(stage: Partial<TuningStage>): Promise<TuningStage> {
-  const res = await fetch("/api/tuning", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(stage),
-  });
-  if (!res.ok) throw new Error("Не удалось сохранить тюнинг-этап");
-  return res.json();
-}
-
-export async function updateTuningStage(id: string, stage: Partial<TuningStage>): Promise<TuningStage> {
-  const res = await fetch(`/api/tuning/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(stage),
-  });
-  if (!res.ok) throw new Error("Не удалось обновить тюнинг-этап");
-  return res.json();
-}
-
-export async function deleteTuningStage(id: string): Promise<void> {
-  const res = await fetch(`/api/tuning/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Не удалось удалить тюнинг-этап");
-}
-
 // Aggregated Stats
 export async function fetchVehicleStats(vehicleId: string): Promise<VehicleStats> {
   const res = await fetch(`/api/stats/${vehicleId}`);
