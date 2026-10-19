@@ -628,6 +628,7 @@ export default function App() {
       <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
         <MobileApp
           vehicles={vehicles}
+          reminders={reminders}
           currentVehicle={currentVehicle}
           onSelectVehicle={(veh) => setActiveVehicleId(veh.id)}
           serviceRecords={serviceRecords}
@@ -759,6 +760,8 @@ export default function App() {
         {showRemindersModal && (
           <RemindersModal
             vehicle={currentVehicle}
+            vehicles={vehicles}
+            reminders={reminders}
             toFixTasks={toFixTasks}
             oemSchedules={oemSchedules}
             onClose={() => setShowRemindersModal(false)}
@@ -1375,6 +1378,8 @@ export default function App() {
       {showRemindersModal && (
         <RemindersModal
           vehicle={currentVehicle}
+          vehicles={vehicles}
+          reminders={reminders}
           toFixTasks={toFixTasks}
           oemSchedules={oemSchedules}
           onClose={() => setShowRemindersModal(false)}

@@ -11,10 +11,13 @@ import {
   ArrowRight,
   Wrench,
 } from "lucide-react";
-import { Vehicle, ToFixTask, OemScheduleItem } from "../types";
+import { Vehicle, ToFixTask, OemScheduleItem, ReminderRecord } from "../types";
+import { computeReminders, ComputedReminder } from "../reminders";
 
 interface RemindersModalProps {
   vehicle: Vehicle;
+  vehicles: Vehicle[];
+  reminders: ReminderRecord[];
   toFixTasks: ToFixTask[];
   oemSchedules: OemScheduleItem[];
   onClose: () => void;
@@ -25,6 +28,8 @@ interface RemindersModalProps {
 
 export const RemindersModal: React.FC<RemindersModalProps> = ({
   vehicle,
+  vehicles,
+  reminders,
   toFixTasks,
   oemSchedules,
   onClose,
@@ -36,11 +41,13 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
     (t) => t.vehicleId === vehicle.id && t.status !== "completed"
   );
   const vehicleOem = oemSchedules.filter((s) => s.vehicleId === vehicle.id);
+  const computedReminders = computeReminders(reminders, vehicles);
+  const currentVehicleReminders = computedReminders.filter((item) => item.vehicleId === vehicle.id);
 
   // Group into urgent and upcoming
   const urgentItems: Array<{
     id: string;
-    type: "oem" | "task";
+    type: "oem" | "task" | "reminder";
     title: string;
     subtitle: string;
     badge: string;
@@ -49,7 +56,7 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
 
   const upcomingItems: Array<{
     id: string;
-    type: "oem" | "task";
+    type: "oem" | "task" | "reminder";
     title: string;
     subtitle: string;
     badge: string;
@@ -101,6 +108,20 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
         badge: "В плане",
       });
     }
+  });
+
+  currentVehicleReminders.forEach((reminder: ComputedReminder) => {
+    const target = reminder.daysLeft < 0 || reminder.daysLeft <= 7 ? urgentItems : upcomingItems;
+    target.push({
+      id: "reminder-" + reminder.id,
+      type: "reminder",
+      title: reminder.title,
+      subtitle:
+        reminder.daysLeft < 0
+          ? `Просрочено на ${-reminder.daysLeft} дн. (${reminder.explanation})`
+          : reminder.explanation,
+      badge: reminder.daysLeft < 0 ? "Просрочено" : reminder.daysLeft <= 7 ? "Критично" : "Скоро",
+    });
   });
 
   const dialogRef = useModalFocus(onClose);

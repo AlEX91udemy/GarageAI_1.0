@@ -11,11 +11,14 @@ import {
   ArrowRight,
   TrendingUp,
 } from "lucide-react";
-import { Vehicle, ServiceRecord, ToFixTask } from "../../types";
+import { Vehicle, ServiceRecord, ToFixTask, FuelRecord, OemScheduleItem } from "../../types";
+import { computeGarageIntelligence } from "../../garageIntelligence";
 
 interface AiDiagnosticsScreenProps {
   vehicle: Vehicle;
   serviceRecords: ServiceRecord[];
+  fuelRecords: FuelRecord[];
+  oemSchedules: OemScheduleItem[];
   toFixTasks: ToFixTask[];
   onBack: () => void;
   onAddTask: (task: any) => void;
@@ -24,6 +27,8 @@ interface AiDiagnosticsScreenProps {
 export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
   vehicle,
   serviceRecords,
+  fuelRecords,
+  oemSchedules,
   toFixTasks,
   onBack,
   onAddTask,
@@ -31,6 +36,13 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
   const [activeTab, setActiveTab] = useState<"patterns" | "causes" | "evidence">("patterns");
 
   const carServices = serviceRecords.filter((r) => r.vehicleId === vehicle.id);
+  const intelligence = computeGarageIntelligence({
+    vehicle,
+    serviceRecords,
+    fuelRecords,
+    oemSchedules,
+    toFixTasks,
+  });
 
   return (
     <div className="flex flex-col w-full pb-10 text-white select-none">
@@ -50,7 +62,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
         </div>
 
         <span className="text-[10px] font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded-full border border-neutral-800">
-          v2.4 Online
+          Правила + данные
         </span>
       </div>
 
@@ -65,7 +77,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
               </span>
             </div>
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              Риск: СРЕДНИЙ
+              Риск: {intelligence.riskLevel === "high" ? "ВЫСОКИЙ" : intelligence.riskLevel === "medium" ? "СРЕДНИЙ" : "НИЗКИЙ"}
             </span>
           </div>
 
@@ -74,8 +86,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
           </h2>
 
           <p className="text-xs text-neutral-300 leading-relaxed">
-            На основе анализа {carServices.length} записей ТО, текущего пробега{" "}
-            {vehicle.currentMileage.toLocaleString("ru-RU")} км и сезонной нагрузки выявлена необходимость превентивного обслуживания контура охлаждения и подвески.
+            {intelligence.explanation}
           </p>
         </div>
 
@@ -116,65 +127,58 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
         {/* TAB CONTENT */}
         {activeTab === "patterns" && (
           <div className="space-y-3">
-            <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
-              <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
-                <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>Обнаружен повторяющийся паттерн: Охлаждение ДВС</span>
+            {intelligence.overdueMaintenance.map((item) => (
+              <div key={item.title} className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>Просрочено по регламенту: {item.title}</span>
+                </div>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Превышение интервала на {item.kmOverdue.toLocaleString("ru-RU")} км при текущем пробеге{" "}
+                  {vehicle.currentMileage.toLocaleString("ru-RU")} км.
+                </p>
               </div>
-              <p className="text-xs text-neutral-300 leading-relaxed">
-                С интервалом 40 000–55 000 км антифриз теряет антикоррозийные свойства. Прошлая замена была на 150 000 км. На складе в гараже уже лежат 2 канистры Nissan L248.
-              </p>
-              <div className="p-2.5 rounded-xl bg-neutral-950/70 border border-neutral-800 text-[11px] text-neutral-400">
-                💡 <span className="text-neutral-200">Рекомендация:</span> Заменить охлаждающую жидкость до наступления летней жары для защиты теплообменника вариатора.
+            ))}
+
+            {intelligence.soonMaintenance.map((item) => (
+              <div key={item.title} className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
+                  <Activity className="w-4 h-4 shrink-0" />
+                  <span>Приближается ресурс: {item.title}</span>
+                </div>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Осталось {item.kmRemaining.toLocaleString("ru-RU")} км до планового интервала.
+                </p>
               </div>
-            </div>
+            ))}
 
             <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
               <div className="flex items-center gap-2 text-blue-400 text-xs font-bold">
                 <Activity className="w-4 h-4 shrink-0" />
-                <span>Паттерн ресурса ходовой части</span>
+                <span>Аналитика парка</span>
               </div>
-              <p className="text-xs text-neutral-300 leading-relaxed">
-                Стойки стабилизатора и сайлентблоки рычагов на данной платформе служат в среднем 45 000–60 000 км. Замена производилась 8 000 км назад — ресурс в безопасной зеленой зоне.
-              </p>
+              <ul className="text-xs text-neutral-300 leading-relaxed list-disc pl-4">
+                <li>Средний пробег: {intelligence.avgKmPerMonth !== null ? `${intelligence.avgKmPerMonth.toLocaleString("ru-RU")} км/мес` : "нет данных"}</li>
+                <li>Средний расход: {intelligence.avgFuelConsumption !== null ? `${intelligence.avgFuelConsumption} л/100 км` : "нет данных"}</li>
+                <li>Средняя стоимость ТО: {intelligence.avgServiceCost !== null ? `${intelligence.avgServiceCost.toLocaleString("ru-RU")} ₽` : "нет данных"}</li>
+                <li>Открытых задач: {intelligence.openTasks}, срочных: {intelligence.urgentTasks}</li>
+              </ul>
             </div>
           </div>
         )}
 
         {activeTab === "causes" && (
           <div className="space-y-3">
-            {[
-              {
-                cause: "Деградация ингибиторов коррозии антифриза",
-                prob: "Высокая (85%)",
-                action: "Ареометр / тест полоски pH",
-                cost: "~2 500 ₽ за работу",
-              },
-              {
-                cause: "Загрязнение сот радиатора пухом и пылью",
-                prob: "Средняя (60%)",
-                action: "Визуальный осмотр со снятием решетки",
-                cost: "~3 000 ₽ мойка с разбором",
-              },
-              {
-                cause: "Просадка резинового уплотнения крышки радиатора",
-                prob: "Низкая (20%)",
-                action: "Проверка давления сброса 0.9 / 1.1 bar",
-                cost: "~800 ₽ новая крышка",
-              },
-            ].map((item, i) => (
-              <div key={i} className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1.5">
+            {intelligence.topCategories.map((item) => (
+              <div key={item.category} className="p-3.5 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-1.5">
                 <div className="flex justify-between items-start">
-                  <h4 className="text-xs font-bold text-white">{item.cause}</h4>
+                  <h4 className="text-xs font-bold text-white">{item.category}</h4>
                   <span className="text-[10px] font-mono text-amber-400 font-semibold px-2 py-0.5 rounded bg-amber-500/10">
-                    {item.prob}
+                    {item.count} записей
                   </span>
                 </div>
-                <div className="text-[11px] text-neutral-400">
-                  <span className="text-neutral-500">Метод проверки:</span> {item.action}
-                </div>
                 <div className="text-[11px] text-neutral-300 font-mono">
-                  Ориентир: {item.cost}
+                  Суммарные затраты: {item.totalCost.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
             ))}

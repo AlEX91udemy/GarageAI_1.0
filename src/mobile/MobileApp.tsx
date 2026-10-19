@@ -6,6 +6,7 @@ import {
   OemScheduleItem,
   ToFixTask,
   GaragePart,
+  ReminderRecord,
 } from "../types";
 import { MobileTab, MobileScreenId, QuickActionType } from "./types";
 import { ThemeMode } from "./theme";
@@ -568,6 +569,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           <AiDiagnosticsScreen
             vehicle={currentVehicle}
             serviceRecords={serviceRecords}
+            fuelRecords={fuelRecords}
+            oemSchedules={oemSchedules}
             toFixTasks={toFixTasks}
             onBack={() => setCurrentScreen("home")}
             onAddTask={(t) => onAddToFixTask(t)}
