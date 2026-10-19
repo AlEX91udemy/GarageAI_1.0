@@ -171,13 +171,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
 
             <div className="p-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/70">
-              <div className="text-[10px] text-neutral-500">Деталей на складе</div>
-              <div className="text-lg font-black text-neutral-900 font-mono mt-0.5">
-                {garageParts.length}
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/70">
               <div className="text-[10px] text-neutral-500">Общий пробег</div>
               <div className="text-lg font-black text-neutral-900 font-mono mt-0.5">
                 {totalMileage.toLocaleString("ru-RU")} км
