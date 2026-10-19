@@ -91,13 +91,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-200/80 shadow-xs">
-        <h2 className="text-xl font-black text-neutral-900 tracking-tight">
+      <div className="sticky top-0 z-30 bg-white/90 dark:bg-[#0d131d]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-200/80 dark:border-[#1f2c3f] shadow-xs">
+        <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight">
           Профиль владельца
         </h2>
         <button
           onClick={() => onNavigate("settings")}
-          className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 flex items-center justify-center text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
+          className="w-9 h-9 rounded-xl bg-neutral-50 dark:bg-[#17202e] border border-neutral-200 dark:border-[#243044] flex items-center justify-center text-neutral-600 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white transition cursor-pointer"
         >
           <Settings className="w-4 h-4" />
         </button>
