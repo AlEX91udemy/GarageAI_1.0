@@ -30,6 +30,7 @@ import {
   verifyAdminPassword,
   adminLogout,
   getAdminToken,
+  authenticatedFetch,
 } from "../api";
 
 interface DataSyncBackupModalProps {
@@ -45,7 +46,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   onDataReloaded,
   isOnline,
 }) => {
-  const [isAdmin, setIsAdmin] = useState(isAdminAuthenticated());
+  const [isAdmin, setIsAdmin] = useState(true);
   const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -65,13 +66,11 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setIsAdmin(isAdminAuthenticated());
+      setIsAdmin(true);
       setAuthError(null);
       setStatusMessage(null);
       setConfirmReset(false);
-      if (isAdminAuthenticated()) {
-        loadStats();
-      }
+      loadStats();
     }
   }, [isOpen]);
 
@@ -116,20 +115,15 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   };
 
   const handleAdminLogout = () => {
-    adminLogout();
-    setIsAdmin(false);
-    setStatusMessage(null);
-    setAuthError(null);
+    setStatusMessage({ type: "success", text: "Окно резервного копирования закрыто" });
+    onClose();
   };
 
   const dialogRef = useModalFocus(onClose, isOpen);
 
   const handleExport = async () => {
     try {
-      const token = getAdminToken() || "";
-      const res = await fetch("/api/backup/export", {
-        headers: { "x-admin-key": token },
-      });
+      const res = await authenticatedFetch("/api/backup/export");
       if (!res.ok) {
         throw new Error("Доступ запрещен. Требуются права администратора.");
       }

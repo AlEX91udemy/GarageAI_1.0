@@ -9,6 +9,66 @@ import {
   DiagnosticResult,
 } from "./types";import type { Brand, Model, Generation, Modification, KnowledgeChunk } from "./catalog/types";
 
+let csrfToken: string | null = null;
+let authSessionActive = false;
+
+export interface AuthSession {
+  username: string;
+  csrfToken: string;
+}
+
+export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (init.method && !["GET", "HEAD", "OPTIONS"].includes(init.method.toUpperCase()) && csrfToken) {
+    headers.set("x-csrf-token", csrfToken);
+  }
+  return fetch(input, { ...init, headers, credentials: "same-origin" });
+}
+
+export async function register(username: string, password: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  return data.session;
+}
+
+export async function login(username: string, password: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось войти");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  return data.session;
+}
+
+export async function restoreSession(): Promise<AuthSession | null> {
+  const res = await authenticatedFetch("/api/auth/session", { credentials: "same-origin" });
+  if (!res.ok) { csrfToken = null; authSessionActive = false; return null; }
+  const data = await res.json();
+  csrfToken = data.csrfToken;
+  authSessionActive = true;
+  return data as AuthSession;
+}
+
+export async function logout(): Promise<void> {
+  await authenticatedFetch("/api/auth/logout", { method: "POST" });
+  csrfToken = null;
+  authSessionActive = false;
+}
+
 export interface FullGarageData {
   vehicles: Vehicle[];
   serviceRecords: ServiceRecord[];
@@ -62,31 +122,31 @@ export interface CatalogSearchResult extends Model {
 }
 
 export async function fetchCatalogBrands(): Promise<Brand[]> {
-  const res = await fetch("/api/vehicles/brands");
+  const res = await authenticatedFetch("/api/vehicles/brands");
   if (!res.ok) throw new Error("Не удалось загрузить марки каталога");
   return res.json();
 }
 
 export async function fetchCatalogModels(brandId: string): Promise<Model[]> {
-  const res = await fetch(`/api/vehicles/brands/${encodeURIComponent(brandId)}/models`);
+  const res = await authenticatedFetch(`/api/vehicles/brands/${encodeURIComponent(brandId)}/models`);
   if (!res.ok) throw new Error("Не удалось загрузить модели каталога");
   return res.json();
 }
 
 export async function fetchCatalogGenerations(modelId: string): Promise<Generation[]> {
-  const res = await fetch(`/api/vehicles/models/${encodeURIComponent(modelId)}/generations`);
+  const res = await authenticatedFetch(`/api/vehicles/models/${encodeURIComponent(modelId)}/generations`);
   if (!res.ok) throw new Error("Не удалось загрузить поколения каталога");
   return res.json();
 }
 
 export async function fetchCatalogModifications(generationId: string): Promise<Modification[]> {
-  const res = await fetch(`/api/vehicles/generations/${encodeURIComponent(generationId)}/modifications`);
+  const res = await authenticatedFetch(`/api/vehicles/generations/${encodeURIComponent(generationId)}/modifications`);
   if (!res.ok) throw new Error("Не удалось загрузить модификации каталога");
   return res.json();
 }
 
 export async function searchVehicleCatalog(query: string): Promise<CatalogSearchResult[]> {
-  const res = await fetch(`/api/vehicles/search?q=${encodeURIComponent(query)}`);
+  const res = await authenticatedFetch(`/api/vehicles/search?q=${encodeURIComponent(query)}`);
   if (!res.ok) throw new Error("Не удалось выполнить поиск в каталоге");
   return res.json();
 }
@@ -94,14 +154,14 @@ export async function searchVehicleCatalog(query: string): Promise<CatalogSearch
 export async function searchTechnicalKnowledge(query: string, context: Partial<{ brand: string; model: string; generation: string; category: string }> = {}): Promise<{ chunks: Array<KnowledgeChunk & { score: number }>; sources: unknown[] }> {
   const params = new URLSearchParams({ q: query });
   Object.entries(context).forEach(([key, value]) => value && params.set(key, value));
-  const res = await fetch(`/api/knowledge/search?${params.toString()}`);
+  const res = await authenticatedFetch(`/api/knowledge/search?${params.toString()}`);
   if (!res.ok) throw new Error("Не удалось выполнить поиск технических знаний");
   return res.json();
 }
 
 // Fetch all garage data
 export async function fetchGarageData(): Promise<FullGarageData> {
-  const res = await fetch("/api/data");
+  const res = await authenticatedFetch("/api/data");
   if (!res.ok) {
     throw new Error(`Ошибка загрузки данных с сервера: ${res.status}`);
   }
@@ -115,7 +175,7 @@ export async function checkBackendHealth(): Promise<{
   vehiclesCount: number;
   serviceRecordsCount: number;
 }> {
-  const res = await fetch("/api/health");
+  const res = await authenticatedFetch("/api/health");
   if (!res.ok) {
     throw new Error("Сервер недоступен");
   }
@@ -124,7 +184,7 @@ export async function checkBackendHealth(): Promise<{
 
 // Vehicle APIs
 export async function createVehicle(vehicle: Partial<Vehicle>): Promise<Vehicle> {
-  const res = await fetch("/api/vehicles", {
+  const res = await authenticatedFetch("/api/vehicles", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(vehicle),
@@ -134,7 +194,7 @@ export async function createVehicle(vehicle: Partial<Vehicle>): Promise<Vehicle>
 }
 
 export async function updateVehicle(id: string, vehicle: Partial<Vehicle>): Promise<Vehicle> {
-  const res = await fetch(`/api/vehicles/${id}`, {
+  const res = await authenticatedFetch(`/api/vehicles/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(vehicle),
@@ -144,7 +204,7 @@ export async function updateVehicle(id: string, vehicle: Partial<Vehicle>): Prom
 }
 
 export async function updateMileage(id: string, mileage: number): Promise<Vehicle> {
-  const res = await fetch(`/api/vehicles/${id}/mileage`, {
+  const res = await authenticatedFetch(`/api/vehicles/${id}/mileage`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mileage }),
@@ -154,7 +214,7 @@ export async function updateMileage(id: string, mileage: number): Promise<Vehicl
 }
 
 export async function deleteVehicle(id: string): Promise<void> {
-  const res = await fetch(`/api/vehicles/${id}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/vehicles/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Не удалось удалить автомобиль");
 }
 
@@ -162,7 +222,7 @@ export async function deleteVehicle(id: string): Promise<void> {
 export async function createServiceRecord(
   record: Partial<ServiceRecord> & { completedTaskId?: string }
 ): Promise<ServiceRecord> {
-  const res = await fetch("/api/services", {
+  const res = await authenticatedFetch("/api/services", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(record),
@@ -172,7 +232,7 @@ export async function createServiceRecord(
 }
 
 export async function updateServiceRecord(id: string, record: Partial<ServiceRecord>): Promise<ServiceRecord> {
-  const res = await fetch(`/api/services/${id}`, {
+  const res = await authenticatedFetch(`/api/services/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(record),
@@ -182,13 +242,13 @@ export async function updateServiceRecord(id: string, record: Partial<ServiceRec
 }
 
 export async function deleteServiceRecord(id: string): Promise<void> {
-  const res = await fetch(`/api/services/${id}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/services/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Не удалось удалить запись ТО");
 }
 
 // Fuel APIs
 export async function createFuelRecord(fuel: Partial<FuelRecord>): Promise<FuelRecord> {
-  const res = await fetch("/api/fuel", {
+  const res = await authenticatedFetch("/api/fuel", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(fuel),
@@ -198,13 +258,13 @@ export async function createFuelRecord(fuel: Partial<FuelRecord>): Promise<FuelR
 }
 
 export async function deleteFuelRecord(id: string): Promise<void> {
-  const res = await fetch(`/api/fuel/${id}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/fuel/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Не удалось удалить заправку");
 }
 
 // Spare Parts Warehouse APIs
 export async function createGaragePart(part: Partial<GaragePart>): Promise<GaragePart> {
-  const res = await fetch("/api/inventory", {
+  const res = await authenticatedFetch("/api/inventory", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(part),
@@ -214,7 +274,7 @@ export async function createGaragePart(part: Partial<GaragePart>): Promise<Garag
 }
 
 export async function updateGaragePart(id: string, part: Partial<GaragePart>): Promise<GaragePart> {
-  const res = await fetch(`/api/inventory/${id}`, {
+  const res = await authenticatedFetch(`/api/inventory/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(part),
@@ -224,19 +284,19 @@ export async function updateGaragePart(id: string, part: Partial<GaragePart>): P
 }
 
 export async function installGaragePart(id: string): Promise<{ success: boolean; part: GaragePart }> {
-  const res = await fetch(`/api/inventory/${id}/install`, { method: "POST" });
+  const res = await authenticatedFetch(`/api/inventory/${id}/install`, { method: "POST" });
   if (!res.ok) throw new Error("Не удалось установить деталь");
   return res.json();
 }
 
 export async function deleteGaragePart(id: string): Promise<void> {
-  const res = await fetch(`/api/inventory/${id}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/inventory/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Не удалось удалить деталь со склада");
 }
 
 // To-Fix Tasks APIs
 export async function createToFixTask(task: Partial<ToFixTask>): Promise<ToFixTask> {
-  const res = await fetch("/api/to-fix", {
+  const res = await authenticatedFetch("/api/to-fix", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(task),
@@ -246,7 +306,7 @@ export async function createToFixTask(task: Partial<ToFixTask>): Promise<ToFixTa
 }
 
 export async function updateToFixTask(id: string, task: Partial<ToFixTask>): Promise<ToFixTask> {
-  const res = await fetch(`/api/to-fix/${id}`, {
+  const res = await authenticatedFetch(`/api/to-fix/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(task),
@@ -256,19 +316,19 @@ export async function updateToFixTask(id: string, task: Partial<ToFixTask>): Pro
 }
 
 export async function completeToFixTask(id: string): Promise<{ success: boolean; task: ToFixTask }> {
-  const res = await fetch(`/api/to-fix/${id}/complete`, { method: "POST" });
+  const res = await authenticatedFetch(`/api/to-fix/${id}/complete`, { method: "POST" });
   if (!res.ok) throw new Error("Не удалось завершить задачу");
   return res.json();
 }
 
 export async function deleteToFixTask(id: string): Promise<void> {
-  const res = await fetch(`/api/to-fix/${id}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/to-fix/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Не удалось удалить задачу");
 }
 
 // OEM Schedule APIs
 export async function updateOemScheduleItem(id: string, item: Partial<OemScheduleItem>): Promise<OemScheduleItem> {
-  const res = await fetch(`/api/oem-schedule/${id}`, {
+  const res = await authenticatedFetch(`/api/oem-schedule/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(item),
@@ -278,7 +338,7 @@ export async function updateOemScheduleItem(id: string, item: Partial<OemSchedul
 }
 
 export async function saveOemScheduleItems(vehicleId: string, items: Partial<OemScheduleItem>[]): Promise<OemScheduleItem[]> {
-  const res = await fetch("/api/oem-schedule", {
+  const res = await authenticatedFetch("/api/oem-schedule", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ vehicleId, items }),
@@ -289,7 +349,7 @@ export async function saveOemScheduleItems(vehicleId: string, items: Partial<Oem
 
 // Aggregated Stats
 export async function fetchVehicleStats(vehicleId: string): Promise<VehicleStats> {
-  const res = await fetch(`/api/stats/${vehicleId}`);
+  const res = await authenticatedFetch(`/api/stats/${vehicleId}`);
   if (!res.ok) throw new Error("Не удалось загрузить аналитику");
   return res.json();
 }
@@ -301,7 +361,7 @@ export async function requestAiDiagnosis(payload: {
   userNotes?: string;
   recentHistory?: string;
 }): Promise<DiagnosticResult> {
-  const res = await fetch("/api/ai/diagnose", {
+  const res = await authenticatedFetch("/api/ai/diagnose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -314,7 +374,7 @@ export async function requestAiDiagnosis(payload: {
 }
 
 export async function requestReceiptOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<any> {
-  const res = await fetch("/api/ai/scan-receipt", {
+  const res = await authenticatedFetch("/api/ai/scan-receipt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ imageBase64, mimeType }),
@@ -333,7 +393,7 @@ export async function requestOemScheduleAi(payload: {
   engine?: string;
   fuelType?: string;
 }): Promise<any> {
-  const res = await fetch("/api/ai/oem-schedule", {
+  const res = await authenticatedFetch("/api/ai/oem-schedule", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -350,7 +410,7 @@ export async function requestPartLookupAi(payload: {
   vehicle: Vehicle;
   partNumber?: string;
 }): Promise<PartLookupResult> {
-  const res = await fetch("/api/ai/part-lookup", {
+  const res = await authenticatedFetch("/api/ai/part-lookup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -367,7 +427,7 @@ export async function requestPartLookupAi(payload: {
 // ---------------------------------------------------------------------------
 
 export async function createTuningStage(stage: Partial<TuningStage>): Promise<TuningStage> {
-  const res = await fetch("/api/tuning", {
+  const res = await authenticatedFetch("/api/tuning", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(stage),
@@ -380,7 +440,7 @@ export async function createTuningStage(stage: Partial<TuningStage>): Promise<Tu
 }
 
 export async function updateTuningStage(id: string, updates: Partial<TuningStage>): Promise<TuningStage> {
-  const res = await fetch(`/api/tuning/${encodeURIComponent(id)}`, {
+  const res = await authenticatedFetch(`/api/tuning/${encodeURIComponent(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
@@ -393,7 +453,7 @@ export async function updateTuningStage(id: string, updates: Partial<TuningStage
 }
 
 export async function deleteTuningStage(id: string): Promise<void> {
-  const res = await fetch(`/api/tuning/${encodeURIComponent(id)}`, { method: "DELETE" });
+  const res = await authenticatedFetch(`/api/tuning/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось удалить этап тюнинга");
@@ -427,7 +487,7 @@ export function setAdminToken(token: string | null): void {
 }
 
 export function isAdminAuthenticated(): boolean {
-  return Boolean(getAdminToken());
+  return authSessionActive;
 }
 
 export function adminLogout(): void {
@@ -436,7 +496,7 @@ export function adminLogout(): void {
 
 export async function verifyAdminPassword(password: string): Promise<{ success: boolean; token?: string; error?: string }> {
   try {
-    const res = await fetch("/api/admin/verify", {
+    const res = await authenticatedFetch("/api/admin/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password }),
@@ -455,7 +515,7 @@ export async function verifyAdminPassword(password: string): Promise<{ success: 
 // Backup & Reset APIs (Admin Restricted)
 export async function resetDatabase(customToken?: string): Promise<FullGarageData> {
   const token = customToken || getAdminToken() || "";
-  const res = await fetch("/api/backup/reset", {
+  const res = await authenticatedFetch("/api/backup/reset", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -472,7 +532,7 @@ export async function resetDatabase(customToken?: string): Promise<FullGarageDat
 
 export async function importDatabaseBackup(backupData: any, customToken?: string): Promise<void> {
   const token = customToken || getAdminToken() || "";
-  const res = await fetch("/api/backup/import", {
+  const res = await authenticatedFetch("/api/backup/import", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
