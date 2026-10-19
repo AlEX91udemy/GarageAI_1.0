@@ -30,15 +30,6 @@ import {
   MaintenanceCategory,
 } from "./types";
 import {
-  INITIAL_VEHICLES,
-  INITIAL_SERVICE_RECORDS,
-  INITIAL_FUEL_RECORDS,
-  INITIAL_OEM_SCHEDULES,
-  INITIAL_GARAGE_PARTS,
-  INITIAL_TO_FIX_TASKS,
-  INITIAL_TUNING_STAGES,
-} from "./mockData";
-import {
   fetchGarageData,
   createVehicle as apiCreateVehicle,
   updateVehicle as apiUpdateVehicle,
@@ -91,17 +82,6 @@ type ActiveView =
 const MobileApp = lazy(() =>
   import("./mobile/MobileApp").then(({ MobileApp }) => ({ default: MobileApp }))
 );
-
-function readCachedArray<T>(key: string, fallback: T[]): T[] {
-  try {
-    const saved = localStorage.getItem(key);
-    if (!saved) return fallback;
-    const parsed: unknown = JSON.parse(saved);
-    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 export default function App() {
   // Theme state: "light" vs "dark" (switchable via button)
@@ -156,37 +136,23 @@ export default function App() {
     }
   };
   // Persistent state initialized from localStorage or mockData
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() =>
-    readCachedArray("garagehub_vehicles", INITIAL_VEHICLES)
-  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const [activeVehicleId, setActiveVehicleId] = useState<string>(() => {
-    return vehicles[0]?.id || "car-1";
+    return vehicles[0]?.id || "empty-garage";
   });
 
-  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>(() =>
-    readCachedArray("garagehub_service_records", INITIAL_SERVICE_RECORDS)
-  );
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
 
-  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>(() =>
-    readCachedArray("garagehub_fuel_records", INITIAL_FUEL_RECORDS)
-  );
+  const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
 
-  const [oemSchedules, setOemSchedules] = useState<OemScheduleItem[]>(() =>
-    readCachedArray("garagehub_oem_schedules", INITIAL_OEM_SCHEDULES)
-  );
+  const [oemSchedules, setOemSchedules] = useState<OemScheduleItem[]>([]);
 
-  const [garageParts, setGarageParts] = useState<GaragePart[]>(() =>
-    readCachedArray("garagehub_garage_parts", INITIAL_GARAGE_PARTS)
-  );
+  const [garageParts, setGarageParts] = useState<GaragePart[]>([]);
 
-  const [toFixTasks, setToFixTasks] = useState<ToFixTask[]>(() =>
-    readCachedArray("garagehub_to_fix_tasks", INITIAL_TO_FIX_TASKS)
-  );
+  const [toFixTasks, setToFixTasks] = useState<ToFixTask[]>([]);
 
-  const [tuningStages, setTuningStages] = useState<TuningStage[]>(() =>
-    readCachedArray("garagehub_tuning_stages", INITIAL_TUNING_STAGES)
-  );
+  const [tuningStages, setTuningStages] = useState<TuningStage[]>([]);
 
   // Current view
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -263,6 +229,16 @@ export default function App() {
       .catch((err) => {
         console.warn("Backend server not responding, running with local cache:", err);
         setIsOnline(false);
+        // Guest mode must never expose the demo garage cached in localStorage.
+        // Local cache is only a fallback for an authenticated session.
+        setVehicles([]);
+        setActiveVehicleId("empty-garage");
+        setServiceRecords([]);
+        setFuelRecords([]);
+        setOemSchedules([]);
+        setGarageParts([]);
+        setToFixTasks([]);
+        setTuningStages([]);
       });
 
     return () => {
@@ -676,6 +652,16 @@ export default function App() {
           }}
           onUpdateVehicleColor={(_vehicleId, color) => handleUpdateVehicleColor(color)}
           onAuthSuccess={handleAuthSuccess}
+          onLogout={() => {
+            setVehicles([]);
+            setActiveVehicleId("empty-garage");
+            setServiceRecords([]);
+            setFuelRecords([]);
+            setOemSchedules([]);
+            setGarageParts([]);
+            setToFixTasks([]);
+            setTuningStages([]);
+          }}
         />
 
         {/* Full Parity Modals accessible from Mobile App */}
