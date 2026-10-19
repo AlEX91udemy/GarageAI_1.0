@@ -4,29 +4,22 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './index.css';
 import { ConnectionNotice } from './components/ConnectionNotice';
+import { AuthGate } from './components/AuthGate';
 
-// Global error shield to prevent unhandled script crashes in embedded environments
+// Keep the error boundary visible for real application failures. Only suppress the
+// browser's known ResizeObserver loop notification.
 if (typeof window !== 'undefined') {
   window.addEventListener('error', (event) => {
     const msg = (event?.message || event?.error?.message || '').toString();
-    if (
-      msg.includes('is not a function') ||
-      msg.includes('Script error') ||
-      msg.includes('ResizeObserver')
-    ) {
-      console.warn('[GlobalErrorShield] Handled error:', msg);
-      try { event.stopImmediatePropagation(); } catch (_) {}
-      try { event.preventDefault(); } catch (_) {}
-      return true;
+    if (msg.includes('ResizeObserver loop')) {
+      event.preventDefault();
     }
   }, true);
 
   window.addEventListener('unhandledrejection', (event) => {
     const reason = (event?.reason?.message || event?.reason || '').toString();
-    if (reason.includes('is not a function') || reason.includes('ResizeObserver')) {
-      console.warn('[GlobalErrorShield] Handled unhandled rejection:', reason);
-      try { event.stopImmediatePropagation(); } catch (_) {}
-      try { event.preventDefault(); } catch (_) {}
+    if (reason.includes('ResizeObserver loop')) {
+      event.preventDefault();
     }
   }, true);
 }
@@ -35,7 +28,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary name="GarageHub">
       <ConnectionNotice />
-      <App />
+      <AuthGate><App /></AuthGate>
     </ErrorBoundary>
   </StrictMode>,
 );

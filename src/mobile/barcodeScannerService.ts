@@ -1,4 +1,5 @@
 import { MaintenanceCategory, Vehicle, GaragePart } from "../types";
+import { authenticatedFetch } from "../api";
 
 export interface SupplierOffer {
   supplierName: string;
@@ -702,7 +703,7 @@ export async function checkPartAvailabilityAPI(
 
   // 2. Try server API
   try {
-    const res = await fetch("/api/parts/check-availability", {
+    const res = await authenticatedFetch("/api/parts/check-availability", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, partNumber, brand }),

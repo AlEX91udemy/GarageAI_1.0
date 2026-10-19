@@ -19,6 +19,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Vehicle, OemScheduleItem, MaintenanceCategory } from "../types";
+import { authenticatedFetch } from "../api";
 
 interface OemScheduleViewProps {
   vehicle: Vehicle;
@@ -81,7 +82,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
     setIsAiGenerating(true);
     setAiError(null);
     try {
-      const response = await fetch("/api/ai/oem-schedule", {
+      const response = await authenticatedFetch("/api/ai/oem-schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

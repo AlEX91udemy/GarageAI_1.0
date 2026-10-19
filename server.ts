@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { AsyncLocalStorage } from "async_hooks";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -42,6 +43,26 @@ import {
 } from "./src/catalog/database";
 import { searchKnowledge } from "./src/catalog/knowledge";
 import { verifyModification } from "./src/catalog/verification";
+import { GarageStore, emptyGarage, type GarageData } from "./server/store";
+import {
+  SESSION_RENEW_THRESHOLD_MS,
+  SESSION_TTL_MS,
+  createSession,
+  hashPassword,
+  hashToken,
+  newId,
+  verifyCsrf,
+  verifyPassword,
+  type SessionRecord,
+} from "./server/security";
+import {
+  asNonNegativeNumber,
+  asTrimmedString,
+  isValidDate,
+  isValidYear,
+  validateCredentials,
+  validateDiagnosticResult,
+} from "./server/validation";
 
 dotenv.config();
 
@@ -50,7 +71,25 @@ const PORT = 3000;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 // Middleware for parsing JSON with 25mb limit for receipt photos
-app.use(express.json({ limit: "25mb" }));
+app.use(express.json({ limit: "10mb" }));
+
+// Базовая защита от клиентских подделок Origin на state-changing запросах.
+app.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
+  const origin = req.headers.origin;
+  if (typeof origin === "string") {
+    let originHost: string;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      return res.status(403).json({ error: "Некорректный Origin" });
+    }
+    if (originHost !== req.headers.host) {
+      return res.status(403).json({ error: "Запрос отклонён: несовпадение origin" });
+    }
+  }
+  return next();
+});
 
 // Serve static assets from /public directory (e.g. 3D models in /models/*.glb)
 const PUBLIC_DIR = path.join(process.cwd(), "public");
@@ -85,8 +124,8 @@ function clone<T>(value: T): T {
 }
 
 function uniqueId(preferred: unknown, prefix: string, existing: { id: string }[]): string {
-  const candidate = typeof preferred === "string" && preferred.trim() ? preferred.trim() : `${prefix}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
-  return existing.some((item) => item.id === candidate) ? `${prefix}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}` : candidate;
+  const candidate = typeof preferred === "string" && preferred.trim() ? preferred.trim() : newId(prefix);
+  return existing.some((item) => item.id === candidate) ? newId(prefix) : candidate;
 }
 
 function getInitialDatabase(): GarageDatabase {
@@ -133,17 +172,46 @@ function ensureDatabaseExists(): GarageDatabase {
 }
 
 // In-memory cache synced to disk
-let dbMemory: GarageDatabase = ensureDatabaseExists();
+const store = new GarageStore(DB_FILE, () => getInitialDatabase());
+
+// Текущий пользователь определяется в requireAuth и кладётся в контекст запроса.
+// Обращения во всех маршрутах идут через dbMemory, который проксирует в данные
+// текущего пользователя, поэтому доступ к чужому гаражу невозможен по построению.
+// AsyncLocalStorage исключает смешивание данных между параллельными запросами.
+interface RequestContext {
+  userId: string;
+  garage: GarageData;
+  session: SessionRecord;
+}
+
+const requestContext = new AsyncLocalStorage<RequestContext>();
+
+function currentContext(): RequestContext {
+  const context = requestContext.getStore();
+  if (!context) throw new Error("Нет активной сессии для доступа к данным гаража");
+  return context;
+}
+
+const dbMemory = new Proxy({} as GarageDatabase, {
+  get(_target, property: string) {
+    return (currentContext().garage as unknown as Record<string, unknown>)[property];
+  },
+  set(_target, property: string, value: unknown) {
+    (currentContext().garage as unknown as Record<string, unknown>)[property] = value;
+    return true;
+  },
+  ownKeys() {
+    return ["vehicles", "serviceRecords", "fuelRecords", "oemSchedules", "garageParts", "toFixTasks", "tuningStages", "lastUpdated"];
+  },
+  getOwnPropertyDescriptor() {
+    return { enumerable: true, configurable: true };
+  },
+});
 
 function saveDatabase(): void {
-  try {
-    dbMemory.lastUpdated = new Date().toISOString();
-    const tempFile = `${DB_FILE}.tmp`;
-    fs.writeFileSync(tempFile, JSON.stringify(dbMemory, null, 2), "utf-8");
-    fs.renameSync(tempFile, DB_FILE);
-  } catch (err) {
-    console.error("Error writing database to disk:", err);
-  }
+  const context = requestContext.getStore();
+  if (!context) return;
+  store.schedulePersist(context.userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,17 +258,44 @@ function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T):
 // REST API Routes
 // ---------------------------------------------------------------------------
 
+// Каталог и поиск по нему — общие справочные данные, они не содержат
+// пользовательских данных и остаются доступными без входа.
+const PUBLIC_ROUTES = new Set(["/health", "/vehicles/brands", "/catalog/meta", "/auth/session"]);
+
+// Всё остальное требует действующей сессии владельца гаража.
+app.use("/api", (req, res, next) => {
+  const fullPath = req.path.replace(/^\//, "");
+  const isPublic =
+    PUBLIC_ROUTES.has(req.path) ||
+    req.path.startsWith("/vehicles/brands/") ||
+    req.path.startsWith("/vehicles/models/") ||
+    req.path.startsWith("/vehicles/generations/") ||
+    req.path === "/vehicles/search" ||
+    req.path === "/vehicles/top100" ||
+    req.path.startsWith("/catalog/modifications/") ||
+    req.path === "/knowledge/search" ||
+    req.path === "/auth/register" ||
+    req.path === "/auth/login" ||
+    req.path === "/auth/logout" ||
+    req.path.startsWith("/auth/session");
+  if (isPublic) return next();
+  if (req.path === "/health" || !fullPath) return next();
+  return requireAuth(req, res, next);
+});
+
 // 1. Health and Meta Check
 app.get("/api/health", (_req, res) => {
+  const garage = requestContext.getStore()?.garage;
   res.json({
     status: "ok",
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
-    vehiclesCount: dbMemory.vehicles.length,
-    serviceRecordsCount: dbMemory.serviceRecords.length,
-    fuelRecordsCount: dbMemory.fuelRecords.length,
-    partsCount: dbMemory.garageParts.length,
-    toFixCount: dbMemory.toFixTasks.length,
-    lastUpdated: dbMemory.lastUpdated,
+    authenticated: Boolean(garage),
+    vehiclesCount: garage ? dbMemory.vehicles.length : 0,
+    serviceRecordsCount: garage ? dbMemory.serviceRecords.length : 0,
+    fuelRecordsCount: garage ? dbMemory.fuelRecords.length : 0,
+    partsCount: garage ? dbMemory.garageParts.length : 0,
+    toFixCount: garage ? dbMemory.toFixTasks.length : 0,
+    lastUpdated: garage ? dbMemory.lastUpdated : null,
     timestamp: new Date().toISOString(),
   });
 });
@@ -288,6 +383,12 @@ app.post("/api/vehicles", (req, res) => {
   if (body.bodyType !== undefined && !VALID_BODY_TYPES.has(body.bodyType)) {
     return res.status(400).json({ error: "Некорректный тип кузова" });
   }
+  if (body.year !== undefined && (!Number.isInteger(Number(body.year)) || Number(body.year) < 1886 || Number(body.year) > new Date().getFullYear() + 1)) {
+    return res.status(400).json({ error: "Некорректный год выпуска" });
+  }
+  if (body.currentMileage !== undefined && (!Number.isFinite(Number(body.currentMileage)) || Number(body.currentMileage) < 0)) {
+    return res.status(400).json({ error: "Некорректный пробег" });
+  }
 
   const colorHex =
     typeof body.colorHex === "string" && /^#[0-9a-f]{6}$/i.test(body.colorHex)
@@ -332,6 +433,12 @@ app.put("/api/vehicles/:id", (req, res) => {
   }
   if (updates.bodyType !== undefined && !VALID_BODY_TYPES.has(updates.bodyType)) {
     return res.status(400).json({ error: "Некорректный тип кузова" });
+  }
+  if (updates.year !== undefined && (!Number.isInteger(Number(updates.year)) || Number(updates.year) < 1886 || Number(updates.year) > new Date().getFullYear() + 1)) {
+    return res.status(400).json({ error: "Некорректный год выпуска" });
+  }
+  if (updates.currentMileage !== undefined && (!Number.isFinite(Number(updates.currentMileage)) || Number(updates.currentMileage) < 0)) {
+    return res.status(400).json({ error: "Некорректный пробег" });
   }
   if (
     updates.colorHex !== undefined &&
@@ -435,11 +542,17 @@ app.post("/api/services", (req, res) => {
   if (!dbMemory.vehicles.some((vehicle) => vehicle.id === body.vehicleId)) {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date) || !Number.isFinite(Number(body.mileage)) || Number(body.mileage) < 0) {
+    return res.status(400).json({ error: "Некорректная дата или пробег" });
+  }
 
   const parts = Array.isArray(body.parts) ? body.parts : [];
   const partsCost = parts.reduce((sum, p) => sum + (p.quantity || 1) * (p.unitPrice || 0), 0);
   const laborCost = Number(body.laborCost) || 0;
   const totalCost = body.totalCost !== undefined ? Number(body.totalCost) : laborCost + partsCost;
+  if (![laborCost, totalCost, partsCost].every((value) => Number.isFinite(value) && value >= 0)) {
+    return res.status(400).json({ error: "Стоимость должна быть неотрицательным числом" });
+  }
 
   const newRecord: ServiceRecord = {
     id: body.id || `rec-${Date.now()}`,
@@ -1181,18 +1294,18 @@ app.get("/api/stats/:vehicleId", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Administrator Auth & Backup Protection
+// User Authentication (server-side sessions, scrypt passwords, CSRF token)
 // ---------------------------------------------------------------------------
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET;
-const ADMIN_TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
-const ADMIN_LOGIN_LIMIT = 5;
-const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_LIMIT = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
-const adminLoginAttempts = new Map<string, { count: number; startedAt: number }>();
+const loginAttempts = new Map<string, { count: number; startedAt: number }>();
+const sessions = new Map<string, SessionRecord>();
+const SESSION_COOKIE = "garagehub_session";
 
 // Периодическая очистка устаревших окон rate-limit, чтобы Map не росла бесконечно
 // при работе сервера под нагрузкой с разных IP.
@@ -1203,41 +1316,71 @@ const rateLimitCleanupTimer = setInterval(() => {
       aiRequestWindows.delete(key);
     }
   }
-  for (const [key, attempt] of adminLoginAttempts) {
-    if (now - attempt.startedAt >= ADMIN_LOGIN_WINDOW_MS) {
-      adminLoginAttempts.delete(key);
+  for (const [key, attempt] of loginAttempts) {
+    if (now - attempt.startedAt >= LOGIN_WINDOW_MS) {
+      loginAttempts.delete(key);
+    }
+  }
+  for (const [key, session] of sessions) {
+    if (session.expiresAt <= now || (session.revokedAt && session.revokedAt <= now)) {
+      sessions.delete(key);
     }
   }
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 // Не удерживаем процесс живым только ради очистки таймеров
 rateLimitCleanupTimer.unref?.();
 
-function issueAdminToken(): string | null {
-  if (!ADMIN_SECRET) return null;
-  const expiresAt = Date.now() + ADMIN_TOKEN_TTL_MS;
-  const signature = crypto
-    .createHmac("sha256", ADMIN_SECRET)
-    .update(String(expiresAt))
-    .digest("base64url");
-  return `${expiresAt}.${signature}`;
+function parseCookies(header: string | undefined): Record<string, string> {
+  const jar: Record<string, string> = {};
+  if (!header) return jar;
+  for (const part of header.split(";")) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    const key = part.slice(0, index).trim();
+    const value = part.slice(index + 1).trim();
+    if (key) jar[key] = decodeURIComponent(value);
+  }
+  return jar;
 }
 
-function verifyAdmin(req: express.Request): boolean {
-  const token =
-    req.headers["x-admin-key"] ||
-    req.headers["authorization"]?.replace(/^Bearer\s+/i, "");
+function sessionCookie(token: string, maxAgeMs: number): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeMs / 1000)}${secure}`;
+}
 
-  if (!ADMIN_SECRET || typeof token !== "string") return false;
-  const [expiresAtText, signature] = token.split(".");
-  const expiresAt = Number(expiresAtText);
-  if (!expiresAt || expiresAt < Date.now() || !signature) return false;
+function clearSessionCookie(): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
+}
 
-  const expected = crypto
-    .createHmac("sha256", ADMIN_SECRET)
-    .update(expiresAtText)
-    .digest("base64url");
-  if (signature.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+function getSession(req: express.Request): SessionRecord | null {
+  const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  if (!token) return null;
+  const record = sessions.get(hashToken(token));
+  if (!record || record.revokedAt || record.expiresAt <= Date.now()) return null;
+  return record;
+}
+
+/**
+ * Обязательная аутентификация для всего доступа к данным гаража.
+ * GET-запросы не требуют CSRF-токен, изменяющие — требуют.
+ */
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getSession(req);
+  if (!session) {
+    return res.status(401).json({ error: "Требуется вход в аккаунт" });
+  }
+  const user = store.getUserById(session.userId);
+  if (!user) {
+    return res.status(401).json({ error: "Аккаунт не найден" });
+  }
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    if (!verifyCsrf(session, req.headers["x-csrf-token"])) {
+      return res.status(403).json({ error: "CSRF-токен недействителен" });
+    }
+  }
+  const garage = store.garageForUser(session.userId, true);
+  requestContext.run({ userId: session.userId, garage, session }, () => next());
 }
 
 function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -1261,73 +1404,107 @@ function requireAiAccess(req: express.Request, res: express.Response, next: expr
   return next();
 }
 
-function requireAdminAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (verifyAdmin(req)) {
-    return next();
+// -------------------------------------------------------------------------
+// Authentication API: register / login / logout / session
+// ---------------------------------------------------------------------------
+
+function rateLimitedLogin(req: express.Request, res: express.Response): boolean {
+  const clientId = req.ip || "unknown";
+  const now = Date.now();
+  const window = loginAttempts.get(clientId);
+  if (window && now - window.startedAt < LOGIN_WINDOW_MS && window.count >= LOGIN_LIMIT) {
+    res.setHeader("Retry-After", Math.ceil((window.startedAt + LOGIN_WINDOW_MS - now) / 1000));
+    res.status(429).json({ error: "Слишком много попыток входа. Повторите позже." });
+    return true;
   }
-  return res.status(403).json({
-    error: "Доступ запрещен. Управление базой данных и бэкапом доступно только администратору.",
-  });
+  const current = window && now - window.startedAt < LOGIN_WINDOW_MS ? window : { count: 0, startedAt: now };
+  current.count += 1;
+  loginAttempts.set(clientId, current);
+  return false;
 }
 
-// Admin login / key verification endpoint (с защитой от перебора пароля)
-app.post("/api/admin/verify", (req, res) => {
-  const clientId = req.ip || "unknown";
-  if (!ADMIN_SECRET) {
-    return res.status(503).json({ success: false, error: "ADMIN_SECRET не настроен на сервере." });
+function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+  const { record, token } = createSession(userId);
+  sessions.set(record.tokenHash, record);
+  res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+  return { username, csrfToken: record.csrfSecret };
+}
+
+app.post("/api/auth/register", (req, res) => {
+  if (rateLimitedLogin(req, res)) return;
+  const credentials = validateCredentials(req.body);
+  if (credentials.error) return res.status(400).json({ error: credentials.error });
+  if (store.getUserByName(credentials.username!)) {
+    return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
   }
-
-  // Rate-limit попыток входа против brute-force перебора
-  const now = Date.now();
-  const attemptWindow = adminLoginAttempts.get(clientId);
-  if (attemptWindow && now - attemptWindow.startedAt < ADMIN_LOGIN_WINDOW_MS && attemptWindow.count >= ADMIN_LOGIN_LIMIT) {
-    res.setHeader("Retry-After", Math.ceil((attemptWindow.startedAt + ADMIN_LOGIN_WINDOW_MS - now) / 1000));
-    return res.status(429).json({
-      success: false,
-      error: "Слишком много неудачных попыток входа. Повторите попытку позже.",
-    });
-  }
-
-  const { password } = req.body || {};
-  // Сравнение постоянного времени: длина проверяется отдельно,
-  // содержимое — через timingSafeEqual (защита от timing-атак).
-  const passwordValid =
-    typeof password === "string" &&
-    password.length === ADMIN_SECRET.length &&
-    crypto.timingSafeEqual(Buffer.from(password, "utf-8"), Buffer.from(ADMIN_SECRET, "utf-8"));
-
-  if (passwordValid) {
-    adminLoginAttempts.delete(clientId);
-    return res.json({
-      success: true,
-      token: issueAdminToken(),
-      message: "Авторизация администратора успешно подтверждена",
-    });
-  }
-
-  // Регистрируем неудачную попытку
-  const current = attemptWindow && now - attemptWindow.startedAt < ADMIN_LOGIN_WINDOW_MS
-    ? attemptWindow
-    : { count: 0, startedAt: now };
-  current.count += 1;
-  adminLoginAttempts.set(clientId, current);
-
-  return res.status(401).json({
-    success: false,
-    error: "Неверный пароль или ключ администратора.",
+  void (async () => {
+    const userId = newId("user");
+    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
+    loginAttempts.delete(req.ip || "unknown");
+    res.status(201).json({ success: true, session: establishSession(req, res, userId, credentials.username!) });
+  })().catch((error) => {
+    console.error("Registration error:", error);
+    res.status(500).json({ error: "Не удалось создать аккаунт" });
   });
 });
 
-// Backup, Export, and Restore API (Strictly protected for Administrator)
+app.post("/api/auth/login", (req, res) => {
+  if (rateLimitedLogin(req, res)) return;
+  const body = (req.body || {}) as Record<string, unknown>;
+  const username = asTrimmedString(body.username, 32).toLowerCase();
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!username || !password) {
+    return res.status(400).json({ error: "Введите логин и пароль" });
+  }
+  const user = store.getUserByName(username);
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ error: "Неверный логин или пароль" });
+  }
+  loginAttempts.delete(req.ip || "unknown");
+  res.json({ success: true, session: establishSession(req, res, user.id, user.username) });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const session = getSession(req);
+  if (session) session.revokedAt = Date.now();
+  res.setHeader("Set-Cookie", clearSessionCookie());
+  res.json({ success: true });
+});
+
+app.get("/api/auth/session", (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.status(401).json({ error: "Сессия не найдена" });
+  const user = store.getUserById(session.userId);
+  if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
+
+  // Скользящее продление сессии при активной работе.
+  let renewedToken: string | null = null;
+  if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+    session.expiresAt = Date.now() + SESSION_TTL_MS;
+    renewedToken = session.csrfSecret;
+  }
+  if (renewedToken) {
+    const token = crypto.randomBytes(32).toString("base64url");
+    const nextHash = hashToken(token);
+    sessions.delete(session.tokenHash);
+    session.tokenHash = nextHash;
+    session.csrfSecret = crypto.randomBytes(24).toString("base64url");
+    sessions.set(nextHash, session);
+    res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+  }
+  res.json({ username: user.username, csrfToken: session.csrfSecret });
+});
+
+// Backup, Export, and Restore API (только для владельца гаража)
 // ---------------------------------------------------------------------------
 
-app.get("/api/backup/export", requireAdminAuth, (_req, res) => {
+app.get("/api/backup/export", requireAuth, (_req, res) => {
   res.setHeader("Content-Disposition", `attachment; filename="garagehub_backup_${Date.now()}.json"`);
   res.setHeader("Content-Type", "application/json");
   res.json(dbMemory);
 });
 
-app.post("/api/backup/import", requireAdminAuth, (req, res) => {
+app.post("/api/backup/import", requireAuth, (req, res) => {
   try {
     const data = req.body;
     if (!data || !Array.isArray(data.vehicles)) {
@@ -1344,7 +1521,7 @@ app.post("/api/backup/import", requireAdminAuth, (req, res) => {
       return res.status(400).json({ error: "В копии нет ни одного корректного автомобиля (нужны поля id и make)" });
     }
 
-    dbMemory = {
+    const imported = {
       vehicles,
       serviceRecords: Array.isArray(data.serviceRecords) ? data.serviceRecords : [],
       fuelRecords: Array.isArray(data.fuelRecords) ? data.fuelRecords : [],
@@ -1354,6 +1531,7 @@ app.post("/api/backup/import", requireAdminAuth, (req, res) => {
       tuningStages: Array.isArray(data.tuningStages) ? data.tuningStages : [],
       lastUpdated: new Date().toISOString(),
     };
+    Object.assign(currentContext().garage, imported);
 
     saveDatabase();
     res.json({ success: true, message: "Данные успешно импортированы", counts: {
@@ -1365,8 +1543,8 @@ app.post("/api/backup/import", requireAdminAuth, (req, res) => {
   }
 });
 
-app.post("/api/backup/reset", requireAdminAuth, (_req, res) => {
-  dbMemory = getInitialDatabase();
+app.post("/api/backup/reset", requireAuth, (_req, res) => {
+  Object.assign(currentContext().garage, getInitialDatabase());
   saveDatabase();
   res.json({ success: true, message: "База данных сброшена к демонстрационным данным", data: dbMemory });
 });
@@ -1484,6 +1662,9 @@ ${retrievedContext}
     });
 
     const parsed = parseJsonSafely(response.text, {});
+    if (!validateDiagnosticResult(parsed)) {
+      return res.status(502).json({ error: "AI вернул ответ в неподдерживаемом формате" });
+    }
     res.json(parsed);
   } catch (error: any) {
     console.error("Diagnostic AI error:", error);
@@ -1498,8 +1679,11 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
 
-    if (!imageBase64) {
+    if (typeof imageBase64 !== "string" || !imageBase64) {
       return res.status(400).json({ error: "Изображение чека не предоставлено." });
+    }
+    if (imageBase64.length > 9_000_000) {
+      return res.status(413).json({ error: "Изображение чека слишком большое" });
     }
 
     // Detect MIME type from data URI if present
@@ -1522,6 +1706,9 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
       .replace(/^data:[a-zA-Z0-9+/.-]+;base64,/, "")
       .replace(/^data:image\/\w+;base64,/, "")
       .trim();
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) {
+      return res.status(400).json({ error: "Некорректное base64-изображение" });
+    }
 
     const ai = getAi();
 

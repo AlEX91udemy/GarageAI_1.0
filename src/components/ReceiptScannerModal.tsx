@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord } from "../types";
 import { SAMPLE_RECEIPT_IMAGE } from "../mockData";
+import { authenticatedFetch } from "../api";
 
 interface ReceiptScannerModalProps {
   vehicle: Vehicle;
@@ -94,7 +95,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         if (match) detectedMime = match[1];
       }
 
-      const response = await fetch("/api/ai/scan-receipt", {
+      const response = await authenticatedFetch("/api/ai/scan-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
