@@ -3,6 +3,7 @@ import path from "path";
 
 export interface GarageData {
   vehicles: unknown[];
+  reminders: unknown[];
   serviceRecords: unknown[];
   fuelRecords: unknown[];
   oemSchedules: unknown[];
@@ -28,6 +29,7 @@ interface StoreShape {
 
 const EMPTY_KEYS: Array<keyof Omit<GarageData, "lastUpdated">> = [
   "vehicles",
+  "reminders",
   "serviceRecords",
   "fuelRecords",
   "oemSchedules",

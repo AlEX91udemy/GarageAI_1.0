@@ -24,6 +24,8 @@ import {
   GaragePart,
   ToFixTask,
   TuningStage,
+  ReminderRecord,
+  ReminderKind,
 } from "./src/types";
 import {
   brands as catalogBrands,
@@ -102,6 +104,7 @@ app.use("/models", express.static(path.join(PUBLIC_DIR, "models")));
 
 interface GarageDatabase {
   vehicles: Vehicle[];
+  reminders: ReminderRecord[];
   serviceRecords: ServiceRecord[];
   fuelRecords: FuelRecord[];
   oemSchedules: OemScheduleItem[];
@@ -134,6 +137,7 @@ function uniqueId(preferred: unknown, prefix: string, existing: { id: string }[]
 function getInitialDatabase(): GarageDatabase {
   return {
     vehicles: clone(INITIAL_VEHICLES),
+    reminders: [],
     serviceRecords: clone(INITIAL_SERVICE_RECORDS),
     fuelRecords: clone(INITIAL_FUEL_RECORDS),
     oemSchedules: clone(INITIAL_OEM_SCHEDULES),
@@ -160,6 +164,7 @@ function ensureDatabaseExists(): GarageDatabase {
     const parsed = JSON.parse(raw);
     return {
       vehicles: Array.isArray(parsed.vehicles) ? parsed.vehicles : INITIAL_VEHICLES,
+      reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
       serviceRecords: Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : INITIAL_SERVICE_RECORDS,
       fuelRecords: Array.isArray(parsed.fuelRecords) ? parsed.fuelRecords : INITIAL_FUEL_RECORDS,
       oemSchedules: Array.isArray(parsed.oemSchedules) ? parsed.oemSchedules : INITIAL_OEM_SCHEDULES,
@@ -204,7 +209,7 @@ const dbMemory = new Proxy({} as GarageDatabase, {
     return true;
   },
   ownKeys() {
-    return ["vehicles", "serviceRecords", "fuelRecords", "oemSchedules", "garageParts", "toFixTasks", "tuningStages", "lastUpdated"];
+    return ["vehicles", "reminders", "serviceRecords", "fuelRecords", "oemSchedules", "garageParts", "toFixTasks", "tuningStages", "lastUpdated"];
   },
   getOwnPropertyDescriptor() {
     return { enumerable: true, configurable: true };
@@ -307,6 +312,7 @@ app.get("/api/health", (_req, res) => {
 app.get("/api/data", (_req, res) => {
   res.json({
     vehicles: dbMemory.vehicles,
+    reminders: dbMemory.reminders,
     serviceRecords: dbMemory.serviceRecords,
     fuelRecords: dbMemory.fuelRecords,
     oemSchedules: dbMemory.oemSchedules,
@@ -323,6 +329,73 @@ app.get("/api/data", (_req, res) => {
 
 app.get("/api/vehicles", (_req, res) => {
   res.json(dbMemory.vehicles);
+});
+
+// ---------------------------------------------------------------------------
+// Reminders API (ОСАГО / КАСКО / налог)
+// ---------------------------------------------------------------------------
+
+const VALID_REMINDER_KINDS = new Set<ReminderKind>(["osago", "kasko", "tax"]);
+
+function normalizeReminder(body: Partial<ReminderRecord>): { value?: ReminderRecord; error?: string } {
+  const kind = body.kind;
+  if (kind === undefined || !VALID_REMINDER_KINDS.has(kind)) return { error: "Некорректный тип напоминания" };
+  if (typeof body.vehicleId !== "string" || !body.vehicleId.trim()) return { error: "vehicleId обязателен" };
+  if (typeof body.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.startDate) || Number.isNaN(Date.parse(body.startDate))) {
+    return { error: "startDate должен быть датой в формате YYYY-MM-DD" };
+  }
+  if (!dbMemory.vehicles.some((vehicle) => vehicle.id === body.vehicleId)) {
+    return { error: "Автомобиль не найден" };
+  }
+  if (body.durationMonths !== undefined && (!Number.isInteger(Number(body.durationMonths)) || Number(body.durationMonths) < 1 || Number(body.durationMonths) > 60)) {
+    return { error: "durationMonths должен быть целым числом от 1 до 60" };
+  }
+  if (body.price !== undefined && (!Number.isFinite(Number(body.price)) || Number(body.price) < 0)) {
+    return { error: "price должен быть неотрицательным числом" };
+  }
+  return {
+    value: {
+      id: body.id || `reminder-${Date.now()}`,
+      vehicleId: body.vehicleId,
+      kind,
+      startDate: body.startDate,
+      durationMonths: body.durationMonths === undefined ? undefined : Number(body.durationMonths),
+      price: body.price === undefined ? undefined : Number(body.price),
+      notes: typeof body.notes === "string" ? body.notes.trim().slice(0, 500) : undefined,
+    },
+  };
+}
+
+app.get("/api/reminders", (_req, res) => {
+  res.json(dbMemory.reminders);
+});
+
+app.post("/api/reminders", (req, res) => {
+  const { value, error } = normalizeReminder(req.body || {});
+  if (error) return res.status(400).json({ error });
+  if (!value) return res.status(400).json({ error: "Некорректное напоминание" });
+  const reminder = { ...value, id: uniqueId(value.id, "reminder", dbMemory.reminders) };
+  dbMemory.reminders.push(reminder);
+  saveDatabase();
+  res.status(201).json(reminder);
+});
+
+app.put("/api/reminders/:id", (req, res) => {
+  const index = dbMemory.reminders.findIndex((item) => item.id === req.params.id);
+  if (index === -1) return res.status(404).json({ error: "Напоминание не найдено" });
+  const { value, error } = normalizeReminder({ ...req.body, id: req.params.id });
+  if (error) return res.status(400).json({ error });
+  dbMemory.reminders[index] = value as ReminderRecord;
+  saveDatabase();
+  res.json(dbMemory.reminders[index]);
+});
+
+app.delete("/api/reminders/:id", (req, res) => {
+  const len = dbMemory.reminders.length;
+  dbMemory.reminders = dbMemory.reminders.filter((item) => item.id !== req.params.id);
+  if (dbMemory.reminders.length === len) return res.status(404).json({ error: "Напоминание не найдено" });
+  saveDatabase();
+  res.json({ success: true });
 });
 
 // Normalized vehicle catalog API. These routes intentionally precede /:id.

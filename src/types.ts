@@ -108,6 +108,18 @@ export interface ToFixTask {
   workHint?: string;
 }
 
+export type ReminderKind = "osago" | "kasko" | "tax";
+
+export interface ReminderRecord {
+  id: string;
+  vehicleId: string;
+  kind: ReminderKind;
+  startDate: string;
+  durationMonths?: number;
+  price?: number;
+  notes?: string;
+}
+
 export interface Vehicle {
   id: string;
   make: string;
