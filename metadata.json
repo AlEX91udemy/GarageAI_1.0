@@ -1,0 +1,8 @@
+{
+  "name": "GarageHub — Дневник авто и ремонта",
+  "description": "Мультиавтомобильный дневник техобслуживания и ремонта: регламент ТО, журнал с чеками и деталями (артикулы и бренды), учёт топлива, склад запчастей, To-Fix и AI-диагностика на основе истории авто.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
