@@ -155,7 +155,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             Статистика автопарка
           </h3>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 gap-2.5">
             <div className="p-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/70">
               <div className="text-[10px] text-neutral-500">Автомобилей</div>
               <div className="text-lg font-black text-neutral-900 font-mono mt-0.5">
@@ -183,21 +183,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {isAuthenticated && (<>
         {/* Quick Tools List */}
         <div className="rounded-3xl bg-white border border-neutral-200/90 shadow-xs overflow-hidden divide-y divide-neutral-100 text-xs">
-          {onOpenAddVehicle && (
-            <button
-              onClick={onOpenAddVehicle}
-              className="w-full p-3.5 flex items-center justify-between hover:bg-neutral-50 transition cursor-pointer text-left"
-            >
-              <div className="flex items-center gap-3 text-neutral-800 font-semibold">
-                <div className="w-7 h-7 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                </div>
-                <span>Добавить автомобиль в гараж</span>
-              </div>
-              <ChevronRight className="w-4 h-4 text-neutral-400" />
-            </button>
-          )}
-
           {onOpenServiceBook && (
             <button
               onClick={() => onOpenServiceBook?.()}
