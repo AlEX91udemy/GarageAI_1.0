@@ -757,6 +757,7 @@ export default function App() {
             onClose={() => setShowBackupModal(false)}
             onDataReloaded={handleDataReloaded}
             isOnline={isOnline}
+            vehicleId={currentVehicle.id !== "empty-garage" ? currentVehicle.id : undefined}
           />
         )}
 
@@ -1378,6 +1379,7 @@ export default function App() {
           onClose={() => setShowBackupModal(false)}
           onDataReloaded={handleDataReloaded}
           isOnline={isOnline}
+          vehicleId={currentVehicle.id !== "empty-garage" ? currentVehicle.id : undefined}
         />
       )}
 

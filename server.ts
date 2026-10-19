@@ -1546,10 +1546,22 @@ app.get("/api/auth/session", (req, res) => {
 // Backup, Export, and Restore API (только для владельца гаража)
 // ---------------------------------------------------------------------------
 
-app.get("/api/backup/export", requireAuth, (_req, res) => {
+app.get("/api/backup/export", requireAuth, (req, res) => {
+  const requestedVehicleId = typeof req.query.vehicleId === "string" ? req.query.vehicleId : null;
+  const vehicleId = requestedVehicleId && dbMemory.vehicles.some((vehicle) => vehicle.id === requestedVehicleId) ? requestedVehicleId : null;
+  const exported = vehicleId ? {
+    ...dbMemory,
+    vehicles: dbMemory.vehicles.filter((vehicle) => vehicle.id === vehicleId),
+    serviceRecords: dbMemory.serviceRecords.filter((record) => record.vehicleId === vehicleId),
+    fuelRecords: dbMemory.fuelRecords.filter((record) => record.vehicleId === vehicleId),
+    oemSchedules: dbMemory.oemSchedules.filter((record) => record.vehicleId === vehicleId),
+    garageParts: dbMemory.garageParts.filter((record) => record.vehicleId === vehicleId),
+    toFixTasks: dbMemory.toFixTasks.filter((record) => record.vehicleId === vehicleId),
+    tuningStages: dbMemory.tuningStages.filter((record) => record.vehicleId === vehicleId),
+  } : dbMemory;
   res.setHeader("Content-Disposition", `attachment; filename="garagehub_backup_${Date.now()}.json"`);
   res.setHeader("Content-Type", "application/json");
-  res.json(dbMemory);
+  res.json(exported);
 });
 
 app.post("/api/backup/import", requireAuth, (req, res) => {
@@ -1592,9 +1604,9 @@ app.post("/api/backup/import", requireAuth, (req, res) => {
 });
 
 app.post("/api/backup/reset", requireAuth, (_req, res) => {
-  Object.assign(currentContext().garage, getInitialDatabase());
+  Object.assign(currentContext().garage, emptyGarage());
   saveDatabase();
-  res.json({ success: true, message: "База данных сброшена к демонстрационным данным", data: dbMemory });
+  res.json({ success: true, message: "Данные текущего гаража очищены", data: dbMemory });
 });
 
 // ---------------------------------------------------------------------------
