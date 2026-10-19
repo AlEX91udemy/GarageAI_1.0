@@ -32,6 +32,11 @@
 *   `fix(app): sync garage part deduction and backup import with backend` — Списание запчастей со склада и импорт бэкапа теперь синхронизируются с бэкендом (без потери записей других авто).
 *   `chore: ignore AI Studio debug artifacts and temp media storage` — В `.gitignore` добавлены `artifacts/` и `.aistudio/`.
 *   `chore: strict TS mode, prod build minification, manual vendor chunks, windows-compatible clean script` — Включён строгий режим TypeScript, минификация прод-сборки, vendor-чанки для `three`/`react`, Windows-совместимый `clean`-скрипт.
+*   `fix: resolve duplicate Tuning API exports, type errors and legacy catalog nulls` — Устранены дублирующиеся экспорты Tuning API в `src/api.ts`, дублирование `totalExpenses` в `HomeScreen.tsx`, типизация `parseEngine` для nullable-лет в `src/catalog/database.ts`, а также использование несуществующих полей `partTitle`/`notes` в `TuningProjectView.tsx` (заменены на `title`/`description` из интерфейса `TuningStage`).
+
+### 4. Результаты финальной валидации
+*   **`npm run lint` (TypeScript, strict mode):** 0 ошибок.
+*   **`npm test` (Vitest + Happy DOM):** 9 тестовых файлов пройдено, 66 тестов — 100% зелёный результат.
 
 ## Запуск проекта
 

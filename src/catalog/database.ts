@@ -61,7 +61,7 @@ const fuelValue = (value: string | undefined) => {
 const engineMap = new Map<string, Engine>();
 const transmissionMap = new Map<string, Transmission>();
 const sourceId = "source-legacy-catalog";
-const parseEngine = (raw: string, brand: string, yearRange: [number, number | null]): Engine => {
+const parseEngine = (raw: string, brand: string, yearRange: [number | null, number | null]): Engine => {
   const key = `${brand}|${raw}`;
   const existing = engineMap.get(key);
   if (existing) return existing;

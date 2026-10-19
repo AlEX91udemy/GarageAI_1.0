@@ -121,9 +121,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const lastVehicleService = [...vehicleServices].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   )[0];
-  const totalExpenses =
-    vehicleServices.reduce((sum, r) => sum + (r.totalCost || 0), 0) +
-    vehicleFuel.reduce((sum, f) => sum + (f.totalCost || 0), 0);
   const fmtRub = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
   const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString("ru-RU") : "");
   const fmtLiters = (n: number) =>
