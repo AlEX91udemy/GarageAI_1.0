@@ -222,6 +222,23 @@ export default function App() {
     Partial<ServiceRecord> | undefined
   >(undefined);
 
+  const handleAuthSuccess = async () => {
+    try {
+      const data = await fetchGarageData();
+      setVehicles(data.vehicles || []);
+      setServiceRecords(data.serviceRecords || []);
+      setFuelRecords(data.fuelRecords || []);
+      setOemSchedules(data.oemSchedules || []);
+      setGarageParts(data.garageParts || []);
+      setToFixTasks(data.toFixTasks || []);
+      setTuningStages(data.tuningStages || []);
+      setActiveVehicleId(data.vehicles?.[0]?.id || "");
+      setIsOnline(true);
+    } catch (error) {
+      console.warn("Не удалось загрузить персональный гараж:", error);
+    }
+  };
+
   // Fetch full dataset from backend on load
   useEffect(() => {
     let active = true;
@@ -290,7 +307,10 @@ export default function App() {
 
   // Current selected vehicle
   const currentVehicle =
-    vehicles.find((v) => v.id === activeVehicleId) || vehicles[0] || INITIAL_VEHICLES[0];
+    vehicles.find((v) => v.id === activeVehicleId) || vehicles[0] || {
+      id: "empty-garage", make: "", model: "", year: new Date().getFullYear(),
+      engine: "", transmission: "", currentMileage: 0, lastMileageUpdate: "",
+    };
 
   const currentRecords = serviceRecords.filter(
     (r) => r.vehicleId === currentVehicle.id
@@ -655,6 +675,7 @@ export default function App() {
             setShowAddServiceModal(true);
           }}
           onUpdateVehicleColor={(_vehicleId, color) => handleUpdateVehicleColor(color)}
+          onAuthSuccess={handleAuthSuccess}
         />
 
         {/* Full Parity Modals accessible from Mobile App */}

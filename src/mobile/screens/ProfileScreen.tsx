@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
+import { login, register, logout } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -31,6 +32,7 @@ interface ProfileScreenProps {
   onOpenAddVehicle?: () => void;
   onSwitchToWebView?: () => void;
   onLogout: () => void;
+  onAuthSuccess?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -45,7 +47,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenAddVehicle,
   onSwitchToWebView,
   onLogout,
+  onAuthSuccess,
 }) => {
+  const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
+  const [username, setUsername] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [authBusy, setAuthBusy] = React.useState(false);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+
+  const submitAuth = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      if (authMode === "login") await login(username, password);
+      else await register(username, password);
+      setIsAuthenticated(true);
+      setPassword("");
+      onAuthSuccess?.();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Не удалось выполнить вход");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
   const totalMileage = vehicles.reduce((sum, v) => sum + v.currentMileage, 0);
   const totalServiceSpent = serviceRecords.reduce(
     (sum, r) => sum + (r.totalCost || 0),
@@ -85,6 +111,30 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <span>GarageHub PRO • Синхронизировано</span>
             </div>
           </div>
+        </div>
+
+        <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-black text-neutral-900">Синхронизация аккаунта</h3>
+              <p className="text-[11px] text-neutral-500 mt-1">Вход и регистрация доступны из профиля</p>
+            </div>
+            {isAuthenticated && <span className="text-[10px] font-bold text-emerald-600">Подключено</span>}
+          </div>
+          {!isAuthenticated ? (
+            <form onSubmit={submitAuth} className="space-y-2">
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setAuthMode("login")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "login" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Войти</button>
+                <button type="button" onClick={() => setAuthMode("register")} className={`flex-1 rounded-xl py-2 text-xs font-bold ${authMode === "register" ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600"}`}>Регистрация</button>
+              </div>
+              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Логин" autoComplete="username" className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" required />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль от 8 символов" autoComplete={authMode === "login" ? "current-password" : "new-password"} className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" minLength={8} required />
+              {authError && <p className="text-[11px] text-red-600">{authError}</p>}
+              <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти и синхронизировать" : "Создать аккаунт"}</button>
+            </form>
+          ) : (
+            <button type="button" onClick={() => { void logout().finally(() => setIsAuthenticated(false)); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
+          )}
         </div>
 
         {/* Global Garage Statistics */}

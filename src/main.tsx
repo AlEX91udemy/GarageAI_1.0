@@ -4,7 +4,6 @@ import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './index.css';
 import { ConnectionNotice } from './components/ConnectionNotice';
-import { AuthGate } from './components/AuthGate';
 
 // Keep the error boundary visible for real application failures. Only suppress the
 // browser's known ResizeObserver loop notification.
@@ -28,7 +27,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary name="GarageHub">
       <ConnectionNotice />
-      <AuthGate><App /></AuthGate>
+      <App />
     </ErrorBoundary>
   </StrictMode>,
 );

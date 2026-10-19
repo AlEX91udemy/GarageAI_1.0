@@ -41,7 +41,7 @@ import { SettingsScreen } from "./screens/SettingsScreen";
 import { PrefilledScanData } from "./types";
 
 // Web modals we can trigger if needed or re-use
-import { Smartphone, Monitor, Sparkles } from "lucide-react";
+import { Smartphone, Monitor, Sparkles, Car } from "lucide-react";
 
 interface MobileAppProps {
   vehicles: Vehicle[];
@@ -71,6 +71,7 @@ interface MobileAppProps {
   onOpenAddServiceModal?: (data?: Partial<ServiceRecord>) => void;
   onOpenEditVehicleModal?: () => void;
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
+  onAuthSuccess?: () => void;
 }
 
 export const MobileApp: React.FC<MobileAppProps> = ({
@@ -101,6 +102,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onOpenAddServiceModal,
   onOpenEditVehicleModal,
   onUpdateVehicleColor,
+  onAuthSuccess,
 }) => {
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
@@ -274,6 +276,16 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         return <AuthScreen onSuccess={() => setCurrentScreen("home")} />;
 
       case "home":
+        if (vehicles.length === 0 && currentVehicle.id === "empty-garage") {
+          return (
+            <div className="h-full w-full bg-neutral-950 text-white flex flex-col items-center justify-center px-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-red-600/15 text-red-400 flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
+              <h2 className="text-xl font-black">Гараж пока пуст</h2>
+              <p className="text-sm text-neutral-400 mt-2 max-w-xs">Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.</p>
+              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold">Добавить автомобиль</button>
+            </div>
+          );
+        }
         return (
           <HomeScreen
             currentVehicle={currentVehicle}
@@ -815,7 +827,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onOpenReminders={onOpenRemindersModal}
             onOpenAddVehicle={onOpenAddVehicleModal}
             onSwitchToWebView={onSwitchToWebView}
-            onLogout={() => setCurrentScreen("auth")}
+            onLogout={() => setCurrentScreen("profile")}
+            onAuthSuccess={onAuthSuccess}
           />
         );
 
