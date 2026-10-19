@@ -449,13 +449,26 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-xs font-mono font-bold text-neutral-900">
-                        {record.totalCost.toLocaleString("ru-RU")} ₽
+                    <div className="flex items-start gap-2 text-right">
+                      <div>
+                        <div className="text-xs font-mono font-bold text-neutral-900">
+                          {record.totalCost.toLocaleString("ru-RU")} ₽
+                        </div>
+                        <div className="text-[10px] text-neutral-500 font-mono">
+                          {record.liters} л по {record.pricePerLiter} ₽
+                        </div>
                       </div>
-                      <div className="text-[10px] text-neutral-500 font-mono">
-                        {record.liters} л по {record.pricePerLiter} ₽
-                      </div>
+                      {onDeleteFuel && (
+                        <button
+                          type="button"
+                          aria-label="Удалить запись о заправке"
+                          title="Удалить запись"
+                          onClick={() => { onDeleteFuel(record.id); setSwipedRecordId(null); }}
+                          className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 flex items-center justify-center transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
