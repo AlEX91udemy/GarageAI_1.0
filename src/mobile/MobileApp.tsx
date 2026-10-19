@@ -45,6 +45,7 @@ import { Smartphone, Monitor, Sparkles, Car } from "lucide-react";
 
 interface MobileAppProps {
   vehicles: Vehicle[];
+  reminders?: ReminderRecord[];
   currentVehicle: Vehicle;
   onSelectVehicle: (v: Vehicle) => void;
   serviceRecords: ServiceRecord[];
@@ -73,10 +74,12 @@ interface MobileAppProps {
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
   onAuthSuccess?: () => void;
   onLogout?: () => void;
+  onDeleteFuelRecord?: (id: string) => void;
 }
 
 export const MobileApp: React.FC<MobileAppProps> = ({
   vehicles,
+  reminders = [],
   currentVehicle,
   onSelectVehicle,
   serviceRecords,
@@ -105,6 +108,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onUpdateVehicleColor,
   onAuthSuccess,
   onLogout,
+  onDeleteFuelRecord,
 }) => {
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
@@ -426,6 +430,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setCurrentScreen("add_event");
             }}
             onScanReceipt={() => setCurrentScreen("scan_receipt")}
+            onDeleteFuel={onDeleteFuelRecord}
           />
         );
 

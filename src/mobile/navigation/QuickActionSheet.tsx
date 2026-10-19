@@ -1,12 +1,7 @@
 import React from "react";
 import {
   Wrench,
-  Flame,
   Fuel,
-  CreditCard,
-  Package,
-  AlertTriangle,
-  Camera,
   ScanLine,
   ScanBarcode,
   X,
@@ -39,22 +34,6 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
     border: string;
   }> = [
     {
-      id: "service",
-      label: "Обслуживание",
-      sublabel: "Плановое ТО, замена масла и фильтров",
-      icon: <Wrench className="w-5 h-5 text-blue-600" />,
-      bg: "bg-blue-50",
-      border: "border-blue-100",
-    },
-    {
-      id: "repair",
-      label: "Ремонт",
-      sublabel: "Устранение неисправности и замена узлов",
-      icon: <Flame className="w-5 h-5 text-red-600" />,
-      bg: "bg-red-50",
-      border: "border-red-100",
-    },
-    {
       id: "fuel",
       label: "Заправка",
       sublabel: "Литры, стоимость, АЗС, расчет расхода",
@@ -63,36 +42,12 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
       border: "border-emerald-100",
     },
     {
-      id: "expense",
-      label: "Расход",
-      sublabel: "Мойка, парковка, страховка, налог",
-      icon: <CreditCard className="w-5 h-5 text-violet-600" />,
-      bg: "bg-violet-50",
-      border: "border-violet-100",
-    },
-    {
-      id: "part",
-      label: "Запчасть",
-      sublabel: "Добавить на склад гаража или в заказ",
-      icon: <Package className="w-5 h-5 text-amber-600" />,
-      bg: "bg-amber-50",
-      border: "border-amber-100",
-    },
-    {
-      id: "problem",
-      label: "Проблема (To-Fix)",
-      sublabel: "Симптом, ошибка Check Engine или стук",
-      icon: <AlertTriangle className="w-5 h-5 text-orange-600" />,
-      bg: "bg-orange-50",
-      border: "border-orange-100",
-    },
-    {
-      id: "photo",
-      label: "Фото (До / После)",
-      sublabel: "Фиксация состояния, тюнинг или ремонт",
-      icon: <Camera className="w-5 h-5 text-cyan-600" />,
-      bg: "bg-cyan-50",
-      border: "border-cyan-100",
+      id: "service",
+      label: "Обслуживание и ремонт",
+      sublabel: "Плановое ТО, ремонт и замена узлов",
+      icon: <Wrench className="w-5 h-5 text-blue-600" />,
+      bg: "bg-blue-50",
+      border: "border-blue-100",
     },
     {
       id: "scan_barcode",
