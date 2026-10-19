@@ -290,6 +290,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </div>
 
       <div className="px-4 pt-3 flex flex-col gap-3">
+        {currentVehicle.id !== "empty-garage" && <>
         {/* 3. VEHICLE HEADER INFO & PLATE */}
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -472,6 +473,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           <ChevronRight className="w-5 h-5 text-red-500 shrink-0" />
         </button>
+        </>}
 
         {/* 7. QUICK ACTIONS (Быстрые действия) */}
         <div className="pt-1">

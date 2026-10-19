@@ -72,6 +72,7 @@ interface MobileAppProps {
   onOpenEditVehicleModal?: () => void;
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
   onAuthSuccess?: () => void;
+  onLogout?: () => void;
 }
 
 export const MobileApp: React.FC<MobileAppProps> = ({
@@ -103,6 +104,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onOpenEditVehicleModal,
   onUpdateVehicleColor,
   onAuthSuccess,
+  onLogout,
 }) => {
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
@@ -827,7 +829,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onOpenReminders={onOpenRemindersModal}
             onOpenAddVehicle={onOpenAddVehicleModal}
             onSwitchToWebView={onSwitchToWebView}
-            onLogout={() => setCurrentScreen("profile")}
+            onLogout={() => {
+              onLogout?.();
+              setCurrentScreen("profile");
+            }}
             onAuthSuccess={onAuthSuccess}
           />
         );
