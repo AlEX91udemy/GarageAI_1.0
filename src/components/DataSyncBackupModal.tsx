@@ -331,12 +331,6 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                   )}
                 </div>
 
-                {/* Security note: the master key is configured on the server
-                    via the ADMIN_SECRET environment variable. */}
-                <p className="text-[11px] text-neutral-500 pt-1">
-                  Мастер-ключ задаётся на сервере через переменную окружения ADMIN_SECRET.
-                </p>
-
                 <button
                   type="submit"
                   disabled={isVerifying}
