@@ -1,3 +1,5 @@
+import { POPULAR_RU_MODEL_ADDITIONS } from "./popularCarModels";
+
 export type CarBodyType =
   | "suv" | "sedan" | "hatchback" | "coupe"
   | "wagon" | "convertible" | "minivan" | "pickup"
@@ -23,6 +25,7 @@ export interface CarModelInfo {
   name: string;
   defaultBodyType: CarBodyType;
   generations: CarGenerationInfo[];
+  bodyTypes?: CarBodyType[];
 }
 
 export interface CarMakeInfo {
@@ -835,7 +838,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
               { type: "suv", label: "Кросс-универсал SW Cross" },
-              { type: "hatchback", label: "Универсал SW" },
+              { type: "wagon", label: "Универсал SW" },
             ],
             defaultBodyType: "suv",
             engineSuggestions: ["1.8 EVO (122 л.с.)", "1.6L ВАЗ-21129 (106 л.с.)", "1.6L ВАЗ-11182 (90 л.с.)"],
@@ -851,7 +854,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
               { type: "suv", label: "Кросс-универсал SW Cross" },
-              { type: "hatchback", label: "Универсал SW" },
+              { type: "wagon", label: "Универсал SW" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6L H4M / HR16DE (113 л.с.)", "1.6L ВАЗ-21129 (106 л.с.)", "1.8L ВАЗ-21179 (122 л.с.)"],
@@ -1507,7 +1510,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2021,
             bodyTypes: [
               { type: "sedan", label: "Лифтбек 5 дв." },
-              { type: "hatchback", label: "Универсал Combi" },
+              { type: "wagon", label: "Универсал Combi" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.4 TSI DJKA (150 л.с.)", "1.6 MPI (110 л.с.)", "2.0 TSI (190 л.с.)"],
@@ -1522,7 +1525,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2018,
             bodyTypes: [
               { type: "sedan", label: "Лифтбек 5 дв." },
-              { type: "hatchback", label: "Универсал Combi" },
+              { type: "wagon", label: "Универсал Combi" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.6 MPI CWVA (110 л.с.)", "1.4 TSI CZDA (150 л.с.)", "1.8 TSI CJSA (180 л.с.)"],
@@ -1769,7 +1772,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2018,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "hatchback", label: "Универсал Avant" },
+              { type: "wagon", label: "Универсал Avant" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["2.0 TFSI (150/190/249 л.с.)", "2.0 TDI (190 л.с.)"],
@@ -1784,7 +1787,7 @@ export const CAR_CATALOG: CarMakeInfo[] = [
             defaultYear: 2012,
             bodyTypes: [
               { type: "sedan", label: "Седан 4 дв." },
-              { type: "hatchback", label: "Универсал Avant" },
+              { type: "wagon", label: "Универсал Avant" },
             ],
             defaultBodyType: "sedan",
             engineSuggestions: ["1.8 TFSI (120/160/170 л.с.)", "2.0 TFSI (211/225 л.с.)", "2.0 TDI (143/177 л.с.)"],
@@ -1930,6 +1933,19 @@ export const CAR_CATALOG: CarMakeInfo[] = [
   },
 ];
 
+POPULAR_RU_MODEL_ADDITIONS.forEach((addition) => {
+  let make = CAR_CATALOG.find((item) => item.name.toLowerCase() === addition.make.toLowerCase());
+  if (!make) {
+    make = { name: addition.make, country: addition.country, flag: addition.flag, models: [] };
+    CAR_CATALOG.push(make);
+  }
+
+  addition.models.forEach(({ name, bodyTypes }) => {
+    if (make!.models.some((model) => model.name.toLowerCase() === name.toLowerCase())) return;
+    make!.models.push({ name, defaultBodyType: bodyTypes[0], generations: [], bodyTypes });
+  });
+});
+
 // Helper functions for easy lookup
 export function findMake(makeName: string): CarMakeInfo | undefined {
   if (!makeName) return undefined;
@@ -1957,4 +1973,9 @@ export function findGeneration(
   return model.generations.find(
     (g) => g.name.toLowerCase() === clean || clean.includes(g.name.toLowerCase()) || g.name.toLowerCase().includes(clean)
   );
+}
+
+export function getModelBodyTypes(model: CarModelInfo): CarBodyType[] {
+  const types = model.bodyTypes || model.generations.flatMap((generation) => generation.bodyTypes.map((body) => body.type));
+  return Array.from(new Set(types));
 }
