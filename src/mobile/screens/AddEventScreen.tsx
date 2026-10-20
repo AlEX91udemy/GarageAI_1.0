@@ -8,7 +8,6 @@ import {
   Layers,
   Calendar,
   Gauge,
-  DollarSign,
   Building2,
   Camera,
   Plus,
@@ -18,12 +17,34 @@ import {
   QrCode,
   Sparkles,
   CheckCircle2,
-  MapPin,
   Tag,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord, ToFixTask, GaragePart, MaintenanceCategory } from "../../types";
 import { QuickActionType, PrefilledScanData } from "../types";
 import { BarcodeScannerScreen } from "./BarcodeScannerScreen";
+import { CURRENCY_SYMBOLS, formatGarageCurrency, getGarageCurrency } from "../currency";
+import { searchServiceWorks } from "../serviceWorkCatalog";
+import { AUTOMOTIVE_BARCODE_CATALOG } from "../barcodeScannerService";
+
+const FUEL_TYPES = ["АИ-92", "АИ-95", "АИ-98", "АИ-100", "ДТ", "Газ", "Другое"];
+const MAINTENANCE_CATEGORIES: MaintenanceCategory[] = [
+  "ТО и замена жидкостей", "Двигатель", "Система охлаждения", "Ходовая часть",
+  "Климатическая система", "Трансмиссия", "Трансмиссия и сцепление",
+  "Подвеска и рулевое", "Тормозная система", "Электрика и датчики",
+  "Выхлопная система", "Кузов и стекла", "Шины и диски", "Другое",
+];
+
+const PART_CATALOG = Object.values(AUTOMOTIVE_BARCODE_CATALOG).filter(
+  (part, index, all) => all.findIndex((candidate) => candidate.partNumber === part.partNumber) === index
+);
+
+function searchParts(query: string, field: "name" | "brand" | "partNumber") {
+  const normalized = query.trim().toLocaleLowerCase("ru");
+  if (normalized.length < 2) return [];
+  return PART_CATALOG.filter((part) =>
+    part[field].toLocaleLowerCase("ru").includes(normalized)
+  ).slice(0, 6);
+}
 
 interface AddEventScreenProps {
   vehicle: Vehicle;
@@ -56,6 +77,8 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
 
   // Common inputs
   const [title, setTitle] = useState(initialPrefilledData?.title || "");
+  const [isWorkSuggestionsOpen, setIsWorkSuggestionsOpen] = useState(false);
+  const [activeWorkSuggestion, setActiveWorkSuggestion] = useState(0);
   const [category, setCategory] = useState<MaintenanceCategory>(
     initialPrefilledData?.category || "ТО и замена жидкостей"
   );
@@ -70,6 +93,11 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   const [location, setLocation] = useState(
     initialPrefilledData?.serviceCenter || "Гараж / Автосервис"
   );
+  const currencySymbol = CURRENCY_SYMBOLS[getGarageCurrency()];
+  const prefilledCenter = initialPrefilledData?.serviceCenter || "";
+  const [customLocation, setCustomLocation] = useState(
+    ["Гараж / Автосервис", "Гараж", "Автосервис", "Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(prefilledCenter) ? "" : prefilledCenter
+  );
   const [notes, setNotes] = useState(initialPrefilledData?.description || "");
 
   // Part-specific inputs for "Добавить запчасть"
@@ -82,9 +110,8 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   const [partQuantity, setPartQuantity] = useState(
     initialPrefilledData?.quantity ? String(initialPrefilledData.quantity) : "1"
   );
-  const [partLocation, setPartLocation] = useState(
-    initialPrefilledData?.location || "Склад гаража: Стеллаж A"
-  );
+  const [partSuggestionField, setPartSuggestionField] = useState<"name" | "brand" | "partNumber" | null>(null);
+  const [activePartSuggestion, setActivePartSuggestion] = useState(0);
 
   // Scanned badge info
   const [scannedBadge, setScannedBadge] = useState<string | null>(
@@ -98,9 +125,38 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   // Fuel specific
   const [liters, setLiters] = useState("45");
   const [fuelType, setFuelType] = useState("АИ-95");
+  const [customFuelType, setCustomFuelType] = useState("");
 
   // Problem specific
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const workSuggestions = (eventType === "service" || eventType === "repair")
+    ? searchServiceWorks(title)
+    : [];
+  const partSuggestions = partSuggestionField === "name"
+    ? searchParts(partName, "name")
+    : partSuggestionField === "brand"
+    ? searchParts(partBrand, "brand")
+    : partSuggestionField === "partNumber"
+    ? searchParts(partNumber, "partNumber")
+    : [];
+
+  const selectPartSuggestion = (part: (typeof PART_CATALOG)[number]) => {
+    setPartName(part.name);
+    setPartBrand(part.brand);
+    setPartNumber(part.partNumber);
+    setCategory(part.category);
+    setPartPrice(String(part.estimatedPrice));
+    setNotes(part.description);
+    setPartSuggestionField(null);
+    setActivePartSuggestion(0);
+  };
+
+  const selectWorkSuggestion = (work: (typeof workSuggestions)[number]) => {
+    setTitle(work.title);
+    setCategory(work.category);
+    setIsWorkSuggestionsOpen(false);
+    setActiveWorkSuggestion(0);
+  };
 
   // Parts list inside service
   const [parts, setParts] = useState<
@@ -138,7 +194,6 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
       if (initialPrefilledData.partNumber) setPartNumber(initialPrefilledData.partNumber);
       if (initialPrefilledData.price) setPartPrice(String(initialPrefilledData.price));
       if (initialPrefilledData.description) setNotes(initialPrefilledData.description);
-      if (initialPrefilledData.location) setPartLocation(initialPrefilledData.location);
       if (initialPrefilledData.barcode) setScannedBadge(`Штрихкод: ${initialPrefilledData.barcode}`);
       else if (initialPrefilledData.vin) setScannedBadge(`VIN: ${initialPrefilledData.vin}`);
     }
@@ -161,7 +216,6 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
       if (scanned.partNumber) setPartNumber(scanned.partNumber);
       if (scanned.category) setCategory(scanned.category);
       if (scanned.price) setPartPrice(String(scanned.price));
-      if (scanned.location) setPartLocation(scanned.location);
       if (scanned.description) setNotes(scanned.description);
     } else {
       // Service or Repair
@@ -217,7 +271,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         liters: numLiters,
         pricePerLiter: numCost && numLiters ? Math.round(numCost / numLiters) : 58,
         totalCost: numCost,
-        fuelType,
+        fuelType: fuelType === "Другое" ? customFuelType.trim() || "Другое" : fuelType,
         station: location || "Газпромнефть",
       });
     } else if (eventType === "problem") {
@@ -243,7 +297,6 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         purchasePrice: pPrice,
         purchaseDate: date,
         status: "in_stock",
-        location: partLocation || "Склад гаража: Полка A1",
       });
     } else {
       // Default: Service or Repair
@@ -267,7 +320,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
           notes ||
           (scannedBadge
             ? `Зафиксировано по ${scannedBadge}`
-            : "Работы внесены через мобильный GarageHub"),
+            : "Работы внесены через мобильный Garage AI"),
         serviceCenter: location || "Автосервис",
         parts: (parts || []).map((p, idx) => ({
           id: `pt-${Date.now()}-${idx}`,
@@ -311,7 +364,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
 
         <span className="text-xs font-bold text-neutral-900">
           {eventType === "part"
-            ? "Добавить запчасть"
+            ? "Добавить деталь"
             : eventType === "service"
             ? "Добавить услугу (ТО)"
             : "Добавить событие"}
@@ -346,18 +399,27 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         )}
 
         {/* Event Type selector pills */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+        <div className="grid grid-cols-3 gap-2" aria-label="Тип события">
           {[
-            { id: "service", label: "Обслуживание (ТО)", icon: <Wrench className="w-3.5 h-3.5" /> },
-            { id: "part", label: "Запчасть на склад", icon: <Package className="w-3.5 h-3.5" /> },
+            { id: "service", label: "Обслуживание", icon: <Wrench className="w-3.5 h-3.5" /> },
+            { id: "part", label: "Деталь", icon: <Package className="w-3.5 h-3.5" /> },
             { id: "repair", label: "Ремонт", icon: <Wrench className="w-3.5 h-3.5" /> },
             { id: "fuel", label: "Заправка", icon: <Fuel className="w-3.5 h-3.5" /> },
-            { id: "problem", label: "Проблема (To-Fix)", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
+            { id: "problem", label: "Проблема", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setEventType(item.id as QuickActionType)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              onClick={() => {
+                const nextType = item.id as QuickActionType;
+                setEventType(nextType);
+                if (nextType === "fuel" && !["Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(location)) {
+                  setLocation("Газпромнефть");
+                  setCustomLocation("");
+                } else if (nextType !== "fuel" && !["Гараж / Автосервис", "Гараж", "Автосервис"].includes(location) && !customLocation) {
+                  setLocation("Гараж / Автосервис");
+                }
+              }}
+              className={`flex min-w-0 items-center justify-center gap-1.5 px-2 py-2.5 rounded-2xl text-[11px] font-bold leading-tight text-center transition cursor-pointer ${
                 eventType === item.id
                   ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                   : "bg-white text-neutral-600 border border-neutral-200 hover:text-neutral-900"
@@ -403,35 +465,76 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         {eventType === "part" ? (
           <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3.5">
             {/* Part Name */}
-            <div>
+            <div className="relative">
               <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
                 Наименование детали
               </label>
               <input
+                role="combobox"
+                aria-label="Наименование детали"
+                aria-autocomplete="list"
+                aria-expanded={partSuggestionField === "name" && partSuggestions.length > 0}
                 type="text"
                 placeholder="Например: Масляный фильтр двигателя"
                 value={partName}
-                onChange={(e) => setPartName(e.target.value)}
+                onFocus={() => { setPartSuggestionField("name"); setActivePartSuggestion(0); }}
+                onBlur={() => window.setTimeout(() => setPartSuggestionField(null), 120)}
+                onChange={(e) => { setPartName(e.target.value); setPartSuggestionField("name"); setActivePartSuggestion(0); }}
+                onKeyDown={(e) => {
+                  if (!partSuggestions.length) return;
+                  if (e.key === "ArrowDown") { e.preventDefault(); setActivePartSuggestion((index) => (index + 1) % partSuggestions.length); }
+                  else if (e.key === "ArrowUp") { e.preventDefault(); setActivePartSuggestion((index) => (index - 1 + partSuggestions.length) % partSuggestions.length); }
+                  else if (e.key === "Enter") { e.preventDefault(); selectPartSuggestion(partSuggestions[activePartSuggestion]); }
+                  else if (e.key === "Escape") setPartSuggestionField(null);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500 font-bold"
               />
+              {partSuggestionField === "name" && partSuggestions.length > 0 && (
+                <div role="listbox" aria-label="Варианты деталей" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg">
+                  {partSuggestions.map((part, index) => (
+                    <button key={part.partNumber} type="button" role="option" aria-selected={activePartSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => selectPartSuggestion(part)} className={`w-full rounded-xl px-3 py-2 text-left ${activePartSuggestion === index ? "bg-red-50 text-red-800" : "text-neutral-800 hover:bg-neutral-50"}`}>
+                      <span className="block text-xs font-semibold">{part.name}</span>
+                      <span className="mt-0.5 block text-[10px] text-neutral-500">{part.brand} · {part.partNumber}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Brand & Part Number / SKU with Scan button */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="relative">
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
                   Производитель / Бренд
                 </label>
                 <input
+                  role="combobox"
+                  aria-label="Производитель / Бренд"
+                  aria-autocomplete="list"
+                  aria-expanded={partSuggestionField === "brand" && partSuggestions.length > 0}
                   type="text"
                   placeholder="Mann-Filter, Brembo, OEM..."
                   value={partBrand}
-                  onChange={(e) => setPartBrand(e.target.value)}
+                  onFocus={() => { setPartSuggestionField("brand"); setActivePartSuggestion(0); }}
+                  onBlur={() => window.setTimeout(() => setPartSuggestionField(null), 120)}
+                  onChange={(e) => { setPartBrand(e.target.value); setPartSuggestionField("brand"); setActivePartSuggestion(0); }}
+                  onKeyDown={(e) => {
+                    if (!partSuggestions.length) return;
+                    if (e.key === "ArrowDown") { e.preventDefault(); setActivePartSuggestion((index) => (index + 1) % partSuggestions.length); }
+                    else if (e.key === "ArrowUp") { e.preventDefault(); setActivePartSuggestion((index) => (index - 1 + partSuggestions.length) % partSuggestions.length); }
+                    else if (e.key === "Enter") { e.preventDefault(); selectPartSuggestion(partSuggestions[activePartSuggestion]); }
+                    else if (e.key === "Escape") setPartSuggestionField(null);
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
                 />
+                {partSuggestionField === "brand" && partSuggestions.length > 0 && (
+                  <div role="listbox" aria-label="Варианты производителя" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg">
+                    {partSuggestions.map((part, index) => <button key={part.partNumber} type="button" role="option" aria-selected={activePartSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => selectPartSuggestion(part)} className={`w-full rounded-xl px-3 py-2 text-left text-xs ${activePartSuggestion === index ? "bg-red-50 text-red-800" : "text-neutral-800 hover:bg-neutral-50"}`}>{part.brand} · {part.name}</button>)}
+                  </div>
+                )}
               </div>
 
-              <div>
+              <div className="relative">
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide block">
                     Артикул / SKU
@@ -446,12 +549,30 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                   </button>
                 </div>
                 <input
+                  role="combobox"
+                  aria-label="Артикул / SKU"
+                  aria-autocomplete="list"
+                  aria-expanded={partSuggestionField === "partNumber" && partSuggestions.length > 0}
                   type="text"
                   placeholder="W67/1 или 15208-9F60A"
                   value={partNumber}
-                  onChange={(e) => setPartNumber(e.target.value)}
+                  onFocus={() => { setPartSuggestionField("partNumber"); setActivePartSuggestion(0); }}
+                  onBlur={() => window.setTimeout(() => setPartSuggestionField(null), 120)}
+                  onChange={(e) => { setPartNumber(e.target.value); setPartSuggestionField("partNumber"); setActivePartSuggestion(0); }}
+                  onKeyDown={(e) => {
+                    if (!partSuggestions.length) return;
+                    if (e.key === "ArrowDown") { e.preventDefault(); setActivePartSuggestion((index) => (index + 1) % partSuggestions.length); }
+                    else if (e.key === "ArrowUp") { e.preventDefault(); setActivePartSuggestion((index) => (index - 1 + partSuggestions.length) % partSuggestions.length); }
+                    else if (e.key === "Enter") { e.preventDefault(); selectPartSuggestion(partSuggestions[activePartSuggestion]); }
+                    else if (e.key === "Escape") setPartSuggestionField(null);
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500 font-mono font-bold"
                 />
+                {partSuggestionField === "partNumber" && partSuggestions.length > 0 && (
+                  <div role="listbox" aria-label="Варианты артикула" className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg">
+                    {partSuggestions.map((part, index) => <button key={part.partNumber} type="button" role="option" aria-selected={activePartSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => selectPartSuggestion(part)} className={`w-full rounded-xl px-3 py-2 text-left text-xs ${activePartSuggestion === index ? "bg-red-50 text-red-800" : "text-neutral-800 hover:bg-neutral-50"}`}>{part.partNumber} · {part.name}</button>)}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -465,26 +586,18 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 onChange={(e) => setCategory(e.target.value as MaintenanceCategory)}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
               >
-                <option value="ТО и замена жидкостей">ТО и замена жидкостей</option>
-                <option value="Двигатель">Двигатель</option>
-                <option value="Тормозная система">Тормозная система</option>
-                <option value="Подвеска и рулевое">Подвеска и рулевое</option>
-                <option value="Трансмиссия">Трансмиссия</option>
-                <option value="Система охлаждения">Система охлаждения</option>
-                <option value="Электрика и датчики">Электрика и датчики</option>
-                <option value="Кузов и стекла">Кузов и стекла</option>
-                <option value="Другое">Другое</option>
+                {MAINTENANCE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
 
             {/* Price & Quantity */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                  Цена покупки (₽)
+                  Цена покупки ({currencySymbol})
                 </label>
                 <div className="relative">
-                  <DollarSign className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <span className="text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
                   <input
                     type="number"
                     placeholder="0"
@@ -505,23 +618,6 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                   value={partQuantity}
                   onChange={(e) => setPartQuantity(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500 font-mono font-bold text-center"
-                />
-              </div>
-            </div>
-
-            {/* Storage Location in Garage */}
-            <div>
-              <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                Место хранения в гараже
-              </label>
-              <div className="relative">
-                <MapPin className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Стеллаж A • Полка 2 или Багажник"
-                  value={partLocation}
-                  onChange={(e) => setPartLocation(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
                 />
               </div>
             </div>
@@ -561,6 +657,13 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 )}
               </div>
               <input
+                id="service-work-title"
+                role="combobox"
+                aria-label="Название события / Работы"
+                aria-autocomplete="list"
+                aria-expanded={isWorkSuggestionsOpen && workSuggestions.length > 0}
+                aria-controls="service-work-suggestions"
+                aria-activedescendant={isWorkSuggestionsOpen && workSuggestions[activeWorkSuggestion] ? `service-work-option-${activeWorkSuggestion}` : undefined}
                 type="text"
                 placeholder={
                   eventType === "fuel"
@@ -572,9 +675,46 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                     : "Плановое ТО: Замена масла и фильтров"
                 }
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onFocus={() => setIsWorkSuggestionsOpen(true)}
+                onBlur={() => window.setTimeout(() => setIsWorkSuggestionsOpen(false), 120)}
+                onChange={(e) => { setTitle(e.target.value); setActiveWorkSuggestion(0); setIsWorkSuggestionsOpen(true); }}
+                onKeyDown={(e) => {
+                  if (!workSuggestions.length) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setIsWorkSuggestionsOpen(true);
+                    setActiveWorkSuggestion((index) => (index + 1) % workSuggestions.length);
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActiveWorkSuggestion((index) => (index - 1 + workSuggestions.length) % workSuggestions.length);
+                  } else if (e.key === "Enter" && isWorkSuggestionsOpen) {
+                    e.preventDefault();
+                    selectWorkSuggestion(workSuggestions[activeWorkSuggestion]);
+                  } else if (e.key === "Escape") {
+                    setIsWorkSuggestionsOpen(false);
+                  }
+                }}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500 font-bold"
               />
+              {isWorkSuggestionsOpen && workSuggestions.length > 0 && (
+                <div id="service-work-suggestions" role="listbox" aria-label="Варианты видов работ" className="mt-1 max-h-56 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg">
+                  {workSuggestions.map((work, index) => (
+                    <button
+                      key={work.title}
+                      id={`service-work-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={activeWorkSuggestion === index}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => selectWorkSuggestion(work)}
+                      className={`w-full rounded-xl px-3 py-2 text-left transition ${activeWorkSuggestion === index ? "bg-red-50 text-red-800" : "text-neutral-800 hover:bg-neutral-50"}`}
+                    >
+                      <span className="block text-xs font-semibold">{work.title}</span>
+                      <span className="mt-0.5 block text-[10px] text-neutral-500">{work.category}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Category for service/repair */}
@@ -588,21 +728,13 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                   onChange={(e) => setCategory(e.target.value as MaintenanceCategory)}
                   className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
                 >
-                  <option value="ТО и замена жидкостей">ТО и замена жидкостей</option>
-                  <option value="Двигатель">Двигатель</option>
-                  <option value="Тормозная система">Тормозная система</option>
-                  <option value="Подвеска и рулевое">Подвеска и рулевое</option>
-                  <option value="Трансмиссия">Трансмиссия</option>
-                  <option value="Система охлаждения">Система охлаждения</option>
-                  <option value="Электрика и датчики">Электрика и датчики</option>
-                  <option value="Кузов и стекла">Кузов и стекла</option>
-                  <option value="Другое">Другое</option>
+                  {MAINTENANCE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </div>
             )}
 
             {/* Date & Mileage */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
                   Дата
@@ -635,13 +767,13 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             </div>
 
             {/* Cost & Location */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                  Итоговая стоимость (₽)
+                  Итоговая стоимость ({currencySymbol})
                 </label>
                 <div className="relative">
-                  <DollarSign className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <span className="text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
                   <input
                     type="number"
                     placeholder="0"
@@ -658,14 +790,44 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 </label>
                 <div className="relative">
                   <Building2 className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    value={eventType === "fuel"
+                      ? (["Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(location) ? location : "Другое")
+                      : (["Гараж / Автосервис", "Гараж", "Автосервис"].includes(location) ? location : "Другое")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setLocation(value === "Другое" ? (customLocation || "Другое") : value);
+                      if (value !== "Другое") setCustomLocation("");
+                    }}
+                    className="w-full appearance-none pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
+                  >
+                    {eventType === "fuel" ? (
+                      <>
+                        <option>Газпромнефть</option>
+                        <option>Лукойл</option>
+                        <option>Роснефть</option>
+                        <option>Татнефть</option>
+                        <option>Другое</option>
+                      </>
+                    ) : (
+                      <>
+                        <option>Гараж / Автосервис</option>
+                        <option>Гараж</option>
+                        <option>Автосервис</option>
+                        <option>Другое</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                {(location === "Другое" || customLocation) && (
                   <input
                     type="text"
-                    placeholder={eventType === "fuel" ? "Газпромнефть" : "Гараж / ПроСТО"}
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
+                    placeholder={eventType === "fuel" ? "Название АЗС" : "Название автосервиса / места"}
+                    value={customLocation}
+                    onChange={(e) => { setCustomLocation(e.target.value); setLocation(e.target.value); }}
+                    className="mt-2 w-full px-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
                   />
-                </div>
+                )}
               </div>
             </div>
 
@@ -674,15 +836,38 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
               <div className="p-3 rounded-2xl bg-neutral-50 border border-neutral-200 flex items-center justify-between">
                 <span className="text-xs text-neutral-600 font-medium">Объем заправки:</span>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={liters}
-                    onChange={(e) => setLiters(e.target.value)}
-                    className="w-20 px-2 py-1 rounded-xl bg-white border border-neutral-300 text-neutral-900 font-mono text-center text-xs font-bold"
-                  />
-                  <span className="text-xs text-neutral-500">литров</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      aria-label="Объем заправки в литрах"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      value={liters}
+                      onChange={(e) => setLiters(e.target.value)}
+                      className="w-20 px-2 py-1 rounded-xl bg-white border border-neutral-300 text-neutral-900 font-mono text-center text-xs font-bold"
+                    />
+                    <span className="text-xs text-neutral-500">литров</span>
+                    <select
+                      aria-label="Тип топлива"
+                      value={fuelType}
+                      onChange={(e) => setFuelType(e.target.value)}
+                      className="max-w-28 px-2 py-1 rounded-xl bg-white border border-neutral-300 text-neutral-900 text-xs"
+                    >
+                      {FUEL_TYPES.map((type) => <option key={type}>{type}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
+            )}
+            {eventType === "fuel" && fuelType === "Другое" && (
+              <input
+                aria-label="Свой тип топлива"
+                type="text"
+                placeholder="Укажите тип топлива"
+                value={customFuelType}
+                onChange={(e) => setCustomFuelType(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-red-500"
+              />
             )}
 
             {/* Notes */}
@@ -747,7 +932,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                             {p.brand} {p.name}
                           </div>
                           <div className="text-[10px] font-mono text-neutral-500">
-                            Арт: {p.sku} • {p.price} ₽
+                            Арт: {p.sku} • {formatGarageCurrency(Number(p.price) || 0)}
                           </div>
                         </div>
                         <button

@@ -20,6 +20,7 @@ import { Vehicle } from "../types";
 import { LicensePlateBadge } from "./LicensePlateBadge";
 import { CarCascadeSelector } from "./CarCascadeSelector";
 import { CarBodyType, findGeneration } from "../carCatalog";
+import { decodeVin } from "../mobile/barcodeScannerService";
 
 const STANDARD_VEHICLE_COLOR = "#dc2626";
 
@@ -46,8 +47,6 @@ const PRESETS: Array<{
   driveType: string;
   mileage: number;
   colorHex: string;
-  licensePlate: string;
-  vin: string;
 }> = [
   {
     make: "Nissan",
@@ -61,8 +60,6 @@ const PRESETS: Array<{
     driveType: "Полный привод (All-Mode 4x4-i)",
     mileage: 206000,
     colorHex: STANDARD_VEHICLE_COLOR,
-    licensePlate: "О742УМ 197",
-    vin: "JN1TBNT31U0048123",
   },
   {
     make: "Toyota",
@@ -76,8 +73,6 @@ const PRESETS: Array<{
     driveType: "Полный привод AWD-i",
     mileage: 18500,
     colorHex: STANDARD_VEHICLE_COLOR,
-    licensePlate: "М319КХ 799",
-    vin: "JTDAGACF9P3012984",
   },
   {
     make: "BMW",
@@ -91,8 +86,6 @@ const PRESETS: Array<{
     driveType: "Полный привод xDrive",
     mileage: 142000,
     colorHex: STANDARD_VEHICLE_COLOR,
-    licensePlate: "В505ОХ 777",
-    vin: "WBA8E1106GNT98231",
   },
   {
     make: "Chery",
@@ -106,8 +99,6 @@ const PRESETS: Array<{
     driveType: "AWD",
     mileage: 38000,
     colorHex: STANDARD_VEHICLE_COLOR,
-    licensePlate: "Е821ТН 790",
-    vin: "LVVDB21B9PD018274",
   },
   {
     make: "Lada",
@@ -121,8 +112,6 @@ const PRESETS: Array<{
     driveType: "Передний привод",
     mileage: 12000,
     colorHex: STANDARD_VEHICLE_COLOR,
-    licensePlate: "К404ХУ 777",
-    vin: "XTA218150P0128912",
   },
 ];
 
@@ -255,10 +244,47 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     "Бензин / Гибрид",
     "Электричество",
   ]);
+
+  const fuelForEngine = (engineName: string) => {
+    const value = engineName.toLowerCase();
+    if (value.includes("электро")) return "Электричество";
+    if (value.includes("гибрид")) return "Бензин / Гибрид";
+    if (value.includes("дизел")) return "Дизель";
+    if (value.includes("бензин")) {
+      return value.includes("аи-92") ? "Бензин (АИ-92)" : "Бензин (АИ-95)";
+    }
+    return undefined;
+  };
+
+  const handleEngineChange = (value: string) => {
+    setEngine(value);
+    const inferred = fuelForEngine(value);
+    if (inferred) setFuelType(inferred);
+  };
+
   const [mileage, setMileage] = useState(mode === "add" ? 25000 : (currentVehicle?.currentMileage || 0));
   const colorHex = STANDARD_VEHICLE_COLOR;
   const [licensePlate, setLicensePlate] = useState(mode === "add" ? "" : (currentVehicle?.licensePlate || ""));
   const [vin, setVin] = useState(mode === "add" ? "" : (currentVehicle?.vin || ""));
+  const decodedVin = decodeVin(vin, currentVehicle, allVehicles);
+
+  // A complete VIN can identify a known make/model/year in the offline decoder.
+  // Unknown VINs leave the user's existing make and model untouched.
+  useEffect(() => {
+    const decoded = decodeVin(vin, currentVehicle, allVehicles);
+    if (!decoded) return;
+
+    if (decoded.make && decoded.make !== "Иномарка / OEM") {
+      setMake(decoded.make);
+    }
+    const isGenericModel = !decoded.model || decoded.model === "Автомобиль" || / \(\d{4}\)$/.test(decoded.model);
+    if (!isGenericModel) {
+      setModel(decoded.model.replace(/ \(F30\)$/, ""));
+    }
+    if (decoded.year) {
+      setYear(decoded.year);
+    }
+  }, [vin, currentVehicle, allVehicles]);
 
   // Active preview vehicle for live 3D rotation
   const previewVehicle: Vehicle = {
@@ -290,8 +316,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     setTransmission(p.transmission);
     setDriveType(p.driveType);
     setMileage(p.mileage);
-    setLicensePlate(p.licensePlate);
-    setVin(p.vin);
   };
 
   const handleStartAdd = () => {
@@ -617,6 +641,12 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                   <span>{decodeVinOrigin(vin)}</span>
                 </div>
               )}
+              {decodedVin && decodedVin.model !== "Автомобиль" && !/ \(\d{4}\)$/.test(decodedVin.model) && (
+                <div className="text-[10px] text-emerald-700 mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                  <span>Распознано: {decodedVin.make} {decodedVin.model}, {decodedVin.year} г.</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -670,7 +700,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
               </label>
               <ModernSelect
                 value={engine}
-                onChange={setEngine}
+                onChange={handleEngineChange}
                 options={engineOptions}
                 placeholder="Выберите двигатель"
                 required

@@ -10,6 +10,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { MobileScreenId } from "../types";
+import { GeneratedNotification } from "../../notifications";
+import { ThemeMode } from "../theme";
 
 interface NotificationItem {
   id: string;
@@ -24,13 +26,20 @@ interface NotificationItem {
 interface NotificationsScreenProps {
   onBack: () => void;
   onNavigate: (screen: MobileScreenId) => void;
+  themeMode?: ThemeMode;
+  notifications: GeneratedNotification[];
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   onBack,
   onNavigate,
+  themeMode = "light",
+  notifications: generatedNotifications,
 }) => {
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
+  const isDark = themeMode === "dark";
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const notifications: NotificationItem[] = generatedNotifications.map(n => ({ ...n, isRead: readIds.includes(n.id) }));
+  /*
     {
       id: "notif-1",
       title: "Приближается плановое ТО: Замена масла",
@@ -58,29 +67,51 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       isRead: true,
       targetScreen: "parts",
     },
-  ]);
+  ]); */
 
   const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setReadIds(notifications.map(n => n.id));
   };
 
   return (
-    <div className="flex flex-col w-full pb-10 text-white select-none">
+    <div
+      className={`flex flex-col w-full pb-10 select-none ${
+        isDark ? "text-white" : "text-neutral-900"
+      }`}
+    >
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-800/80">
+      <div
+        className={`sticky top-0 z-30 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b ${
+          isDark
+            ? "bg-neutral-950/90 border-neutral-800/80"
+            : "bg-white/90 border-neutral-200"
+        }`}
+      >
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300 hover:text-white cursor-pointer active:scale-95"
+          className={`flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 ${
+            isDark
+              ? "text-neutral-300 hover:text-white"
+              : "text-neutral-600 hover:text-neutral-900"
+          }`}
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Назад</span>
         </button>
 
-        <span className="text-xs font-bold text-white">Уведомления</span>
+        <span
+          className={`text-xs font-bold ${isDark ? "text-white" : "text-neutral-900"}`}
+        >
+          Уведомления
+        </span>
 
         <button
           onClick={handleMarkAllRead}
-          className="text-[11px] font-medium text-red-400 hover:text-red-300 cursor-pointer"
+          className={`text-[11px] font-medium cursor-pointer ${
+            isDark
+              ? "text-red-400 hover:text-red-300"
+              : "text-red-600 hover:text-red-500"
+          }`}
         >
           Прочитать все
         </button>
@@ -95,15 +126,23 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             }}
             className={`p-3.5 rounded-2xl border transition active:scale-[0.99] cursor-pointer flex items-start gap-3 ${
               item.isRead
-                ? "bg-neutral-900/60 border-neutral-850 opacity-80"
-                : "bg-neutral-900 border-neutral-750 shadow-md"
+                ? isDark
+                  ? "bg-neutral-900/60 border-neutral-800 opacity-80"
+                  : "bg-[#FAFAFC] border-neutral-200 opacity-80"
+                : isDark
+                  ? "bg-neutral-900 border-neutral-700 shadow-md"
+                  : "bg-white border-[#E2E8F0] shadow-xs"
             }`}
           >
             <div
               className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                 item.category === "ai"
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "bg-red-500/15 text-red-400 border border-red-500/30"
+                  ? isDark
+                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                    : "bg-amber-50 text-amber-600 border border-amber-200"
+                  : isDark
+                    ? "bg-red-500/15 text-red-400 border border-red-500/30"
+                    : "bg-red-50 text-red-600 border border-red-200"
               }`}
             >
               {item.category === "ai" ? (
@@ -117,7 +156,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
               <div className="flex justify-between items-baseline gap-1">
                 <h4
                   className={`text-xs font-bold leading-tight ${
-                    item.isRead ? "text-neutral-300" : "text-white font-black"
+                    item.isRead
+                      ? isDark
+                        ? "text-neutral-300"
+                        : "text-neutral-500"
+                      : isDark
+                        ? "text-white font-black"
+                        : "text-neutral-900 font-black"
                   }`}
                 >
                   {item.title}
@@ -127,13 +172,25 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                 )}
               </div>
 
-              <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+              <p
+                className={`text-[11px] mt-1 leading-relaxed ${
+                  isDark ? "text-neutral-400" : "text-neutral-600"
+                }`}
+              >
                 {item.description}
               </p>
 
-              <div className="text-[10px] text-neutral-500 font-mono mt-2 flex justify-between items-center">
+              <div
+                className={`text-[10px] font-mono mt-2 flex justify-between items-center ${
+                  isDark ? "text-neutral-500" : "text-neutral-400"
+                }`}
+              >
                 <span>{item.date}</span>
-                <span className="text-red-400 flex items-center gap-0.5">
+                <span
+                  className={`flex items-center gap-0.5 ${
+                    isDark ? "text-red-400" : "text-red-600"
+                  }`}
+                >
                   Открыть <ChevronRight className="w-3 h-3" />
                 </span>
               </div>

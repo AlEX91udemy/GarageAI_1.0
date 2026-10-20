@@ -11,6 +11,7 @@ import {
   Share2,
 } from "lucide-react";
 import { ToFixTask, Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface ProblemDetailScreenProps {
   task: ToFixTask;
@@ -76,7 +77,7 @@ export const ProblemDetailScreen: React.FC<ProblemDetailScreenProps> = ({
             <span>Статус: <strong className="text-neutral-800">{task.status === "completed" ? "Устранено" : "Требует ремонта"}</strong></span>
             {task.estimatedCost && (
               <span className="font-mono text-neutral-900 font-bold">
-                Оценка: ~{task.estimatedCost.toLocaleString("ru-RU")} ₽
+                Оценка: ~{formatGarageCurrency(task.estimatedCost)}
               </span>
             )}
           </div>

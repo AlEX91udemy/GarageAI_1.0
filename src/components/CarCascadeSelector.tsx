@@ -330,7 +330,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                 </option>
                 {CAR_CATALOG.map((m) => (
                   <option key={m.name} value={m.name}>
-                    {m.flag} {m.name} ({m.country})
+                    {m.flag} {m.name}
                   </option>
                 ))}
                 <option value="__custom__">✏️ Другая марка (ввести вручную)...</option>

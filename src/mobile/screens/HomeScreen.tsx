@@ -22,6 +22,8 @@ import {
   Edit2,
   ScanBarcode,
 } from "lucide-react";
+import { formatGarageCurrency } from "../currency";
+import { formatDistance } from "../units";
 import {
   Vehicle,
   ServiceRecord,
@@ -34,6 +36,9 @@ import { LicensePlateBadge } from "../../components/LicensePlateBadge";
 import { MobileScreenId, QuickActionType } from "../types";
 import { ThemeMode } from "../theme";
 import { VehicleModelRenderer, getVehicleModelSpec } from "../../components/VehicleModelRenderer";
+
+// Quick actions are hidden on the home screen for now; keep the markup for later.
+const SHOW_QUICK_ACTIONS = false;
 
 interface HomeScreenProps {
   currentVehicle: Vehicle;
@@ -75,7 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenNotifications,
   onOpenProfile,
   onUpdateMileage,
-  unreadNotificationsCount = 3,
+  unreadNotificationsCount = 0,
   onOpenAddVehicle,
   onOpenServiceBook,
   onOpenReminders,
@@ -83,7 +88,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenScanReceipt,
   onOpenScanBarcode,
   onOpenAddService,
-  themeMode = "dark",
+  themeMode = "light",
   onToggleTheme,
 }) => {
   const isDark = themeMode === "dark";
@@ -121,7 +126,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const lastVehicleService = [...vehicleServices].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   )[0];
-  const fmtRub = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
+  const fmtRub = formatGarageCurrency;
   const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString("ru-RU") : "");
   const fmtLiters = (n: number) =>
     n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -169,21 +174,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }`}
       >
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-red-600 to-red-500 flex items-center justify-center font-black text-xs text-white shadow-sm shadow-red-600/30">
-            GH
-          </div>
-          <div>
-            <h1 className="text-base font-black tracking-tight leading-none">
-              Garage<span className="text-red-500">Hub</span>
-            </h1>
-            <span
-              className={`text-[10px] font-medium ${
-                isDark ? "text-slate-400" : "text-slate-500"
-              }`}
-            >
-              Больше, чем просто гараж
-            </span>
-          </div>
+          <img src="/garage-ai-mark.png" alt="GarageAI" className="w-8 h-8 rounded-xl object-contain" />
+          <h1 className="text-base font-black tracking-tight leading-none">
+            Garage<span className="text-red-500">AI</span>
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -310,15 +304,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {currentVehicle.licensePlate && (
               <LicensePlateBadge plate={currentVehicle.licensePlate} />
             )}
-            <button
-              onClick={() => {
-                setNewMileageInput(String(currentVehicle.currentMileage));
-                setShowQuickMileageModal(true);
-              }}
-              className="text-[11px] font-bold text-red-500 hover:text-red-400 transition cursor-pointer"
-            >
-              Изменить
-            </button>
           </div>
         </div>
 
@@ -377,7 +362,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </span>
             </div>
             <div className="text-sm font-black font-mono tracking-tight leading-none">
-              {currentVehicle.currentMileage.toLocaleString("ru-RU")} км
+              {formatDistance(currentVehicle.currentMileage)}
             </div>
             <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
               Обновлён 07.06.2026
@@ -387,8 +372,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Badge 2: Топливо */}
           <button
             type="button"
-            aria-label="Добавить запись о заправке"
-            onClick={() => onOpenQuickAction("fuel")}
+            aria-label="Открыть дневник заправок"
+            onClick={() => onNavigate("fuel")}
             className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
                 ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
@@ -440,42 +425,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
 
-        {/* 6. REMINDERS CARD */}
-        <button
-          type="button"
-          aria-label="Открыть напоминания по автомобилю"
-          onClick={() => {
-            if (typeof onOpenReminders === "function") {
-              onOpenReminders();
-            } else if (typeof onNavigate === "function") {
-              onNavigate("notifications");
-            }
-          }}
-          className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition-all active:scale-[0.99] ${
-            isDark
-              ? "bg-[#17202e] border-[#243044] hover:border-red-500/40"
-              : "bg-white border-[#E2E8F0] shadow-xs hover:border-red-400"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-red-600/30">
-              <Bell className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-black tracking-tight leading-tight">
-                3 напоминания
-              </div>
-              <div className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                Проверь первым: замена антифриза, масло, фильтр
-              </div>
-            </div>
-          </div>
-
-          <ChevronRight className="w-5 h-5 text-red-500 shrink-0" />
-        </button>
         </>}
 
         {/* 7. QUICK ACTIONS (Быстрые действия) */}
+        {SHOW_QUICK_ACTIONS && (
         <div className="pt-1">
           <div className="text-sm font-extrabold tracking-tight mb-2.5">
             Быстрые действия
@@ -556,6 +509,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </button>
           </div>
         </div>
+        )}
 
         {/* 8. KEY INFORMATION (Ключевая информация) */}
         <div className="pt-1">
@@ -805,7 +759,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           {v.make} {v.model}
                         </div>
                         <div className={`text-[10px] mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                          {v.year} • {v.currentMileage.toLocaleString("ru-RU")} км
+                          {v.year} • {formatDistance(v.currentMileage)}
                         </div>
                       </div>
                     </div>

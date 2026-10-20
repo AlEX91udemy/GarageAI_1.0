@@ -1,4 +1,4 @@
-const CACHE_NAME = "garagehub-cache-v1";
+const CACHE_NAME = "garage-ai-cache-v3";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
@@ -24,7 +24,11 @@ self.addEventListener("activate", (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()).then(() =>
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) =>
+        Promise.all(clients.map((client) => client.navigate(client.url)))
+      )
+    )
   );
 });
 

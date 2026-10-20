@@ -14,6 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { Vehicle, GaragePart, ToFixTask } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface GarageScreenProps {
   vehicle: Vehicle;
@@ -229,7 +230,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
                     <div className="text-right shrink-0">
                       <div className="text-xs font-mono font-bold text-neutral-900">
-                        {(part.purchasePrice * part.quantity).toLocaleString("ru-RU")} ₽
+                        {formatGarageCurrency(part.purchasePrice * part.quantity)}
                       </div>
                       <div className="text-[10px] text-neutral-400 font-mono">
                         {part.quantity} шт.
@@ -379,7 +380,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
                         {task.estimatedCost && (
                           <span className="text-[11px] font-mono font-bold text-neutral-900">
-                            ~{task.estimatedCost.toLocaleString("ru-RU")} ₽
+                            ~{formatGarageCurrency(task.estimatedCost)}
                           </span>
                         )}
                       </div>

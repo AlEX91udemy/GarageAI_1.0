@@ -31,7 +31,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   onApplyService,
   onApplyFuel,
 }) => {
-  const [imagePreview, setImagePreview] = useState<string | null>(SAMPLE_RECEIPT_IMAGE);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -293,6 +293,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     <input
                       type="file"
                       accept="image/*"
+                      capture="environment"
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -331,6 +332,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     onChange={handleFileUpload}
                     className="hidden"
                   />

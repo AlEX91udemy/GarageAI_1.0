@@ -1,20 +1,18 @@
 import React, { useState } from "react";
 import {
-  Wallet,
   Fuel,
   PieChart,
   BarChart3,
   Plus,
   Calendar,
   Gauge,
-  ScanLine,
   Camera,
-  ChevronRight,
-  Car,
   Droplet,
   Trash2,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord, GaragePart } from "../../types";
+import { formatGarageCurrency } from "../currency";
+import { formatDistance, formatVolume, formatConsumption, distanceUnitLabel, volumeUnitLabel } from "../units";
 
 const EXPENSE_COLORS = ["#ef4444", "#f59e0b", "#3b82f6"];
 
@@ -37,7 +35,6 @@ interface ExpensesScreenProps {
   fuelRecords: FuelRecord[];
   garageParts?: GaragePart[];
   onAddFuel: () => void;
-  onAddExpense?: () => void;
   onScanReceipt?: () => void;
   onDeleteFuel?: (recordId: string) => void;
 }
@@ -48,7 +45,6 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   fuelRecords,
   garageParts = [],
   onAddFuel,
-  onAddExpense,
   onScanReceipt,
   onDeleteFuel,
 }) => {
@@ -136,44 +132,29 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
+      <div className="flex flex-col w-full pb-10 bg-neutral-100 dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-20 shadow-xs">
-        <div className="flex items-center justify-between">
+      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 dark:border-[#1f2c3f] bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md sticky top-0 z-20 shadow-xs">
+        <div>
           <div>
-            <h2 className="text-xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+            <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
               <span>Расходы</span>
             </h2>
             <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
-              <Car className="w-3.5 h-3.5 text-red-600" />
               <span>{vehicle.make} {vehicle.model}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {onAddExpense && (
-              <button
-                type="button"
-                onClick={onAddExpense}
-                className="px-2.5 py-1.5 rounded-xl bg-neutral-50 hover:bg-neutral-100 text-neutral-700 border border-neutral-200 transition cursor-pointer active:scale-95 text-xs font-bold flex items-center gap-1.5"
-                title="Добавить расход"
-                aria-label="Добавить расход"
-              >
-                <Wallet className="w-4 h-4" />
-                <span>Расход</span>
-              </button>
-            )}
-          </div>
         </div>
 
         {/* 2 Tabs: Сводка расходов vs Дневник заправок */}
-        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
+        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#2b3a50]">
           <button
             onClick={() => setActiveTab("summary")}
             className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTab === "summary"
-                ? "bg-white text-neutral-900 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900"
+                ? "bg-white dark:bg-[#243044] text-neutral-900 dark:text-white shadow-xs"
+                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
             }`}
           >
             <PieChart className="w-3.5 h-3.5" />
@@ -184,8 +165,8 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
             onClick={() => setActiveTab("fuel_log")}
             className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
               activeTab === "fuel_log"
-                ? "bg-white text-neutral-900 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900"
+                ? "bg-white dark:bg-[#243044] text-neutral-900 dark:text-white shadow-xs"
+                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
             }`}
           >
             <Fuel className="w-3.5 h-3.5" />
@@ -195,58 +176,24 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
       </div>
 
       <div className="p-4 space-y-3.5">
-        {/* Metric Cards Banner */}
-        <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 space-y-3 shadow-xs">
-          <div className="flex justify-between items-baseline">
-            <span className="text-xs text-neutral-500 font-medium">
-              Всего зафиксировано расходов:
-            </span>
-            <span className="text-2xl font-black text-neutral-900 font-mono tracking-tight">
-              {grandTotal.toLocaleString("ru-RU")} ₽
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-neutral-100">
-            <div className="p-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/60">
-              <div className="text-[10px] text-neutral-500 flex items-center gap-1">
-                <Fuel className="w-3 h-3 text-red-600" />
-                <span>Средний расход</span>
-              </div>
-              <div className="text-base font-black text-neutral-900 font-mono mt-0.5">
-                {avgConsumption} <span className="text-xs font-normal text-neutral-400">л/100км</span>
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-2xl bg-neutral-50 border border-neutral-200/60">
-              <div className="text-[10px] text-neutral-500 flex items-center gap-1">
-                <Gauge className="w-3 h-3 text-emerald-600" />
-                <span>Стоимость 1 км</span>
-              </div>
-              <div className="text-base font-black text-neutral-900 font-mono mt-0.5">
-                {costPerKm} <span className="text-xs font-normal text-neutral-400">₽/км</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* TAB 1: SUMMARY */}
         {activeTab === "summary" && (
           <div className="space-y-3.5">
             {/* SMART OCR RECEIPT SCANNER BANNER (Identical description moved from Home menu) */}
             {onScanReceipt && (
-              <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 text-white p-4 rounded-3xl border border-neutral-800 shadow-md flex items-center justify-between gap-3">
+              <div className="bg-white dark:bg-[#17202e] text-neutral-900 dark:text-white p-4 rounded-3xl border border-neutral-200 dark:border-[#233044] shadow-xs flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 flex items-center justify-center shrink-0">
                     <Camera className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
-                      <span>Умный сканер чеков</span>
+                      <span>Умный сканер</span>
                       <span className="text-[9px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded-full">
                         OCR + AI
                       </span>
                     </div>
-                    <p className="text-[11px] text-neutral-300 mt-0.5 leading-snug">
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-300 mt-0.5 leading-snug">
                       Распознает сумму, работы и запчасти с артикулами.
                     </p>
                   </div>
@@ -281,13 +228,13 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
 
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  ["cost_per_km", "Стоимость 1 км", `${costPerKm} ₽`],
-                  ["fuel_cost_km", "Топливо / км", `${fuelCostPerKm} ₽`],
-                  ["service_total", "ТО и ремонт", `${serviceTotal.toLocaleString("ru-RU")} ₽`],
-                  ["fuel_total", "Всего топливо", `${fuelTotal.toLocaleString("ru-RU")} ₽`],
-                ].map(([key, label, value]) => (
+                  { key: "cost_per_km", label: "Стоимость 1 " + distanceUnitLabel(), value: formatGarageCurrency(Number(costPerKm)), icon: <Gauge className="w-3 h-3 text-emerald-600" /> },
+                  { key: "fuel_cost_km", label: "Средний расход", value: avgConsumption === "—" ? "—" : formatConsumption(parseFloat(avgConsumption)), icon: <Fuel className="w-3 h-3 text-red-600" /> },
+                  { key: "service_total", label: "ТО и ремонт", value: formatGarageCurrency(serviceTotal), icon: <Gauge className="w-3 h-3 text-amber-600" /> },
+                  { key: "fuel_total", label: "Всего топливо", value: formatGarageCurrency(fuelTotal), icon: <Fuel className="w-3 h-3 text-red-600" /> },
+                ].map(({ key, label, value, icon }) => (
                   <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
-                    <span className={`block text-[10px] font-semibold ${selectedMetric === key ? "text-neutral-300" : "text-neutral-500"}`}>{label}</span>
+                    <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-neutral-300" : "text-neutral-500"}`}>{icon}{label}</span>
                     <span className="block text-sm font-black font-mono mt-0.5">{value}</span>
                   </button>
                 ))}
@@ -330,7 +277,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                     <span className="text-[10px] text-neutral-400">Всего</span>
-                    <span className="text-lg font-black font-mono text-neutral-900">{grandTotal.toLocaleString("ru-RU")} ₽</span>
+                    <span className="text-lg font-black font-mono text-neutral-900">{formatGarageCurrency(grandTotal)}</span>
                   </div>
                 </div>
               ) : (
@@ -343,32 +290,10 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
               )}
 
               <div className="space-y-1.5 pt-1">
-                {categories.map((cat, idx) => <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className={`w-full flex items-center justify-between text-xs py-1.5 rounded-lg px-1 transition ${activeCategory === cat.name ? "bg-neutral-100" : ""}`}><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length] }} /><span className="text-neutral-700 font-medium">{cat.name}</span></span><span className="font-mono font-bold text-neutral-900">{cat.cost.toLocaleString("ru-RU")} ₽ <span className="text-[10px] text-neutral-400">({cat.percent}%)</span></span></button>)}
+                {categories.map((cat, idx) => <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className={`w-full flex items-center justify-between text-xs py-1.5 rounded-lg px-1 transition ${activeCategory === cat.name ? "bg-neutral-100" : ""}`}><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length] }} /><span className="text-neutral-700 font-medium">{cat.name}</span></span><span className="font-mono font-bold text-neutral-900">{formatGarageCurrency(cat.cost)} <span className="text-[10px] text-neutral-400">({cat.percent}%)</span></span></button>)}
               </div>
             </div>
 
-            {/* AI OCR Scanner banner */}
-            {onScanReceipt && (
-              <div
-                onClick={onScanReceipt}
-                className="p-3.5 rounded-2xl bg-gradient-to-r from-neutral-900 to-neutral-850 text-white border border-neutral-800 hover:border-neutral-700 flex items-center justify-between cursor-pointer active:scale-[0.99] transition shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-red-600/20 flex items-center justify-center text-red-400 border border-red-500/30">
-                    <ScanLine className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white">
-                      Сканировать кассовый чек
-                    </h4>
-                    <p className="text-[10px] text-neutral-300">
-                      Распознавание бензина, запчастей и услуг автосервиса
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-neutral-400" />
-              </div>
-            )}
           </div>
         )}
 
@@ -433,10 +358,10 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                     <div className="flex items-start gap-2 text-right">
                       <div>
                         <div className="text-xs font-mono font-bold text-neutral-900">
-                          {record.totalCost.toLocaleString("ru-RU")} ₽
+                          {formatGarageCurrency(record.totalCost)}
                         </div>
                         <div className="text-[10px] text-neutral-500 font-mono">
-                          {record.liters} л по {record.pricePerLiter} ₽
+                          {formatVolume(record.liters)} по {formatGarageCurrency(record.pricePerLiter)}/{volumeUnitLabel()}
                         </div>
                       </div>
                       {onDeleteFuel && (
@@ -458,7 +383,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                       <span className="text-neutral-500">Расход по этой заправке:</span>
                       <span className="font-mono font-bold text-emerald-600 flex items-center gap-1">
                         <Droplet className="w-3 h-3" />
-                        {record.calculatedConsumption} л / 100 км
+                        {formatConsumption(record.calculatedConsumption ?? 0)}
                       </span>
                     </div>
                   )}

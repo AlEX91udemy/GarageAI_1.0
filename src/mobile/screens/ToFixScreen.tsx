@@ -10,6 +10,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ToFixTask, Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface ToFixScreenProps {
   vehicle: Vehicle;
@@ -100,7 +101,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
               Отлично! Нет активных проблем
             </div>
             <p className="text-xs text-neutral-400 max-w-xs">
-              GarageHub не обнаружил незакрытых замечаний для {vehicle.make} {vehicle.model}.
+              Garage AI не обнаружил незакрытых замечаний для {vehicle.make} {vehicle.model}.
             </p>
           </div>
         ) : (
@@ -138,7 +139,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
 
                   {task.estimatedCost && (
                     <div className="text-xs font-bold text-neutral-200 font-mono">
-                      ~{task.estimatedCost.toLocaleString("ru-RU")} ₽
+                      ~{formatGarageCurrency(task.estimatedCost)}
                     </div>
                   )}
                 </div>

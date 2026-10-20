@@ -1,21 +1,41 @@
 /**
- * GarageHub Mobile Design System Tokens & Style Definitions
+ * Garage AI Mobile Design System Tokens & Style Definitions
  * Matches exact color schemes and naming from the user screenshots
  * Photo 1: Deep obsidian/slate-blue dark mode with vibrant red accent
  * Photo 2: Clean crisp light mode with white surfaces and vibrant red accent
  */
 
 export type ThemeMode = "dark" | "light";
+export type DarkVariant = "dark_racing" | "carbon" | "oled";
+export const DARK_VARIANT_KEY = "garagehub_dark_variant";
+
+export function readDarkVariant(): DarkVariant {
+  try {
+    const saved = localStorage.getItem(DARK_VARIANT_KEY);
+    if (saved === "carbon" || saved === "oled") return saved;
+  } catch {
+    // Keep the default when storage is unavailable.
+  }
+  return "dark_racing";
+}
+
+export function saveDarkVariant(variant: DarkVariant): void {
+  try {
+    localStorage.setItem(DARK_VARIANT_KEY, variant);
+  } catch {
+    // Ignore persistence failures in embedded/private browsers.
+  }
+}
 
 export const THEME = {
   colors: {
     // Brand Accent
     brand: {
-      primary: "#EF4444", // Coral Red
-      glow: "#F87171",
-      dark: "#DC2626",
-      surface: "rgba(239, 68, 68, 0.12)",
-      gradient: "from-red-600 to-rose-600",
+      primary: "#B7F34A",
+      glow: "#D1FF83",
+      dark: "#8CBF32",
+      surface: "rgba(183, 243, 74, 0.12)",
+      gradient: "from-[#B7F34A] to-[#8CBF32]",
     },
     dark: {
       canvas: "#0d131d",

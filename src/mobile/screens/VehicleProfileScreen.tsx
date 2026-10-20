@@ -36,6 +36,7 @@ import { VehicleStage } from "../../components/VehicleStage";
 import { MobileScreenId } from "../types";
 import { ThemeMode } from "../theme";
 import { VehicleModelRenderer } from "../../components/VehicleModelRenderer";
+import { formatGarageCurrency } from "../currency";
 
 interface VehicleProfileScreenProps {
   vehicle: Vehicle;
@@ -73,7 +74,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
   onOpenReminders,
   onOpenAiMechanic,
   onUpdateColor,
-  themeMode = "dark",
+  themeMode = "light",
   initialTab = "works",
   onSelectRecord,
   onAddServiceRecord,
@@ -98,7 +99,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
   const totalExpenses =
     carServices.reduce((sum, r) => sum + (r.totalCost || 0), 0) +
     carFuel.reduce((sum, f) => sum + (f.totalCost || 0), 0);
-  const fmtRub = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
+  const fmtRub = formatGarageCurrency;
   const fmtFuelDate = (d?: string) =>
     d ? new Date(d).toLocaleDateString("ru-RU") : "";
   const fmtLiters = (n: number) =>
@@ -413,7 +414,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
                     {/* Price & Menu */}
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="text-sm font-black font-mono tracking-tight">
-                        {record.totalCost?.toLocaleString("ru-RU")} ₽
+                        {record.totalCost !== undefined && formatGarageCurrency(record.totalCost)}
                       </span>
                       <button
                         type="button"

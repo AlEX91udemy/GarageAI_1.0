@@ -1,24 +1,48 @@
 import React, { useState } from "react";
-import {
-  ArrowLeft,
-  Sliders,
-  Bell,
-  Moon,
-  ShieldCheck,
-  Check,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { GARAGE_CURRENCY_KEY, getGarageCurrency, type GarageCurrency } from "../currency";
+import { DISTANCE_UNIT_KEY, VOLUME_UNIT_KEY } from "../units";
+import { type DarkVariant, type ThemeMode } from "../theme";
+
+const NOTIFY_SERVICE_KEY = "garagehub_notify_service";
+const NOTIFY_AI_KEY = "garagehub_notify_ai";
 
 interface SettingsScreenProps {
   onBack: () => void;
+  themeMode?: ThemeMode;
+  onThemeChange?: (mode: ThemeMode) => void;
+  darkVariant?: DarkVariant;
+  onDarkVariantChange?: (variant: DarkVariant) => void;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
-  const [distanceUnit, setDistanceUnit] = useState<"km" | "mi">("km");
-  const [volumeUnit, setVolumeUnit] = useState<"l" | "gal">("l");
-  const [currency, setCurrency] = useState<"rub" | "usd" | "eur">("rub");
-  const [notifyService, setNotifyService] = useState(true);
-  const [notifyAi, setNotifyAi] = useState(true);
-  const [theme, setTheme] = useState<"dark_racing" | "carbon" | "oled">("dark_racing");
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({
+  onBack,
+  themeMode,
+  onThemeChange,
+  darkVariant = "dark_racing",
+  onDarkVariantChange,
+}) => {
+  const [distanceUnit, setDistanceUnit] = useState<"km" | "mi">(() =>
+    localStorage.getItem(DISTANCE_UNIT_KEY) === "mi" ? "mi" : "km"
+  );
+  const [volumeUnit, setVolumeUnit] = useState<"l" | "gal">(() =>
+    localStorage.getItem(VOLUME_UNIT_KEY) === "gal" ? "gal" : "l"
+  );
+  const [currency, setCurrency] = useState<GarageCurrency>(getGarageCurrency);
+  const [notifyService, setNotifyService] = useState<boolean>(
+    () => localStorage.getItem(NOTIFY_SERVICE_KEY) !== "false"
+  );
+  const [notifyAi, setNotifyAi] = useState<boolean>(
+    () => localStorage.getItem(NOTIFY_AI_KEY) !== "false"
+  );
+  const handleThemeVariant = (variant: DarkVariant) => {
+    onDarkVariantChange?.(variant);
+    // All three variants are dark themes — activate dark mode when selected.
+    onThemeChange?.("dark");
+  };
+
+  // A variant button looks "active" only when the app is currently in dark mode.
+  const variantActive = (variant: DarkVariant) => darkVariant === variant;
 
   return (
     <div className="flex flex-col w-full pb-10 text-white select-none">
@@ -31,9 +55,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
           <ArrowLeft className="w-4 h-4" />
           <span>Назад</span>
         </button>
-
         <span className="text-xs font-bold text-white">Параметры Гаража</span>
-
         <div className="w-8" />
       </div>
 
@@ -48,7 +70,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             <span className="text-neutral-300">Расстояние и одометр:</span>
             <div className="flex bg-neutral-950 rounded-xl p-0.5 border border-neutral-800">
               <button
-                onClick={() => setDistanceUnit("km")}
+                onClick={() => {
+                  setDistanceUnit("km");
+                  localStorage.setItem(DISTANCE_UNIT_KEY, "km");
+                }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                   distanceUnit === "km" ? "bg-red-600 text-white" : "text-neutral-500"
                 }`}
@@ -56,7 +81,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                 Км (km)
               </button>
               <button
-                onClick={() => setDistanceUnit("mi")}
+                onClick={() => {
+                  setDistanceUnit("mi");
+                  localStorage.setItem(DISTANCE_UNIT_KEY, "mi");
+                }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                   distanceUnit === "mi" ? "bg-red-600 text-white" : "text-neutral-500"
                 }`}
@@ -70,7 +98,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             <span className="text-neutral-300">Объем топлива:</span>
             <div className="flex bg-neutral-950 rounded-xl p-0.5 border border-neutral-800">
               <button
-                onClick={() => setVolumeUnit("l")}
+                onClick={() => {
+                  setVolumeUnit("l");
+                  localStorage.setItem(VOLUME_UNIT_KEY, "l");
+                }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                   volumeUnit === "l" ? "bg-red-600 text-white" : "text-neutral-500"
                 }`}
@@ -78,7 +109,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
                 Литры (L)
               </button>
               <button
-                onClick={() => setVolumeUnit("gal")}
+                onClick={() => {
+                  setVolumeUnit("gal");
+                  localStorage.setItem(VOLUME_UNIT_KEY, "gal");
+                }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                   volumeUnit === "gal" ? "bg-red-600 text-white" : "text-neutral-500"
                 }`}
@@ -91,30 +125,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
           <div className="flex justify-between items-center py-1 border-t border-neutral-800/60">
             <span className="text-neutral-300">Валюта:</span>
             <div className="flex bg-neutral-950 rounded-xl p-0.5 border border-neutral-800">
-              <button
-                onClick={() => setCurrency("rub")}
-                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  currency === "rub" ? "bg-red-600 text-white" : "text-neutral-500"
-                }`}
-              >
-                ₽
-              </button>
-              <button
-                onClick={() => setCurrency("usd")}
-                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  currency === "usd" ? "bg-red-600 text-white" : "text-neutral-500"
-                }`}
-              >
-                $
-              </button>
-              <button
-                onClick={() => setCurrency("eur")}
-                className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  currency === "eur" ? "bg-red-600 text-white" : "text-neutral-500"
-                }`}
-              >
-                €
-              </button>
+              {(["rub", "usd", "eur"] as GarageCurrency[]).map((cur, idx) => (
+                <button
+                  key={cur}
+                  onClick={() => {
+                    setCurrency(cur);
+                    localStorage.setItem(GARAGE_CURRENCY_KEY, cur);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                    currency === cur ? "bg-red-600 text-white" : "text-neutral-500"
+                  }`}
+                >
+                  {cur === "rub" ? "₽" : cur === "usd" ? "$" : "€"}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -135,7 +159,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             <input
               type="checkbox"
               checked={notifyService}
-              onChange={(e) => setNotifyService(e.target.checked)}
+              onChange={(e) => {
+                setNotifyService(e.target.checked);
+                localStorage.setItem(NOTIFY_SERVICE_KEY, String(e.target.checked));
+              }}
               className="w-4 h-4 accent-red-600 rounded cursor-pointer"
             />
           </div>
@@ -150,7 +177,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             <input
               type="checkbox"
               checked={notifyAi}
-              onChange={(e) => setNotifyAi(e.target.checked)}
+              onChange={(e) => {
+                setNotifyAi(e.target.checked);
+                localStorage.setItem(NOTIFY_AI_KEY, String(e.target.checked));
+              }}
               className="w-4 h-4 accent-red-600 rounded cursor-pointer"
             />
           </div>
@@ -162,16 +192,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
             Стиль оформления
           </h3>
           <div className="grid grid-cols-3 gap-2">
-            {[
-              { id: "dark_racing", label: "Dark Racing" },
-              { id: "carbon", label: "Carbon Black" },
-              { id: "oled", label: "OLED Midnight" },
-            ].map((th) => (
+            {(
+              [
+                { id: "dark_racing" as DarkVariant, label: "Dark Racing" },
+                { id: "carbon" as DarkVariant, label: "Carbon Black" },
+                { id: "oled" as DarkVariant, label: "OLED Midnight" },
+              ] as { id: DarkVariant; label: string }[]
+            ).map((th) => (
               <button
                 key={th.id}
-                onClick={() => setTheme(th.id as any)}
+                onClick={() => handleThemeVariant(th.id)}
                 className={`p-2.5 rounded-xl border text-center font-bold text-[11px] transition cursor-pointer ${
-                  theme === th.id
+                  variantActive(th.id)
                     ? "bg-red-600 text-white border-red-500 shadow-md shadow-red-600/30"
                     : "bg-neutral-950 text-neutral-400 border-neutral-800"
                 }`}
@@ -180,13 +212,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
               </button>
             ))}
           </div>
+          <p className="text-[10px] text-neutral-500 pt-1">
+            Выбранная схема сразу применяется ко всему приложению.
+          </p>
         </div>
 
         {/* About App */}
         <div className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-center space-y-1">
-          <div className="font-black text-sm text-white">
-            GarageHub Mobile OS
-          </div>
+          <div className="font-black text-sm text-white">Garage AI Mobile OS</div>
           <div className="text-[10px] text-neutral-500 font-mono">
             Версия 2.4.0 (Build 882) • Automotive Edition
           </div>
@@ -198,3 +231,4 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack }) => {
     </div>
   );
 };
+

@@ -11,6 +11,7 @@ import {
   Car,
 } from "lucide-react";
 import { Vehicle, OemScheduleItem } from "../../types";
+import { formatDistance } from "../units";
 
 interface RepairScreenProps {
   vehicle: Vehicle;
@@ -83,7 +84,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
             </h2>
             <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
               <Car className="w-3.5 h-3.5 text-red-600" />
-              <span>{vehicle.make} {vehicle.model} • {vehicle.currentMileage.toLocaleString("ru-RU")} км</span>
+              <span>{vehicle.make} {vehicle.model} • {formatDistance(vehicle.currentMileage)}</span>
             </div>
           </div>
 
@@ -229,11 +230,11 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   {/* Progress bar */}
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between text-[11px] font-mono text-neutral-500">
-                      <span>Интервал: {item.intervalKm.toLocaleString("ru-RU")} км</span>
+                      <span>Интервал: {formatDistance(item.intervalKm)}</span>
                       <span className={status === "overdue" ? "text-rose-600 font-bold" : "text-neutral-700 font-semibold"}>
                         {kmLeft <= 0
-                          ? `Просрочено на ${Math.abs(kmLeft).toLocaleString("ru-RU")} км`
-                          : `Осталось: ${kmLeft.toLocaleString("ru-RU")} км`}
+                          ? `Просрочено на ${formatDistance(Math.abs(kmLeft))}`
+                          : `Осталось: ${formatDistance(kmLeft)}`}
                       </span>
                     </div>
 
@@ -251,7 +252,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                     </div>
 
                     <div className="flex justify-between text-[10px] text-neutral-400 font-mono">
-                      <span>Было на {(item.lastDoneKm || 0).toLocaleString("ru-RU")} км</span>
+                      <span>Было на {formatDistance(item.lastDoneKm || 0)}</span>
                       <span>{percent}% ресурса</span>
                     </div>
                   </div>

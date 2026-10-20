@@ -71,6 +71,8 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // Middleware for parsing JSON with 25mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
@@ -240,6 +242,23 @@ function getAi(): GoogleGenAI {
     });
   }
   return aiClient;
+}
+
+async function requestOpenRouterVision(imageBase64: string, mimeType: string, prompt: string): Promise<string> {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error("OpenRouter API key is not configured");
+  const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "GarageHub" },
+    body: JSON.stringify({ model: OPENROUTER_MODEL, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.message || "OpenRouter request failed (" + response.status + ")");
+  const content = payload?.choices?.[0]?.message?.content;
+  if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
+  if (typeof content !== "string") throw new Error("OpenRouter returned an empty response");
+  return content;
 }
 
 function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T): T {
@@ -1502,7 +1521,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
     return res.status(503).json({ error: "AI-функции не настроены на сервере." });
   }
 
@@ -1843,58 +1862,27 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
       return res.status(400).json({ error: "Некорректное base64-изображение" });
     }
 
-    const ai = getAi();
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: cleanBase64,
-              mimeType: supportedMime,
-            },
-          },
-          {
-            text: `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
+    const receiptPrompt = `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
 Извлеки точные данные и верни JSON со структурой:
 {
   "merchantName": "название СТО, АЗС или магазина",
   "date": "дата в формате YYYY-MM-DD, если есть, иначе сегодня",
   "totalAmount": 12500,
   "category": "repair" | "fuel" | "parts" | "wash" | "tires" | "tuning" | "other",
-  "description": "краткое общее описание чека, например 'Замена моторного масла и фильтра в Fit Service'",
-  "fuelDetails": {
-    "fuelType": "АИ-95" | "ДТ" | null,
-    "liters": 45.2,
-    "pricePerLiter": 58.4
-  },
-  "works": [
-    {
-      "description": "Замена масла ДВС",
-      "cost": 1500
-    }
-  ],
-  "parts": [
-    {
-      "name": "Масло моторное 5W-40",
-      "brand": "Motul",
-      "partNumber": "102784",
-      "quantity": 1,
-      "price": 5400
-    }
-  ],
-  "notes": "любые важные примечания: гарантия, рекомендации мастера"
-}`,
-          },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const parsed = parseJsonSafely(response.text, {});
+  "description": "краткое общее описание чека",
+  "fuelDetails": { "fuelType": "АИ-95" | "ДТ" | null, "liters": 45.2, "pricePerLiter": 58.4 },
+  "works": [{ "description": "Замена масла ДВС", "cost": 1500 }],
+  "parts": [{ "name": "Масло моторное 5W-40", "brand": "Motul", "partNumber": "102784", "quantity": 1, "price": 5400 }],
+  "notes": "важные примечания"
+}`;
+    const responseText = process.env.OPENROUTER_API_KEY
+      ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt)
+      : (await getAi().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
+          config: { responseMimeType: "application/json" },
+        })).text;
+    const parsed = parseJsonSafely(responseText, {});
     res.json(parsed);
   } catch (error: any) {
     console.error("Receipt OCR error:", error);
@@ -2034,3 +2022,4 @@ async function startServer() {
 }
 
 startServer();
+

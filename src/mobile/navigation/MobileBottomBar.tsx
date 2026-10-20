@@ -29,7 +29,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   onTabChange,
   onOpenQuickAction,
   onQuickAction,
-  themeMode = "dark",
+  themeMode = "light",
   badgeCounts,
 }) => {
   const isDark = themeMode === "dark";
@@ -57,7 +57,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           : "bg-white/95 backdrop-blur-xl border-neutral-200/90 text-neutral-900 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
       }`}
     >
-      <div className="flex items-center justify-around max-w-md mx-auto relative px-2 py-1.5 pb-2">
+      <div className="flex items-center justify-around max-w-2xl mx-auto relative px-2 py-1.5 pb-2">
         {/* 1. ГЛАВНАЯ */}
         <button
           id="tab-btn-home"

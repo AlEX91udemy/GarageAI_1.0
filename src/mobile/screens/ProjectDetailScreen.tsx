@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { TuningProject } from "./ProjectsScreen";
 import { Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface ProjectDetailScreenProps {
   project: TuningProject;
@@ -114,13 +115,13 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
             <div>
               <div className="text-[10px] text-neutral-400">Освоено:</div>
               <div className="font-mono font-bold text-white mt-0.5">
-                {project.spent.toLocaleString("ru-RU")} ₽
+                {formatGarageCurrency(project.spent)}
               </div>
             </div>
             <div className="text-right">
               <div className="text-[10px] text-neutral-400">Запланировано:</div>
               <div className="font-mono font-bold text-neutral-300 mt-0.5">
-                {project.budget.toLocaleString("ru-RU")} ₽
+                {formatGarageCurrency(project.budget)}
               </div>
             </div>
           </div>
@@ -170,7 +171,7 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
                     </h3>
                   </div>
                   <span className="text-[10px] font-mono text-neutral-400 shrink-0">
-                    {st.cost.toLocaleString("ru-RU")} ₽
+                    {formatGarageCurrency(st.cost)}
                   </span>
                 </div>
 

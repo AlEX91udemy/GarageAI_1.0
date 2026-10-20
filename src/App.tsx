@@ -69,6 +69,7 @@ import { GarageInventoryToFixView } from "./components/GarageInventoryToFixView"
 import { AiMechanicModal } from "./components/AiMechanicModal";
 import { TuningProjectView } from "./components/TuningProjectView";
 import { ServiceBookModal } from "./components/ServiceBookModal";
+import { readThemePreference, saveThemePreference, applyThemePreference, type ThemePreference } from "./themePreference";
 import { VehicleModal } from "./components/VehicleModal";
 import { RemindersModal } from "./components/RemindersModal";
 import { DataSyncBackupModal } from "./components/DataSyncBackupModal";
@@ -87,34 +88,17 @@ const MobileApp = lazy(() =>
   import("./mobile/MobileApp").then(({ MobileApp }) => ({ default: MobileApp }))
 );
 
+const WebApp = lazy(() =>
+  import("./web/WebApp").then(({ WebApp }) => ({ default: WebApp }))
+);
+
 export default function App() {
-  // Theme state: "light" vs "dark" (switchable via button)
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    try {
-      const saved = localStorage.getItem("garagehub_theme");
-      if (saved === "light" || saved === "dark") return saved;
-      if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        return "dark";
-      }
-    } catch {
-      // fallback
-    }
-    return "dark";
-  });
+  // Theme state: "light" vs "dark" (switchable via button). Light by default.
+  const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("garagehub_theme", theme);
-      if (theme === "dark") {
-        document.documentElement.classList.add("dark");
-        document.documentElement.classList.remove("light");
-      } else {
-        document.documentElement.classList.remove("dark");
-        document.documentElement.classList.add("light");
-      }
-    } catch {
-      // ignore
-    }
+    saveThemePreference(theme);
+    applyThemePreference(theme);
   }, [theme]);
 
   // Mobile vs Web view mode (Defaulting to Web per user requirement)
@@ -236,17 +220,26 @@ export default function App() {
       .catch((err) => {
         console.warn("Backend server not responding, running with local cache:", err);
         setIsOnline(false);
-        // Guest mode must never expose the demo garage cached in localStorage.
-        // Local cache is only a fallback for an authenticated session.
-        setVehicles([]);
-        setReminders([]);
-        setActiveVehicleId("empty-garage");
-        setServiceRecords([]);
-        setFuelRecords([]);
-        setOemSchedules([]);
-        setGarageParts([]);
-        setToFixTasks([]);
-        setTuningStages([]);
+        // The app is usable without an account. Keep the last local garage
+        // available when the server requires authentication or is offline.
+        const readCache = <T,>(key: string): T[] => {
+          try {
+            const value = JSON.parse(localStorage.getItem(key) || "[]");
+            return Array.isArray(value) ? value : [];
+          } catch {
+            return [];
+          }
+        };
+        const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
+        setVehicles(cachedVehicles);
+        setReminders(readCache<ReminderRecord>("garagehub_reminders"));
+        setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
+        setServiceRecords(readCache<ServiceRecord>("garagehub_service_records"));
+        setFuelRecords(readCache<FuelRecord>("garagehub_fuel_records"));
+        setOemSchedules(readCache<OemScheduleItem>("garagehub_oem_schedules"));
+        setGarageParts(readCache<GaragePart>("garagehub_garage_parts"));
+        setToFixTasks(readCache<ToFixTask>("garagehub_to_fix_tasks"));
+        setTuningStages(readCache<TuningStage>("garagehub_tuning_stages"));
       });
 
     return () => {
@@ -623,10 +616,252 @@ export default function App() {
     }
   };
 
+  // Общий слой модальных окон (веб, мобильный предпросмотр, десктоп)
+  const renderAppModals = () => (
+    <>
+      {showAddServiceModal && (
+        <AddServiceModal
+          vehicle={currentVehicle}
+          garageParts={garageParts}
+          toFixTasks={toFixTasks}
+          onClose={() => {
+            setShowAddServiceModal(false);
+            setServiceModalInitialData(undefined);
+          }}
+          onSave={handleSaveServiceRecord}
+          initialData={serviceModalInitialData}
+        />
+      )}
+
+      {showScanReceiptModal && (
+        <ReceiptScannerModal
+          vehicle={currentVehicle}
+          onClose={() => setShowScanReceiptModal(false)}
+          onApplyService={(serviceData) => {
+            setServiceModalInitialData(serviceData);
+            setShowAddServiceModal(true);
+          }}
+          onApplyFuel={(fuelData) => {
+            handleAddFuelRecord({
+              id: "fuel-" + crypto.randomUUID(),
+              vehicleId: currentVehicle.id,
+              date: fuelData.date || new Date().toISOString().split("T")[0],
+              mileage: fuelData.mileage || currentVehicle.currentMileage,
+              liters: fuelData.liters || 50,
+              pricePerLiter: fuelData.pricePerLiter || 60,
+              totalCost: fuelData.totalCost || 3000,
+              fuelType: fuelData.fuelType || "АИ-95",
+              isFullTank: true,
+              station: fuelData.station || "АЗС",
+            });
+            setActiveView("expenses");
+          }}
+        />
+      )}
+
+      {showAiMechanicModal && (
+        <AiMechanicModal
+          vehicle={currentVehicle}
+          serviceRecords={serviceRecords}
+          onClose={() => setShowAiMechanicModal(false)}
+          onAddTaskToFix={(task) => {
+            // Сохраняем задачу на сервере, иначе она теряется после перезагрузки.
+            handleCreateToFixTask(task);
+            setActiveView("garage_inventory");
+            setShowAiMechanicModal(false);
+          }}
+        />
+      )}
+
+      {showServiceBookModal && (
+        <ServiceBookModal
+          vehicle={currentVehicle}
+          serviceRecords={serviceRecords}
+          onClose={() => setShowServiceBookModal(false)}
+          onImportBackup={handleImportBackup}
+        />
+      )}
+
+      {showVehicleModal && (
+        <VehicleModal
+          currentVehicle={currentVehicle}
+          allVehicles={vehicles}
+          initialMode={vehicleModalMode}
+          onClose={() => setShowVehicleModal(false)}
+          onSaveVehicle={handleSaveVehicle}
+          onAddVehicle={handleAddVehicle}
+          onDeleteVehicle={handleDeleteVehicle}
+        />
+      )}
+
+      {showRemindersModal && (
+        <RemindersModal
+          vehicle={currentVehicle}
+          vehicles={vehicles}
+          reminders={reminders}
+          toFixTasks={toFixTasks}
+          oemSchedules={oemSchedules}
+          onClose={() => setShowRemindersModal(false)}
+          onOpenOemSchedule={() => {
+            setActiveView("oem_schedule");
+            setShowRemindersModal(false);
+          }}
+          onOpenInventoryToFix={() => {
+            setActiveView("garage_inventory");
+            setShowRemindersModal(false);
+          }}
+          onResolveOem={handleMarkOemDone}
+        />
+      )}
+
+      {showBackupModal && (
+        <DataSyncBackupModal
+          isOpen={showBackupModal}
+          onClose={() => setShowBackupModal(false)}
+          onDataReloaded={handleDataReloaded}
+          isOnline={isOnline}
+          vehicleId={currentVehicle.id !== "empty-garage" ? currentVehicle.id : undefined}
+        />
+      )}
+
+      {showInstallPcModal && (
+        <InstallPcModal
+          deferredPrompt={deferredInstallPrompt}
+          onClose={() => setShowInstallPcModal(false)}
+          onInstallSuccess={() => setShowInstallPcModal(false)}
+        />
+      )}
+    </>
+  );
+  // Professional WebApp for desktop, MobileApp for mobile preview
+  // below is intentionally unreachable while the product finishes migrating.
+  if (appPlatform === "web") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+        <WebApp
+          vehicles={vehicles}
+          activeVehicleId={activeVehicleId}
+          setActiveVehicleId={setActiveVehicleId}
+          serviceRecords={serviceRecords}
+          fuelRecords={fuelRecords}
+          oemSchedules={oemSchedules}
+          garageParts={garageParts}
+          toFixTasks={toFixTasks}
+          tuningStages={tuningStages}
+          reminders={reminders}
+          theme={theme}
+          onUpdateMileage={handleUpdateMileage}
+          onSaveServiceRecord={handleSaveServiceRecord}
+          onDeleteServiceRecord={handleDeleteServiceRecord}
+          onAddFuelRecord={handleAddFuelRecord}
+          onMarkOemDone={handleMarkOemDone}
+          onInstallPartInService={handleInstallPartInService}
+          onAddVehicle={handleAddVehicle}
+          onSaveVehicle={handleSaveVehicle}
+          onDeleteVehicle={handleDeleteVehicle}
+          onUpdateVehicleColor={handleUpdateVehicleColor}
+          onUpdateVehicleModel3d={handleUpdateVehicleModel3d}
+          onToggleTheme={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
+          onSaveOemScheduleItems={(items) => {
+            setOemSchedules((prev) => {
+              const updatedIds = new Set(items.map((i) => i.id));
+              return [...prev.filter((s) => !updatedIds.has(s.id)), ...items];
+            });
+            apiSaveOemScheduleItems(currentVehicle.id, items).catch(console.error);
+          }}
+          onAddOemScheduleItem={(item) => {
+            const nextItem = { ...item, vehicleId: currentVehicle.id };
+            const itemsForVehicle = [
+              ...oemSchedules.filter(
+                (s) => s.vehicleId === currentVehicle.id || s.vehicleId === "all"
+              ),
+              nextItem,
+            ];
+            setOemSchedules((prev) => [...prev, nextItem]);
+            apiSaveOemScheduleItems(currentVehicle.id, itemsForVehicle).catch(console.error);
+          }}
+          onAddGaragePart={handleAddGaragePart}
+          onUpdateGaragePart={handleUpdateGaragePart}
+          onDeleteGaragePart={handleDeleteGaragePart}
+          onAddToFixTask={handleCreateToFixTask}
+          onUpdateToFixTask={(task) => {
+            setToFixTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+            apiUpdateToFixTask(task.id, task).catch(console.error);
+          }}
+          onCompleteToFixTask={(taskId) => {
+            setToFixTasks((prev) =>
+              prev.map((t) => (t.id === taskId ? { ...t, status: "completed" } : t))
+            );
+            apiCompleteToFixTask(taskId).catch(console.error);
+          }}
+          onAddTuningStage={(stage) => {
+            setTuningStages((prev) => [stage, ...prev]);
+            apiCreateTuningStage(stage).catch(console.error);
+          }}
+          onUpdateTuningStage={(stage) => {
+            setTuningStages((prev) => prev.map((s) => (s.id === stage.id ? stage : s)));
+            apiUpdateTuningStage(stage.id, stage).catch(console.error);
+          }}
+          onDeleteTuningStage={(stageId) => {
+            setTuningStages((prev) => prev.filter((s) => s.id !== stageId));
+            apiDeleteTuningStage(stageId).catch(console.error);
+          }}
+          onAddReminder={(reminder) => {
+            setReminders((prev) => [reminder, ...prev]);
+            apiCreateReminder(reminder).catch(console.error);
+          }}
+          onUpdateReminder={(reminder) => {
+            setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
+            apiUpdateReminder(reminder.id, reminder).catch(console.error);
+          }}
+          onDeleteReminder={(reminderId) => {
+            setReminders((prev) => prev.filter((r) => r.id !== reminderId));
+            apiDeleteReminder(reminderId).catch(console.error);
+          }}
+          onImportBackup={handleImportBackup}
+          onExportBackup={() => {
+            const data = {
+              vehicle: currentVehicle,
+              serviceRecords: serviceRecords.filter((r) => r.vehicleId === currentVehicle.id),
+              fuelRecords: fuelRecords.filter((f) => f.vehicleId === currentVehicle.id),
+              oemSchedules: oemSchedules.filter(
+                (s) => s.vehicleId === currentVehicle.id || s.vehicleId === "all"
+              ),
+              garageParts: garageParts.filter(
+                (p) => p.vehicleId === currentVehicle.id || p.vehicleId === "all"
+              ),
+              toFixTasks: toFixTasks.filter((t) => t.vehicleId === currentVehicle.id),
+              tuningStages: tuningStages.filter((s) => s.vehicleId === currentVehicle.id),
+            };
+            return JSON.stringify(data, null, 2);
+          }}
+          onOpenAddService={() => setShowAddServiceModal(true)}
+          onOpenScanReceipt={() => setShowScanReceiptModal(true)}
+          onOpenAiMechanic={() => setShowAiMechanicModal(true)}
+          onOpenServiceBook={() => setShowServiceBookModal(true)}
+          onOpenReminders={() => setShowRemindersModal(true)}
+          onOpenAddVehicle={() => {
+            setVehicleModalMode("add");
+            setShowVehicleModal(true);
+          }}
+          onOpenEditVehicle={() => {
+            setVehicleModalMode("edit");
+            setShowVehicleModal(true);
+          }}
+          onOpenBackup={() => setShowBackupModal(true)}
+          onSwitchToMobile={() => handleSetPlatform("mobile")}
+        />
+        {renderAppModals()}
+      </Suspense>
+    );
+  }
+
+  // Mobile preview mode
   if (appPlatform === "mobile") {
     return (
       <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
         <MobileApp
+          variant="preview"
           vehicles={vehicles}
           reminders={reminders}
           currentVehicle={currentVehicle}
@@ -682,112 +917,7 @@ export default function App() {
           }}
         />
 
-        {/* Full Parity Modals accessible from Mobile App */}
-        {showAddServiceModal && (
-          <AddServiceModal
-            vehicle={currentVehicle}
-            garageParts={garageParts}
-            toFixTasks={toFixTasks}
-            onClose={() => {
-              setShowAddServiceModal(false);
-              setServiceModalInitialData(undefined);
-            }}
-            onSave={handleSaveServiceRecord}
-            initialData={serviceModalInitialData}
-          />
-        )}
-
-        {showScanReceiptModal && (
-          <ReceiptScannerModal
-            vehicle={currentVehicle}
-            onClose={() => setShowScanReceiptModal(false)}
-            onApplyService={(serviceData) => {
-              setServiceModalInitialData(serviceData);
-              setShowAddServiceModal(true);
-            }}
-            onApplyFuel={(fuelData) => {
-              handleAddFuelRecord({
-                id: "fuel-" + crypto.randomUUID(),
-                vehicleId: currentVehicle.id,
-                date: fuelData.date || new Date().toISOString().split("T")[0],
-                mileage: fuelData.mileage || currentVehicle.currentMileage,
-                liters: fuelData.liters || 50,
-                pricePerLiter: fuelData.pricePerLiter || 60,
-                totalCost: fuelData.totalCost || 3000,
-                fuelType: fuelData.fuelType || "АИ-95",
-                isFullTank: true,
-                station: fuelData.station || "АЗС",
-              });
-            }}
-          />
-        )}
-
-        {showAiMechanicModal && (
-          <AiMechanicModal
-            vehicle={currentVehicle}
-            serviceRecords={serviceRecords}
-            onClose={() => setShowAiMechanicModal(false)}
-            onAddTaskToFix={(task) => {
-              // Сохраняем задачу на сервере (не только в локальном состоянии),
-              // иначе она теряется после перезагрузки страницы.
-              handleCreateToFixTask(task);
-              setShowAiMechanicModal(false);
-            }}
-          />
-        )}
-
-        {showServiceBookModal && (
-          <ServiceBookModal
-            vehicle={currentVehicle}
-            serviceRecords={serviceRecords}
-            onClose={() => setShowServiceBookModal(false)}
-            onImportBackup={handleImportBackup}
-          />
-        )}
-
-        {showVehicleModal && (
-          <VehicleModal
-            currentVehicle={currentVehicle}
-            allVehicles={vehicles}
-            initialMode={vehicleModalMode}
-            onClose={() => setShowVehicleModal(false)}
-            onSaveVehicle={handleSaveVehicle}
-            onAddVehicle={handleAddVehicle}
-            onDeleteVehicle={handleDeleteVehicle}
-          />
-        )}
-
-        {showRemindersModal && (
-          <RemindersModal
-            vehicle={currentVehicle}
-            vehicles={vehicles}
-            reminders={reminders}
-            toFixTasks={toFixTasks}
-            oemSchedules={oemSchedules}
-            onClose={() => setShowRemindersModal(false)}
-            onOpenOemSchedule={() => setShowRemindersModal(false)}
-            onOpenInventoryToFix={() => setShowRemindersModal(false)}
-            onResolveOem={handleMarkOemDone}
-          />
-        )}
-
-        {showBackupModal && (
-          <DataSyncBackupModal
-            isOpen={showBackupModal}
-            onClose={() => setShowBackupModal(false)}
-            onDataReloaded={handleDataReloaded}
-            isOnline={isOnline}
-            vehicleId={currentVehicle.id !== "empty-garage" ? currentVehicle.id : undefined}
-          />
-        )}
-
-        {showInstallPcModal && (
-          <InstallPcModal
-            deferredPrompt={deferredInstallPrompt}
-            onClose={() => setShowInstallPcModal(false)}
-            onInstallSuccess={() => setShowInstallPcModal(false)}
-          />
-        )}
+        {renderAppModals()}
       </Suspense>
     );
   }
@@ -812,20 +942,12 @@ export default function App() {
         <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Brand Logo & Name */}
-            <button type="button" aria-label="GarageHub — главная"
+            <button type="button" aria-label="Garage AI — главная"
               aria-current={activeView === "dashboard" ? "page" : undefined} onClick={() => setActiveView("dashboard")}
               className="flex items-center gap-2 cursor-pointer group"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-white font-black text-xs shadow-sm shadow-red-600/30 group-hover:scale-105 transition-transform">
-                GH
-              </div>
-              <div>
-                <span className={`font-extrabold text-sm tracking-tight leading-none ${
-                  theme === "light" ? "text-slate-900" : "text-white"
-                }`}>
-                  GarageHub
-                </span>
-              </div>
+              <img src="/garage-ai-mark.png" alt="" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg group-hover:scale-105 transition-transform" />
+              <img src="/garageai-wordmark.png" alt="GarageAI" className="w-24 h-5 object-contain object-left" />
             </button>
 
             {/* Desktop Navigation Links */}
@@ -1024,7 +1146,7 @@ export default function App() {
                   ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
                   : "bg-red-600/15 hover:bg-red-600/25 text-red-300 border-red-500/30"
               }`}
-              title="Установить GarageHub на компьютер (ПК) / Скачать как отдельное приложение"
+              title="Установить Garage AI на компьютер (ПК) / Скачать как отдельное приложение"
             >
               <Download aria-hidden="true" className="w-3.5 h-3.5 text-red-500" />
               <span className="hidden sm:inline">Установить на ПК</span>
@@ -1299,119 +1421,7 @@ export default function App() {
       </nav>
 
       {/* Modals */}
-      {showAddServiceModal && (
-        <AddServiceModal
-          vehicle={currentVehicle}
-          garageParts={garageParts}
-          toFixTasks={toFixTasks}
-          onClose={() => {
-            setShowAddServiceModal(false);
-            setServiceModalInitialData(undefined);
-          }}
-          onSave={handleSaveServiceRecord}
-          initialData={serviceModalInitialData}
-        />
-      )}
-
-      {showScanReceiptModal && (
-        <ReceiptScannerModal
-          vehicle={currentVehicle}
-          onClose={() => setShowScanReceiptModal(false)}
-          onApplyService={(serviceData) => {
-            setServiceModalInitialData(serviceData);
-            setShowAddServiceModal(true);
-          }}
-          onApplyFuel={(fuelData) => {
-            handleAddFuelRecord({
-              id: "fuel-" + crypto.randomUUID(),
-              vehicleId: currentVehicle.id,
-              date: fuelData.date || new Date().toISOString().split("T")[0],
-              mileage: fuelData.mileage || currentVehicle.currentMileage,
-              liters: fuelData.liters || 50,
-              pricePerLiter: fuelData.pricePerLiter || 60,
-              totalCost: fuelData.totalCost || 3000,
-              fuelType: fuelData.fuelType || "АИ-95",
-              isFullTank: true,
-              station: fuelData.station || "АЗС",
-            });
-            setActiveView("expenses");
-          }}
-        />
-      )}
-
-      {showAiMechanicModal && (
-        <AiMechanicModal
-          vehicle={currentVehicle}
-          serviceRecords={serviceRecords}
-          onClose={() => setShowAiMechanicModal(false)}
-          onAddTaskToFix={(task) => {
-            // Сохраняем задачу на сервере (не только в локальном состоянии),
-            // иначе она теряется после перезагрузки страницы.
-            handleCreateToFixTask(task);
-            setActiveView("garage_inventory");
-            setShowAiMechanicModal(false);
-          }}
-        />
-      )}
-
-      {showServiceBookModal && (
-        <ServiceBookModal
-          vehicle={currentVehicle}
-          serviceRecords={serviceRecords}
-          onClose={() => setShowServiceBookModal(false)}
-          onImportBackup={handleImportBackup}
-        />
-      )}
-
-      {showVehicleModal && (
-        <VehicleModal
-          currentVehicle={currentVehicle}
-          allVehicles={vehicles}
-          initialMode={vehicleModalMode}
-          onClose={() => setShowVehicleModal(false)}
-          onSaveVehicle={handleSaveVehicle}
-          onAddVehicle={handleAddVehicle}
-          onDeleteVehicle={handleDeleteVehicle}
-        />
-      )}
-
-      {showRemindersModal && (
-        <RemindersModal
-          vehicle={currentVehicle}
-          vehicles={vehicles}
-          reminders={reminders}
-          toFixTasks={toFixTasks}
-          oemSchedules={oemSchedules}
-          onClose={() => setShowRemindersModal(false)}
-          onOpenOemSchedule={() => {
-            setActiveView("oem_schedule");
-            setShowRemindersModal(false);
-          }}
-          onOpenInventoryToFix={() => {
-            setActiveView("garage_inventory");
-            setShowRemindersModal(false);
-          }}
-          onResolveOem={handleMarkOemDone}
-        />
-      )}
-
-      {showBackupModal && (
-        <DataSyncBackupModal
-          isOpen={showBackupModal}
-          onClose={() => setShowBackupModal(false)}
-          onDataReloaded={handleDataReloaded}
-          isOnline={isOnline}
-          vehicleId={currentVehicle.id !== "empty-garage" ? currentVehicle.id : undefined}
-        />
-      )}
-
-      {showInstallPcModal && (
-        <InstallPcModal
-          deferredPrompt={deferredInstallPrompt}
-          onClose={() => setShowInstallPcModal(false)}
-          onInstallSuccess={() => setShowInstallPcModal(false)}
-        />
-      )}
+      {renderAppModals()}
     </div>
   );
 }

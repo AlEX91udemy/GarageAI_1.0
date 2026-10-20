@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, OemScheduleItem } from "../../types";
 import { exportServiceBookToPdf } from "../../utils/serviceBookPdfExport";
+import { formatGarageCurrency } from "../currency";
 
 interface ServiceScreenProps {
   vehicle: Vehicle;
@@ -71,11 +72,11 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
   const dueSoonCount = upcomingItems.filter((i) => i.priority === "due_soon").length;
 
   return (
-    <div className="flex flex-col w-full pb-8 bg-neutral-100 text-neutral-900 select-none">
+    <div className="flex flex-col w-full pb-8 bg-neutral-100 dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 backdrop-blur-md border-b border-neutral-200/80 sticky top-0 z-20 shadow-xs">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-[#1f2c3f] sticky top-0 z-20 shadow-xs">
         <div>
-          <h2 className="text-xl font-black text-neutral-900 tracking-tight">
+          <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight">
             Сервис и ТО
           </h2>
           <p className="text-xs text-neutral-500">
@@ -122,13 +123,13 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
 
       {/* Segmented Tab Controller (UPCOMING / HISTORY) */}
       <div className="px-4 py-3">
-        <div className="flex p-1 bg-neutral-200/70 rounded-2xl border border-neutral-200">
+        <div className="flex p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#2b3a50]">
           <button
             onClick={() => setActiveTab("upcoming")}
             className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "upcoming"
-                ? "bg-white text-neutral-900 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900"
+                ? "bg-white dark:bg-[#243044] text-neutral-900 dark:text-white shadow-xs"
+                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
             }`}
           >
             <span>Ближайшие ТО</span>
@@ -141,8 +142,8 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
             onClick={() => setActiveTab("history")}
             className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === "history"
-                ? "bg-white text-neutral-900 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900"
+                ? "bg-white dark:bg-[#243044] text-neutral-900 dark:text-white shadow-xs"
+                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
             }`}
           >
             <span>История ({carRecords.length})</span>
@@ -244,7 +245,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                 Сервисная книжка авто
               </div>
               <div className="text-xs font-bold text-neutral-900 truncate">
-                {carRecords.length} {carRecords.length === 1 ? "запись" : "записей"} • {carRecords.reduce((s, r) => s + r.totalCost, 0).toLocaleString("ru-RU")} ₽
+                {carRecords.length} {carRecords.length === 1 ? "запись" : "записей"} • {formatGarageCurrency(carRecords.reduce((s, r) => s + r.totalCost, 0))}
               </div>
             </div>
             <button
@@ -281,7 +282,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-sm font-black text-neutral-900 font-mono">
-                      {record.totalCost.toLocaleString("ru-RU")} ₽
+                      {formatGarageCurrency(record.totalCost)}
                     </div>
                     <div className="text-[10px] text-neutral-400 font-mono">
                       {record.date}
