@@ -55,6 +55,7 @@ export function getVehicleModelSpec(vehicle: Pick<Vehicle, "make" | "model" | "b
     model: catalogModel.name,
     bodyType,
     description: BODY_DESCRIPTIONS[bodyType],
+    placeholder: undefined,
   };
 }
 

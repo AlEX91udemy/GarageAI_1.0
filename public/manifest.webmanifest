@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "GarageHub — Дневник авто и ремонта",
-  "short_name": "GarageHub",
+  "name": "Garage AI — Дневник авто и ремонта",
+  "short_name": "Garage AI",
   "description": "Мультиавтомобильный дневник техобслуживания и ремонта: регламент ТО, журнал с чеками, учёт топлива, склад запчастей и AI-диагностика.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "theme_color": "#b91c1c",
-  "background_color": "#0f172a",
+  "theme_color": "#171B1A",
+  "background_color": "#171B1A",
   "lang": "ru",
   "categories": ["utilities", "productivity", "lifestyle"],
   "icons": [

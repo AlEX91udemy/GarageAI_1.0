@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, logout, restoreSession, type AuthSession } from "../../api";
+import { restoreSession } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -49,11 +49,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onLogout,
   onAuthSuccess,
 }) => {
-  const [authMode, setAuthMode] = React.useState<"login" | "register">("login");
-  const [username, setUsername] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [authError, setAuthError] = React.useState<string | null>(null);
-  const [authBusy, setAuthBusy] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
 
@@ -64,24 +59,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     });
   }, []);
 
-  const submitAuth = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setAuthBusy(true);
-    setAuthError(null);
-    try {
-      const session: AuthSession = authMode === "login"
-        ? await login(username, password)
-        : await register(username, password);
-      setIsAuthenticated(true);
-      setSessionUsername(session.username);
-      setPassword("");
-      onAuthSuccess?.();
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Не удалось выполнить вход");
-    } finally {
-      setAuthBusy(false);
-    }
-  };
   const totalMileage = vehicles.reduce((sum, v) => sum + v.currentMileage, 0);
   const totalServiceSpent = serviceRecords.reduce(
     (sum, r) => sum + (r.totalCost || 0),
@@ -111,7 +88,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-black text-neutral-900 truncate">
-              {isAuthenticated ? sessionUsername ?? username : "Гостевой профиль"}
+              {isAuthenticated ? sessionUsername ?? "Владелец гаража" : "Гостевой профиль"}
             </h3>
             {isAuthenticated && (
               <div className="text-xs text-neutral-500 font-mono truncate">
@@ -120,37 +97,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             )}
             <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? "bg-emerald-500" : "bg-neutral-400"}`} />
-              <span>{isAuthenticated ? "GarageHub PRO • Синхронизировано" : "Гостевой режим • Аккаунт не подключён"}</span>
+              <span>{isAuthenticated ? "Garage AI PRO • Синхронизировано" : "Гостевой режим • Аккаунт не подключён"}</span>
             </div>
           </div>
-        </div>
-
-        <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-black text-neutral-900">Синхронизация аккаунта</h3>
-              <p className="text-[11px] text-neutral-500 mt-1">Вход и регистрация доступны из профиля</p>
-            </div>
-            {isAuthenticated && <span className="text-[10px] font-bold text-emerald-600">Подключено</span>}
-          </div>
-          {!isAuthenticated ? (
-            <form onSubmit={submitAuth} className="space-y-2">
-              <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Логин" autoComplete="username" className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" required />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль от 8 символов" autoComplete={authMode === "login" ? "current-password" : "new-password"} className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs outline-none focus:border-red-500" minLength={8} required />
-              {authError && <p className="text-[11px] text-red-600">{authError}</p>}
-              <button disabled={authBusy} className="w-full rounded-xl bg-red-600 text-white py-2.5 text-xs font-bold disabled:opacity-50">{authBusy ? "Подключение..." : authMode === "login" ? "Войти" : "Создать аккаунт"}</button>
-              <button type="button" onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
-                {authMode === "login" ? "Нет аккаунта? Зарегистрироваться" : "Уже есть аккаунт? Войти"}
-              </button>
-            </form>
-          ) : (
-            <button type="button" onClick={() => { void logout().finally(() => { setIsAuthenticated(false); setSessionUsername(null); }); }} className="w-full rounded-xl border border-neutral-200 py-2.5 text-xs font-bold text-neutral-700">Выйти из аккаунта</button>
-          )}
         </div>
 
         {isAuthenticated && (<>
         {/* Global Garage Statistics */}
-        <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
+        <div className="hidden p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
           <h3 className="text-xs font-bold text-neutral-700 uppercase tracking-wider">
             Статистика автопарка
           </h3>

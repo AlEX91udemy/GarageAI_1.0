@@ -6,6 +6,15 @@ import {
   MapPin,
 } from "lucide-react";
 import { FuelRecord, Vehicle } from "../../types";
+import { CURRENCY_SYMBOLS, formatGarageCurrency, getGarageCurrency } from "../currency";
+import {
+  formatDistance,
+  formatVolume,
+  formatConsumption,
+  consumptionLabel,
+  volumeUnitLabel,
+  distanceUnitLabel,
+} from "../units";
 
 interface FuelScreenProps {
   vehicle: Vehicle;
@@ -38,6 +47,7 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
       : 10.2;
 
   const costPerKm = (avgConsumption * avgPrice) / 100;
+  const currencySymbol = CURRENCY_SYMBOLS[getGarageCurrency()];
 
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
@@ -69,10 +79,7 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
               Средний расход
             </div>
             <div className="text-2xl font-black text-neutral-900 font-mono mt-0.5 flex items-baseline gap-1">
-              <span>{avgConsumption.toFixed(1)}</span>
-              <span className="text-xs font-sans text-neutral-500 font-normal">
-                л / 100 км
-              </span>
+              <span>{formatConsumption(avgConsumption)}</span>
             </div>
             <div className="text-[10px] text-emerald-600 flex items-center gap-1 mt-1 font-semibold">
               <TrendingDown className="w-3 h-3" />
@@ -82,16 +89,16 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
 
           <div className="p-3.5 rounded-2xl bg-white border border-neutral-200/90 shadow-xs">
             <div className="text-[11px] text-neutral-500 font-medium">
-              Стоимость 1 км пути
+              Стоимость 1 {distanceUnitLabel()} пути
             </div>
             <div className="text-2xl font-black text-neutral-900 font-mono mt-0.5 flex items-baseline gap-1">
               <span>{costPerKm.toFixed(2)}</span>
               <span className="text-xs font-sans text-neutral-500 font-normal">
-                ₽ / км
+                {currencySymbol} / {distanceUnitLabel()}
               </span>
             </div>
             <div className="text-[10px] text-neutral-500 mt-1">
-              АИ-95 (~{avgPrice.toFixed(1)} ₽/л)
+              АИ-95 (~{formatGarageCurrency(avgPrice)}/{volumeUnitLabel()})
             </div>
           </div>
         </div>
@@ -99,15 +106,15 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
         {/* Total stats strip */}
         <div className="p-3.5 rounded-2xl bg-white border border-neutral-200/90 shadow-xs flex justify-between items-center text-xs">
           <div>
-            <div className="text-[10px] text-neutral-500">Всего бензина</div>
+            <div className="text-[10px] text-neutral-500">Всего топлива</div>
             <div className="font-mono font-bold text-neutral-900 mt-0.5">
-              {totalLiters.toFixed(1)} л
+              {formatVolume(totalLiters)}
             </div>
           </div>
           <div className="text-right">
             <div className="text-[10px] text-neutral-500">Сумма чеков</div>
             <div className="font-mono font-bold text-emerald-600 mt-0.5">
-              {totalCost.toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(totalCost)}
             </div>
           </div>
         </div>
@@ -116,12 +123,11 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
         <div className="p-4 rounded-2xl bg-white border border-neutral-200/90 shadow-xs space-y-3">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold text-neutral-700 uppercase tracking-wide">
-              Динамика расхода (л / 100 км)
+              Динамика расхода ({consumptionLabel()})
             </h3>
             <span className="text-[10px] font-mono text-neutral-400">Последние заправки</span>
           </div>
 
-          {/* Simple crisp mobile bar chart */}
           <div className="flex items-end justify-between h-28 pt-4 pb-1 gap-2 border-b border-neutral-100">
             {carFuel.slice(0, 5).reverse().map((f, i) => {
               const val = f.calculatedConsumption || 10.2;
@@ -129,7 +135,7 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
               return (
                 <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
                   <span className="text-[10px] font-mono text-neutral-700 font-bold">
-                    {val.toFixed(1)}
+                    {formatConsumption(val)}
                   </span>
                   <div className="w-full max-w-[28px] bg-neutral-100 rounded-t-lg relative overflow-hidden" style={{ height: `${heightPct}%` }}>
                     <div className="absolute inset-0 bg-gradient-to-t from-emerald-600 to-emerald-500 rounded-t-lg" />
@@ -161,23 +167,23 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
                   </div>
                   <div>
                     <div className="text-xs font-bold text-neutral-900">
-                      {fuel.liters} л • {fuel.fuelType}
+                      {formatVolume(fuel.liters)} • {fuel.fuelType}
                     </div>
                     <div className="text-[10px] text-neutral-500 flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3 h-3 text-neutral-400" />
                       <span>{fuel.station || "АЗС"}</span>
                       <span>•</span>
-                      <span>{fuel.mileage.toLocaleString("ru-RU")} км</span>
+                      <span>{formatDistance(fuel.mileage)}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
                   <div className="text-xs font-mono font-bold text-neutral-900">
-                    {fuel.totalCost.toLocaleString("ru-RU")} ₽
+                    {formatGarageCurrency(fuel.totalCost)}
                   </div>
                   <div className="text-[9px] text-neutral-400 font-mono">
-                    {fuel.pricePerLiter} ₽/л • {fuel.date}
+                    {formatGarageCurrency(fuel.pricePerLiter)}/{volumeUnitLabel()} • {fuel.date}
                   </div>
                 </div>
               </div>
@@ -188,3 +194,4 @@ export const FuelScreen: React.FC<FuelScreenProps> = ({
     </div>
   );
 };
+

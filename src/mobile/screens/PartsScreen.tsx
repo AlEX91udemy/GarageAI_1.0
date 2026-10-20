@@ -6,6 +6,7 @@ import {
   ScanBarcode,
 } from "lucide-react";
 import { GaragePart, Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface PartsScreenProps {
   parts: GaragePart[];
@@ -168,7 +169,7 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
 
                   <div className="text-right shrink-0">
                     <div className="text-xs font-mono font-bold text-neutral-900">
-                      {(part.purchasePrice * part.quantity).toLocaleString("ru-RU")} ₽
+                      {formatGarageCurrency(part.purchasePrice * part.quantity)}
                     </div>
                     <div className="text-[10px] text-neutral-500 font-mono">
                       {part.quantity} шт.

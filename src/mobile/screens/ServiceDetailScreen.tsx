@@ -11,6 +11,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { ServiceRecord, Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
+import { formatDistance } from "../units";
 
 interface ServiceDetailScreenProps {
   record: ServiceRecord;
@@ -72,14 +74,14 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
             </div>
             <div className="flex items-center gap-2 text-xs text-neutral-600">
               <Gauge className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="font-mono">{record.mileage.toLocaleString("ru-RU")} км</span>
+              <span className="font-mono">{formatDistance(record.mileage)}</span>
             </div>
           </div>
 
           <div className="mt-3 p-3 rounded-2xl bg-neutral-50 border border-neutral-200/70 flex items-baseline justify-between">
             <span className="text-xs text-neutral-500 font-medium">Итоговая стоимость:</span>
             <span className="text-2xl font-black text-neutral-900 font-mono">
-              {record.totalCost.toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(record.totalCost)}
             </span>
           </div>
         </div>
@@ -92,13 +94,13 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
           <div className="flex justify-between text-xs py-1 border-b border-neutral-100">
             <span className="text-neutral-500">Работы сервиса (Labor):</span>
             <span className="font-mono text-neutral-900 font-semibold">
-              {(record.laborCost || 0).toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(record.laborCost || 0)}
             </span>
           </div>
           <div className="flex justify-between text-xs py-1">
             <span className="text-neutral-500">Запчасти и расходники:</span>
             <span className="font-mono text-neutral-900 font-semibold">
-              {(record.totalCost - (record.laborCost || 0)).toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(record.totalCost - (record.laborCost || 0))}
             </span>
           </div>
         </div>
@@ -150,7 +152,7 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
                     </div>
                   </div>
                   <div className="text-xs font-mono font-bold text-neutral-900">
-                    {(part.quantity * part.unitPrice).toLocaleString("ru-RU")} ₽
+                    {formatGarageCurrency(part.quantity * part.unitPrice)}
                   </div>
                 </div>
               ))}

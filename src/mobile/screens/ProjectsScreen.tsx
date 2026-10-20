@@ -11,6 +11,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Vehicle } from "../../types";
+import { CURRENCY_SYMBOLS, getGarageCurrency } from "../currency";
 
 export interface TuningProject {
   id: string;
@@ -114,7 +115,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
                 <div>
                   <div className="text-[10px] text-neutral-400">Бюджет проекта:</div>
                   <div className="font-mono font-bold text-white mt-0.5">
-                    {proj.spent.toLocaleString("ru-RU")} / {proj.budget.toLocaleString("ru-RU")} ₽
+                    {proj.spent.toLocaleString("ru-RU")} / {proj.budget.toLocaleString("ru-RU")} {CURRENCY_SYMBOLS[getGarageCurrency()]}
                   </div>
                 </div>
 
