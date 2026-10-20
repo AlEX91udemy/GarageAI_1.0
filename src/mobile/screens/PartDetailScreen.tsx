@@ -11,6 +11,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { GaragePart, Vehicle } from "../../types";
+import { formatGarageCurrency } from "../currency";
 
 interface PartDetailScreenProps {
   part: GaragePart;
@@ -76,7 +77,7 @@ export const PartDetailScreen: React.FC<PartDetailScreenProps> = ({
           <div className="mt-4 p-3 rounded-2xl bg-neutral-50 border border-neutral-200 flex items-baseline justify-between">
             <span className="text-xs text-neutral-500 font-medium">Стоимость позиции:</span>
             <span className="text-2xl font-black text-neutral-900 font-mono">
-              {(part.purchasePrice * part.quantity).toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(part.purchasePrice * part.quantity)}
             </span>
           </div>
         </div>
@@ -93,7 +94,7 @@ export const PartDetailScreen: React.FC<PartDetailScreenProps> = ({
           <div className="flex justify-between items-center py-1 border-b border-neutral-100">
             <span className="text-neutral-500">Цена за 1 единицу:</span>
             <span className="font-bold text-neutral-900 font-mono">
-              {part.purchasePrice.toLocaleString("ru-RU")} ₽
+              {formatGarageCurrency(part.purchasePrice)}
             </span>
           </div>
 

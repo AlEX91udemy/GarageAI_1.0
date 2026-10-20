@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, ToFixTask, FuelRecord, OemScheduleItem } from "../../types";
 import { computeGarageIntelligence } from "../../garageIntelligence";
+import { formatGarageCurrency } from "../currency";
+import { formatDistance } from "../units";
 
 interface AiDiagnosticsScreenProps {
   vehicle: Vehicle;
@@ -160,7 +162,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
               <ul className="text-xs text-neutral-300 leading-relaxed list-disc pl-4">
                 <li>Средний пробег: {intelligence.avgKmPerMonth !== null ? `${intelligence.avgKmPerMonth.toLocaleString("ru-RU")} км/мес` : "нет данных"}</li>
                 <li>Средний расход: {intelligence.avgFuelConsumption !== null ? `${intelligence.avgFuelConsumption} л/100 км` : "нет данных"}</li>
-                <li>Средняя стоимость ТО: {intelligence.avgServiceCost !== null ? `${intelligence.avgServiceCost.toLocaleString("ru-RU")} ₽` : "нет данных"}</li>
+                <li>Средняя стоимость ТО: {intelligence.avgServiceCost !== null ? formatGarageCurrency(intelligence.avgServiceCost) : "нет данных"}</li>
                 <li>Открытых задач: {intelligence.openTasks}, срочных: {intelligence.urgentTasks}</li>
               </ul>
             </div>
@@ -178,7 +180,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
                   </span>
                 </div>
                 <div className="text-[11px] text-neutral-300 font-mono">
-                  Суммарные затраты: {item.totalCost.toLocaleString("ru-RU")} ₽
+                  Суммарные затраты: {formatGarageCurrency(item.totalCost)}
                 </div>
               </div>
             ))}
@@ -194,10 +196,10 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
               <div key={rec.id} className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex justify-between items-center text-xs">
                 <div>
                   <div className="font-bold text-white">{rec.title}</div>
-                  <div className="text-[10px] text-neutral-400">{rec.date} • {rec.mileage.toLocaleString("ru-RU")} км</div>
+                  <div className="text-[10px] text-neutral-400">{rec.date} • {formatDistance(rec.mileage)}</div>
                 </div>
                 <div className="font-mono text-neutral-300 font-bold">
-                  {rec.totalCost.toLocaleString("ru-RU")} ₽
+                  {formatGarageCurrency(rec.totalCost)}
                 </div>
               </div>
             ))}

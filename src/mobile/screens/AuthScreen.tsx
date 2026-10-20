@@ -35,11 +35,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center font-black text-xs text-white">
-            GH
-          </div>
+          <img src="/garage-ai-mark.png" alt="" className="w-8 h-8 rounded-lg" />
           <div>
-            <div className="text-xs font-bold text-white tracking-tight">GarageHub ID</div>
+            <div className="text-xs font-bold text-white tracking-tight">Garage AI ID</div>
             <div className="text-[10px] text-neutral-400">Демо-доступ к авто</div>
           </div>
         </div>

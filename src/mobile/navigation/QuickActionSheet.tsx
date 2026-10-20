@@ -34,22 +34,6 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
     border: string;
   }> = [
     {
-      id: "fuel",
-      label: "Заправка",
-      sublabel: "Литры, стоимость, АЗС, расчет расхода",
-      icon: <Fuel className="w-5 h-5 text-emerald-600" />,
-      bg: "bg-emerald-50",
-      border: "border-emerald-100",
-    },
-    {
-      id: "service",
-      label: "Обслуживание и ремонт",
-      sublabel: "Плановое ТО, ремонт и замена узлов",
-      icon: <Wrench className="w-5 h-5 text-blue-600" />,
-      bg: "bg-blue-50",
-      border: "border-blue-100",
-    },
-    {
       id: "scan_barcode",
       label: "Сканер деталей / VIN",
       sublabel: "Камера: штрихкод запчасти, QR или VIN",
@@ -64,6 +48,22 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
       icon: <ScanLine className="w-5 h-5 text-rose-600" />,
       bg: "bg-rose-50",
       border: "border-rose-100",
+    },
+    {
+      id: "fuel",
+      label: "Заправка",
+      sublabel: "Литры, стоимость, АЗС, расчет расхода",
+      icon: <Fuel className="w-5 h-5 text-emerald-600" />,
+      bg: "bg-emerald-50",
+      border: "border-emerald-100",
+    },
+    {
+      id: "service",
+      label: "Обслуживание и ремонт",
+      sublabel: "Плановое ТО, ремонт и замена узлов",
+      icon: <Wrench className="w-5 h-5 text-blue-600" />,
+      bg: "bg-blue-50",
+      border: "border-blue-100",
     },
   ];
 

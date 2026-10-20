@@ -9,7 +9,8 @@ import {
   ReminderRecord,
 } from "../types";
 import { MobileTab, MobileScreenId, QuickActionType } from "./types";
-import { ThemeMode } from "./theme";
+import { DarkVariant, ThemeMode, readDarkVariant, saveDarkVariant } from "./theme";
+import { readThemePreference, saveThemePreference, applyThemePreference } from "../themePreference";
 import { MobileBottomBar } from "./navigation/MobileBottomBar";
 import { QuickActionSheet } from "./navigation/QuickActionSheet";
 
@@ -40,11 +41,13 @@ import { NotificationsScreen } from "./screens/NotificationsScreen";
 import { ProfileScreen } from "./screens/ProfileScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { PrefilledScanData } from "./types";
+import { buildNotifications } from "../notifications";
 
 // Web modals we can trigger if needed or re-use
 import { Smartphone, Monitor, Sparkles, Car } from "lucide-react";
 
 interface MobileAppProps {
+  variant?: "preview" | "web";
   vehicles: Vehicle[];
   reminders?: ReminderRecord[];
   currentVehicle: Vehicle;
@@ -79,6 +82,7 @@ interface MobileAppProps {
 }
 
 export const MobileApp: React.FC<MobileAppProps> = ({
+  variant = "preview",
   vehicles,
   reminders = [],
   currentVehicle,
@@ -111,23 +115,23 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onLogout,
   onDeleteFuelRecord,
 }) => {
+  const isWeb = variant === "web";
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
   const [activeTab, setActiveTab] = useState<MobileTab>("home");
+  const generatedNotifications = buildNotifications(currentVehicle, oemSchedules, serviceRecords, toFixTasks, garageParts, reminders);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState<"frame" | "full">("frame");
 
-  // App color theme state (dark by default matching Photo 1, can toggle to light matching Photo 2)
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
-    const saved = localStorage.getItem("garagehub_theme");
-    return saved === "light" ? "light" : "dark";
-  });
+  // App color theme state. Light is the default (Photo 2); dark stays a toggle.
+  const [themeMode, setThemeMode] = useState<ThemeMode>(readThemePreference);
+  const [darkVariant, setDarkVariant] = useState<DarkVariant>(readDarkVariant);
+
   useLayoutEffect(() => {
     const html = document.documentElement;
     const wasDark = html.classList.contains("dark");
     const wasLight = html.classList.contains("light");
-    html.classList.toggle("dark", themeMode === "dark");
-    html.classList.toggle("light", themeMode === "light");
+    applyThemePreference(themeMode);
     return () => {
       html.classList.toggle("dark", wasDark);
       html.classList.toggle("light", wasLight);
@@ -137,7 +141,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   const toggleTheme = () => {
     setThemeMode((prev) => {
       const next = prev === "dark" ? "light" : "dark";
-      localStorage.setItem("garagehub_theme", next);
+      saveThemePreference(next);
       return next;
     });
   };
@@ -313,7 +317,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               navigateTo("profile");
             }}
             onUpdateMileage={onUpdateMileage}
-            unreadNotificationsCount={3}
+            unreadNotificationsCount={generatedNotifications.length}
             onOpenAddVehicle={onOpenAddVehicleModal}
             onOpenServiceBook={onOpenServiceBookModal}
             onOpenReminders={onOpenRemindersModal}
@@ -424,10 +428,6 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             garageParts={garageParts}
             onAddFuel={() => {
               setInitialQuickActionType("fuel");
-              setCurrentScreen("add_event");
-            }}
-            onAddExpense={() => {
-              setInitialQuickActionType("expense");
               setCurrentScreen("add_event");
             }}
             onScanReceipt={() => setCurrentScreen("scan_receipt")}
@@ -730,6 +730,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
                 description: rec.description || "",
                 serviceCenter: rec.serviceCenter || "Сервис",
                 parts: rec.parts || [],
+                receiptImages: rec.receiptImages || [],
               });
             }}
             onSaveFuel={(f) => {
@@ -812,6 +813,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
                 description: rec.description || "Распознано AI OCR",
                 serviceCenter: rec.serviceCenter || "Сервис",
                 parts: rec.parts || [],
+                receiptImages: rec.receiptImages || [],
               });
             }}
           />
@@ -822,6 +824,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           <NotificationsScreen
             onBack={() => setCurrentScreen("home")}
             onNavigate={(s) => setCurrentScreen(s)}
+            themeMode={themeMode}
+            notifications={generatedNotifications}
           />
         );
 
@@ -836,7 +840,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onOpenServiceBook={onOpenServiceBookModal}
             onOpenReminders={onOpenRemindersModal}
             onOpenAddVehicle={onOpenAddVehicleModal}
-            onSwitchToWebView={onSwitchToWebView}
+            onSwitchToWebView={isWeb ? undefined : onSwitchToWebView}
             onLogout={() => {
               onLogout?.();
               setCurrentScreen("profile");
@@ -846,7 +850,21 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         );
 
       case "settings":
-        return <SettingsScreen onBack={() => setCurrentScreen("profile")} />;
+        return (
+          <SettingsScreen
+            onBack={() => setCurrentScreen("profile")}
+            themeMode={themeMode}
+            onThemeChange={(mode) => {
+              setThemeMode(mode);
+              saveThemePreference(mode);
+            }}
+            darkVariant={darkVariant}
+            onDarkVariantChange={(variant: DarkVariant) => {
+              setDarkVariant(variant);
+              saveDarkVariant(variant);
+            }}
+          />
+        );
 
       default:
         return null;
@@ -854,14 +872,17 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-neutral-950 text-neutral-100 flex flex-col items-center justify-start p-0 sm:py-6 overflow-hidden">
+    <div
+      className={`h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
+        isWeb ? "bg-[#06090e]" : "bg-neutral-950 sm:py-6"
+      }`}
+    >
       {/* Top Floating Control Bar (Desktop/Preview mode toggle) */}
+      {!isWeb && (
       <header className="mobile-preview-controls w-full max-w-[430px] shrink-0 px-3 sm:px-4 py-2 flex items-center justify-between z-40 bg-neutral-900/90 backdrop-blur-md rounded-2xl mb-2 sm:mb-3 border border-neutral-800 text-xs shadow-xl">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-[10px] text-white shadow-sm shadow-red-600/40">
-            GH
-          </div>
-          <span className="font-bold text-white tracking-tight text-xs">GarageHub Mobile</span>
+          <img src="/garage-ai-mark.png" alt="GarageAI" className="w-6 h-6 rounded-lg object-contain" />
+          <span className="font-bold text-white tracking-tight text-xs">GarageAI</span>
           <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded hidden xs:inline">
             iOS / Android
           </span>
@@ -893,20 +914,25 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           </button>
         </div>
       </header>
+      )}
 
       {/* Main Mobile Device Container (Matches 360-430px mobile specs) */}
       <div
-        className={`w-full max-w-[430px] mx-auto relative flex flex-1 min-h-0 flex-col justify-between overflow-hidden shadow-2xl transition-all ${
+        data-theme-variant={darkVariant}
+        className={`w-full mx-auto relative flex flex-1 min-h-0 flex-col justify-between overflow-hidden shadow-2xl transition-all ${
+          isWeb ? "max-w-[820px]" : "max-w-[430px]"
+        } ${
           themeMode === "dark"
             ? "bg-[#0d131d] text-white"
             : "bg-[#F4F5F8] text-[#0F172A]"
         } ${
-          deviceFrameMode === "frame"
+          !isWeb && deviceFrameMode === "frame"
             ? "sm:flex-none sm:rounded-[44px] sm:border-[8px] sm:border-neutral-800 sm:h-[840px] sm:max-h-[calc(100vh-60px)] sm:min-h-[640px] sm:ring-1 sm:ring-neutral-700"
             : ""
         }`}
       >
         {/* Dynamic Island / Native Notch Simulation */}
+        {!isWeb && (
         <div
           className={`w-full pt-3 pb-1 px-7 flex items-center justify-between z-30 pointer-events-none transition-colors ${
             themeMode === "dark"
@@ -929,6 +955,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             </div>
           </div>
         </div>
+        )}
 
         {/* Scrollable Screen Content */}
         <main
@@ -963,6 +990,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         )}
 
         {/* Native Home Indicator Bar */}
+        {!isWeb && (
         <div
           className={`w-full py-2 flex items-center justify-center pointer-events-none border-t transition-colors ${
             themeMode === "dark"
@@ -976,6 +1004,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             }`}
           />
         </div>
+        )}
 
         {/* Quick Action Sheet Modal */}
         <QuickActionSheet
@@ -988,3 +1017,4 @@ export const MobileApp: React.FC<MobileAppProps> = ({
     </div>
   );
 };
+

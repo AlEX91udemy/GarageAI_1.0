@@ -29,13 +29,13 @@ describe("VehicleModelRenderer", () => {
   it("resolves every catalog model to a model-layer renderer", () => {
     expect(getVehicleModelSpec(baseVehicle("Audi", "Q5", "#dc2626"))).toBeDefined();
     expect(getVehicleModelSpec(baseVehicle("Mercedes-Benz", "E-Class", "#dc2626"))).toBeDefined();
-    const fallback = getVehicleModelSpec(baseVehicle("Nissan", "Pathfinder", "#dc2626"));
-    expect(fallback).toMatchObject({ bodyType: "suv", placeholder: true });
+    const addedModel = getVehicleModelSpec(baseVehicle("Nissan", "Pathfinder", "#dc2626"));
+    expect(addedModel).toMatchObject({ bodyType: "suv", placeholder: undefined });
   });
 
   it("covers every model exposed by the dropdown catalog", () => {
     const models = CAR_CATALOG.flatMap((make) => make.models.map((model) => ({ make: make.name, model: model.name })));
-    expect(models).toHaveLength(55);
+    expect(models).toHaveLength(200);
     expect(models.every((item) => getVehicleModelSpec(baseVehicle(item.make, item.model, "#dc2626")))).toBe(true);
   });
 

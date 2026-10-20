@@ -89,10 +89,8 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       {/* Top bar with skip button */}
       <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-1.5">
-          <div className="w-6 h-6 rounded-lg bg-red-600 flex items-center justify-center font-black text-[10px]">
-            GH
-          </div>
-          <span className="text-xs font-bold text-neutral-300">GarageHub</span>
+          <img src="/garage-ai-mark.png" alt="" className="w-6 h-6 rounded-md" />
+          <span className="text-xs font-bold text-neutral-300">Garage AI</span>
         </div>
 
         <button

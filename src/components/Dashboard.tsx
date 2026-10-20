@@ -37,6 +37,8 @@ interface DashboardProps {
   onOpenOemSchedule: () => void;
   onOpenInventoryToFix: () => void;
   onOpenServiceBook: () => void;
+  /** Показывать блок «Гараж: склад запчастей и To-Fix» (в мобильной версии его нет) */
+  showGarageBoard?: boolean;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -53,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenOemSchedule,
   onOpenInventoryToFix,
   onOpenServiceBook,
+  showGarageBoard = true,
 }) => {
   // Collapsible section visibility states
   const [isKilvoCollapsed, setIsKilvoCollapsed] = useState(false);
@@ -596,7 +599,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Two Columns: Upcoming OEM Maintenance & To-Fix Tasks (Equal Height in Open State) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+      <div
+        className={`grid grid-cols-1 ${
+          showGarageBoard ? "md:grid-cols-2" : ""
+        } gap-4 items-stretch`}
+      >
         {/* Column 1: OEM Maintenance Checklist */}
         <div className="bg-white rounded-3xl p-5 border border-neutral-200/80 hover:border-emerald-200 shadow-sm transition-all duration-200 flex flex-col justify-between h-full">
           <div className="flex-1 flex flex-col">
@@ -716,6 +723,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Column 2: To-Fix Priority Board & Garage Inventory */}
+        {showGarageBoard && (
         <div className="bg-white rounded-3xl p-5 border border-neutral-200/80 hover:border-blue-200 shadow-sm transition-all duration-200 flex flex-col justify-between h-full">
           <div className="flex-1 flex flex-col">
             <div className="flex items-center justify-between mb-3">
@@ -820,6 +828,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Recent Repairs Timeline */}
