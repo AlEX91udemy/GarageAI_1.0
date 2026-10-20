@@ -20,6 +20,7 @@ import {
   findMake,
   findModel,
   findGeneration,
+  getModelBodyTypes,
 } from "../carCatalog";
 
 const STANDARD_BODY_TYPES: CarBodyType[] = [
@@ -88,9 +89,10 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
   const availableModels: CarModelInfo[] = matchedMake ? matchedMake.models : [];
   const availableGenerations: CarGenerationInfo[] = matchedModel ? matchedModel.generations : [];
 
-  // Body type is an independent vehicle attribute. All standard styles remain available
-  // regardless of the selected model or generation.
-  const availableBodyTypes = STANDARD_BODY_TYPES.map((type) => ({ type, label: BODY_TYPE_LABELS[type] }));
+  // Catalog selections only expose body styles recorded for that model/generation.
+  const modelBodyTypes = matchedModel ? getModelBodyTypes(matchedModel) : [];
+  const availableBodyTypes = (matchedModel ? modelBodyTypes : STANDARD_BODY_TYPES)
+    .map((type) => ({ type, label: BODY_TYPE_LABELS[type] }));
 
   // Sync custom modes if incoming value doesn't match catalog
   useEffect(() => {
@@ -126,6 +128,12 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
       if (firstModel.generations.length > 0) {
         const firstGen = firstModel.generations[0];
         onChangeGeneration?.(firstGen.name);
+        const generationBodyTypes = firstGen.bodyTypes.map((body) => body.type);
+        if (generationBodyTypes.length > 0) {
+          onChangeBodyType?.(generationBodyTypes.includes(firstModel.defaultBodyType)
+            ? firstModel.defaultBodyType
+            : generationBodyTypes[0]);
+        }
         onChangeYear?.(firstGen.defaultYear);
         if (firstGen.engineSuggestions?.[0]) {
           onChangeEngine?.(firstGen.engineSuggestions[0]);
@@ -141,7 +149,11 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         }
       } else {
         onChangeGeneration?.("");
+        const types = getModelBodyTypes(firstModel);
+        if (types.length > 0) {
+          onChangeBodyType?.(types.includes(firstModel.defaultBodyType) ? firstModel.defaultBodyType : types[0]);
         }
+      }
     } else {
       onChangeModel?.("");
       onChangeGeneration?.("");
@@ -165,6 +177,13 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         // Auto-select first generation of this model
         const firstGen = mod.generations[0];
         onChangeGeneration?.(firstGen.name);
+        const generationBodyTypes = firstGen.bodyTypes.map((body) => body.type);
+        if (generationBodyTypes.length > 0) {
+          const nextBodyType = generationBodyTypes.includes(mod.defaultBodyType)
+            ? mod.defaultBodyType
+            : generationBodyTypes[0];
+          onChangeBodyType?.(nextBodyType);
+        }
         onChangeYear?.(firstGen.defaultYear);
         if (firstGen.engineSuggestions?.[0]) {
           onChangeEngine?.(firstGen.engineSuggestions[0]);
@@ -180,12 +199,16 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         }
       } else {
         onChangeGeneration?.("");
+        const types = getModelBodyTypes(mod);
+        if (types.length > 0) {
+          onChangeBodyType?.(types.includes(mod.defaultBodyType) ? mod.defaultBodyType : types[0]);
+        }
       }
     }
   };
 
   // Handler when user chooses a Generation from dropdown
-  const handleSelectGeneration = (genName: string) => {
+  const handleSelectGeneration = (genName: string, preferredBodyType?: CarBodyType) => {
     if (genName === "__custom__") {
       setCustomGenMode(true);
       return;
@@ -196,6 +219,16 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
 
     const gen = findGeneration(make, model, genName);
     if (gen) {
+      const generationBodyTypes = gen.bodyTypes.map((body) => body.type);
+      if (generationBodyTypes.length > 0 && (!generationBodyTypes.includes(bodyType) || preferredBodyType)) {
+        const defaultBodyType = matchedModel?.defaultBodyType;
+        const nextBodyType = preferredBodyType && generationBodyTypes.includes(preferredBodyType)
+          ? preferredBodyType
+          : defaultBodyType && generationBodyTypes.includes(defaultBodyType)
+            ? defaultBodyType
+            : generationBodyTypes[0];
+        onChangeBodyType?.(nextBodyType);
+      }
 
       // Link: Year default
       onChangeYear?.(gen.defaultYear);
@@ -218,6 +251,15 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
 
   // Body type is intentionally independent from generation.
   const handleSelectBodyType = (newBodyType: CarBodyType) => {
+    if (matchedModel && matchedGen && !matchedGen.bodyTypes.some((body) => body.type === newBodyType)) {
+      const compatibleGeneration = matchedModel.generations.find((gen) =>
+        gen.bodyTypes.some((body) => body.type === newBodyType)
+      );
+      if (compatibleGeneration) {
+        handleSelectGeneration(compatibleGeneration.name, newBodyType);
+        return;
+      }
+    }
     onChangeBodyType?.(newBodyType);
   };
 
@@ -354,7 +396,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                 </option>
                 {availableModels.map((mod) => (
                   <option key={mod.name} value={mod.name}>
-                    {mod.name} ({mod.generations.length} пок.)
+                    {mod.name}{mod.generations.length > 0 ? ` (${mod.generations.length} пок.)` : ""}
                   </option>
                 ))}
                 <option value="__custom__">✏️ Другая модель (ввести вручную)...</option>
