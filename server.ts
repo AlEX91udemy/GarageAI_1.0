@@ -77,14 +77,22 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
 const OPENROUTER_RECEIPT_MODEL = process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL;
 const OPENROUTER_DOCUMENT_MODEL = process.env.OPENROUTER_DOCUMENT_MODEL || OPENROUTER_MODEL;
+const OPENROUTER_DOCUMENT_REFINEMENT_ENABLED = process.env.OPENROUTER_DOCUMENT_REFINEMENT_ENABLED === "true";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 let documentAiClient: documentai.DocumentProcessorServiceClient | null = null;
 function getDocumentAiClient() {
-  if (!documentAiClient) documentAiClient = new documentai.DocumentProcessorServiceClient();
+  if (!documentAiClient) {
+    const location = process.env.DOCUMENT_AI_LOCATION || "us";
+    documentAiClient = new documentai.DocumentProcessorServiceClient({ apiEndpoint: `${location}-documentai.googleapis.com` });
+  }
   return documentAiClient;
 }
 function documentProcessorName(id: string) {
   return `projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/${process.env.DOCUMENT_AI_LOCATION || "us"}/processors/${id}`;
+}
+function documentEntityValue(entities: Array<{ type?: string; mentionText?: string; normalizedValue?: { text?: string; moneyValue?: { currencyCode?: string; units?: string; nanos?: number } } }>, types: string[]) {
+  const entity = entities.find(item => types.some(type => (item.type || "").toLowerCase().includes(type)));
+  return entity?.normalizedValue?.text || entity?.mentionText || null;
 }
 async function processWithDocumentAi(content: Buffer, mimeType: string, processorId: string) {
   const [result] = await getDocumentAiClient().processDocument({
@@ -314,6 +322,38 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("Document OCR returned an empty response");
   return content.trim();
+}
+
+async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<string, any>> {
+  const { key, model } = getOpenRouterConfig("receipt");
+  if (!key) throw new Error("Receipt OpenRouter API key is not configured");
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI Receipt Parser" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${ocrText}` }], temperature: 0, response_format: { type: "json_object" } }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.message || "Receipt text parsing failed (" + response.status + ")");
+  const content = payload?.choices?.[0]?.message?.content;
+  const text = Array.isArray(content) ? content.map((part: any) => part?.text || "").join("") : content;
+  if (typeof text !== "string") throw new Error("Receipt parser returned an empty response");
+  return parseJsonSafely(text, {});
+}
+
+async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<string> {
+  const { key, model } = getOpenRouterConfig("document");
+  if (!key) throw new Error("Document OpenRouter API key is not configured");
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI Document OCR" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: `Исправь только очевидные OCR-ошибки в распознанном тексте документа. Не добавляй догадки, не меняй имена, даты, номера и суммы без явного основания. Сохрани порядок и строки. Верни только исправленный текст.\n\n${ocrText}` }], temperature: 0, max_tokens: 4000 }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.message || "Document text refinement failed (" + response.status + ")");
+  const content = payload?.choices?.[0]?.message?.content;
+  const text = Array.isArray(content) ? content.map((part: any) => part?.text || "").join("") : content;
+  if (typeof text !== "string" || !text.trim()) throw new Error("Document refiner returned an empty response");
+  return text.trim();
 }
 
 function mergeOcrText(...texts: string[]) {
@@ -1919,7 +1959,30 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     if (documentReceiptId && process.env.GOOGLE_CLOUD_PROJECT) {
       try {
         const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), supportedMime, documentReceiptId);
-        if (doc?.text) return res.json({ merchantName: null, date: null, totalAmount: null, category: "other", description: doc.text, notes: doc.text, _source: "google-document-ai" });
+        const entities = (doc?.entities || []) as Array<{ type?: string; mentionText?: string; normalizedValue?: { text?: string; moneyValue?: { currencyCode?: string; units?: string; nanos?: number } } }>;
+        const totalEntity = entities.find(item => (item.type || "").toLowerCase().includes("total_amount"));
+        const totalText = documentEntityValue(entities, ["total_amount", "total"]);
+        const totalAmount = totalEntity?.normalizedValue?.moneyValue?.units
+          ? Number(totalEntity.normalizedValue.moneyValue.units) + Number(totalEntity.normalizedValue.moneyValue.nanos || 0) / 1e9
+          : totalText ? Number(String(totalText).replace(/[^0-9.,-]/g, "").replace(",", ".")) : null;
+        const googleResult = { merchantName: documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"]), date: documentEntityValue(entities, ["receipt_date", "date"]), totalAmount, category: "other", description: doc?.text || "", notes: doc?.text || "", _source: "google-document-ai" };
+        if (doc?.text && getOpenRouterConfig("receipt").key) {
+          try {
+            const refined = await requestOpenRouterReceiptFields(doc.text);
+            return res.json({
+              ...googleResult,
+              merchantName: refined.merchantName || googleResult.merchantName,
+              date: refined.date || googleResult.date,
+              totalAmount: Number.isFinite(Number(refined.totalAmount)) ? Number(refined.totalAmount) : googleResult.totalAmount,
+              category: refined.category || googleResult.category,
+              description: refined.description || googleResult.description,
+              notes: refined.notes || googleResult.notes,
+              _source: "google-document-ai+openrouter-text",
+            });
+          }
+          catch (error) { console.warn("OpenRouter receipt refinement failed; using Google result:", error); }
+        }
+        return res.json(googleResult);
       } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
     }
     const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
@@ -1954,7 +2017,15 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
     if (documentOcrId && process.env.GOOGLE_CLOUD_PROJECT) {
       try {
         const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), detectedMime, documentOcrId);
-        if (doc?.text) return res.json({ text: doc.text, sources: { vision: doc.text, local: "", confidence: 1 }, preprocessing: { variants: ["google-document-ai"], mimeType: detectedMime }, warning: null });
+        if (doc?.text) {
+          let refinedText: string | null = null;
+          let refinementWarning: string | null = null;
+          if (OPENROUTER_DOCUMENT_REFINEMENT_ENABLED && getOpenRouterConfig("document").key) {
+            try { refinedText = await requestOpenRouterDocumentRefinement(doc.text); }
+            catch (error: any) { refinementWarning = error?.message || "OpenRouter refinement failed"; }
+          }
+          return res.json({ text: refinedText || doc.text, sources: { vision: doc.text, local: "", google: doc.text, refined: refinedText }, preprocessing: { variants: ["google-document-ai", ...(refinedText ? ["openrouter-text-refinement"] : [])], mimeType: detectedMime }, warning: refinementWarning });
+        }
       } catch (error) { console.warn("Document AI OCR failed, using fallback:", error); }
     }
     const local = await recognizeDocumentImage(prepared[0].image, "sparse");
