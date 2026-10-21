@@ -49,7 +49,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       {/* Center PIN pad */}
       <div className="flex flex-col items-center my-auto">
-        <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-red-400 mb-4 shadow-lg">
+        <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-brand-on-dark mb-4 shadow-lg">
           <KeyRound className="w-7 h-7" />
         </div>
 
@@ -70,7 +70,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 key={idx}
                 className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
                   isFilled
-                    ? "bg-red-500 scale-110 shadow-sm shadow-red-500/80"
+                    ? "bg-brand scale-110 shadow-sm shadow-brand/80"
                     : "bg-neutral-800 border border-neutral-700"
                 }`}
               />
@@ -113,7 +113,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       <div className="flex flex-col items-center gap-2">
         <button
           onClick={onSuccess}
-          className="text-xs font-medium text-red-400 hover:text-red-300 flex items-center gap-1.5 py-1 px-3 rounded-lg hover:bg-neutral-900 transition cursor-pointer"
+          className="text-xs font-medium text-brand-on-dark hover:text-brand-light flex items-center gap-1.5 py-1 px-3 rounded-lg hover:bg-neutral-900 transition cursor-pointer"
         >
           <Smartphone className="w-3.5 h-3.5" />
           Гостевой вход (демо, без биометрии)

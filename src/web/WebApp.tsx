@@ -76,6 +76,7 @@ export interface WebAppProps {
   onOpenEditVehicle?: () => void;
   onOpenBackup?: () => void;
   onSwitchToMobile?: () => void;
+  onLogout?: () => void;
 }
 
 const VIEW_TITLES: Record<ActiveView, string> = {
@@ -114,6 +115,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     onOpenEditVehicle,
     onOpenBackup,
     onSwitchToMobile,
+    onLogout,
   } = props;
 
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -122,61 +124,16 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const isDark = theme === "dark";
-  const currentVehicle = vehicles.find((v) => v.id === activeVehicleId) || vehicles[0];
-
-  /* ----------------------------- Пустой гараж ----------------------------- */
-  if (!currentVehicle) {
-    return (
-      <div
-        className={`min-h-screen flex items-center justify-center p-6 ${
-          isDark ? "bg-[#06090e] text-white" : "bg-slate-50 text-slate-900"
-        }`}
-      >
-        <div
-          className={`w-full max-w-lg rounded-2xl border p-8 text-center shadow-2xl ${
-            isDark
-              ? "bg-[#0B0E14] border-[#1E293B] shadow-black/40"
-              : "bg-white border-slate-200 shadow-slate-200/60"
-          }`}
-        >
-          <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-[#F97316] to-[#EF4444] flex items-center justify-center font-black text-sm text-white shadow-sm">
-            GH
-          </div>
-          <h1 className="mt-5 text-2xl font-black tracking-tight">
-            Добро пожаловать в Garage<span className="text-[#F97316]">Hub</span>
-          </h1>
-          <p className={`mt-2 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            Добавьте первый автомобиль — и весь журнал обслуживания, регламент ТО
-            и расходы будут собраны в одном месте.
-          </p>
-
-          <ul
-            className={`mt-6 space-y-2 text-left text-sm ${
-              isDark ? "text-slate-300" : "text-slate-600"
-            }`}
-          >
-            {[
-              "История ремонтов и замен с чеками",
-              "Напоминания о регламентном обслуживании",
-              "Учёт расходов на топливо и запчасти",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2">
-                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#EF4444] shrink-0" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-
-          <button
-            onClick={onOpenAddVehicle}
-            className="mt-7 w-full px-6 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white font-semibold rounded-lg transition"
-          >
-            Добавить автомобиль
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const currentVehicle = vehicles.find((v) => v.id === activeVehicleId) || vehicles[0] || {
+    id: "empty-garage",
+    make: "Автомобиль",
+    model: "не добавлен",
+    year: new Date().getFullYear(),
+    engine: "",
+    transmission: "",
+    currentMileage: 0,
+    lastMileageUpdate: "",
+  };
 
   const currentRecords = serviceRecords.filter((r) => r.vehicleId === currentVehicle.id);
   const currentFuel = fuelRecords.filter((f) => f.vehicleId === currentVehicle.id);
@@ -193,11 +150,11 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     currentFuel.reduce((sum, f) => sum + (f.totalCost || 0), 0);
 
   const cardClass = `rounded-xl border p-6 ${
-    isDark ? "bg-[#0B0E14] border-[#1E293B]" : "bg-white border-slate-200"
+    isDark ? "bg-[#17202E] border-[#243044]" : "bg-white border-slate-200"
   }`;
   const ghostButton = `px-4 py-2 rounded-lg text-sm font-semibold border transition ${
     isDark
-      ? "bg-[#111827] border-[#1E293B] text-slate-200 hover:border-[#EF4444]/40"
+      ? "bg-[#0D131D] border-[#243044] text-slate-200 hover:border-[#EF3038]/40"
       : "bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300"
   }`;
 
@@ -208,7 +165,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `garagehub-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `Garage AI-backup-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -218,7 +175,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     <div className="space-y-5">
       <div
         className={`inline-flex items-center gap-1 p-1 rounded-xl border ${
-          isDark ? "bg-[#0B0E14] border-[#1E293B]" : "bg-white border-slate-200"
+          isDark ? "bg-[#17202E] border-[#243044]" : "bg-white border-slate-200"
         }`}
       >
         {(
@@ -232,7 +189,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
             onClick={() => setHistoryTab(tab.id)}
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
               historyTab === tab.id
-                ? "bg-[#EF4444] text-[#06090e] shadow-sm"
+                ? "bg-[#B91C1C] text-white shadow-sm"
                 : isDark
                 ? "text-slate-400 hover:text-slate-200"
                 : "text-slate-500 hover:text-slate-900"
@@ -270,7 +227,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     <div className="space-y-6 max-w-3xl">
       <section className={cardClass}>
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#F97316] to-[#EF4444] flex items-center justify-center font-black text-lg text-white shadow-sm">
+          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#EF3038] flex items-center justify-center font-black text-lg text-white shadow-sm">
             {currentVehicle.make[0]}
             {currentVehicle.model[0]}
           </div>
@@ -291,7 +248,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
           {onOpenEditVehicle && (
             <button
               onClick={onOpenEditVehicle}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#F97316] hover:bg-[#EA580C] text-white transition"
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#B91C1C] hover:bg-[#991B1B] text-white transition"
             >
               Редактировать
             </button>
@@ -317,7 +274,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
             <div
               key={item.label}
               className={`rounded-lg border p-3 ${
-                isDark ? "bg-[#111827] border-[#1E293B]" : "bg-slate-50 border-slate-200"
+                isDark ? "bg-[#0D131D] border-[#243044]" : "bg-slate-50 border-slate-200"
               }`}
             >
               <div className={`text-[11px] ${isDark ? "text-slate-500" : "text-slate-500"}`}>
@@ -348,7 +305,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
               onClick={item.action}
               className={`w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left text-sm font-semibold transition border-b last:border-b-0 ${
                 isDark
-                  ? "border-[#1E293B] text-slate-200 hover:bg-[#111827]"
+                  ? "border-[#243044] text-slate-200 hover:bg-[#0D131D]"
                   : "border-slate-100 text-slate-700 hover:bg-slate-50"
               }`}
             >
@@ -377,7 +334,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${
                 theme === mode
-                  ? "bg-[#EF4444] border-[#EF4444] text-[#06090e]"
+                  ? "bg-[#B91C1C] border-[#EF3038] text-white"
                   : ghostButton
               }`}
             >
@@ -402,7 +359,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
           {onOpenBackup && (
             <button
               onClick={onOpenBackup}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#EF4444] text-[#06090e] hover:bg-[#F87171] transition"
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#B91C1C] text-white hover:bg-[#991B1B] transition"
             >
               Синхронизация с сервером
             </button>
@@ -503,7 +460,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
   return (
     <div
       className={`min-h-screen flex ${
-        isDark ? "bg-[#06090e] text-slate-200" : "bg-slate-50 text-slate-900"
+        isDark ? "bg-[#0D131D] text-slate-200" : "bg-[#F4F5F8] text-slate-900"
       }`}
     >
       {/* Sidebar */}
@@ -512,6 +469,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
         onNavigate={(view) => setActiveView(view as ActiveView)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        onLogout={onLogout}
         theme={theme}
       />
 
@@ -543,11 +501,6 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
               <h1 className="text-xl font-black tracking-tight">
                 {VIEW_TITLES[activeView]}
               </h1>
-              {activeView !== "profile" && activeView !== "settings" && (
-                <span className={`text-xs ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                  {currentVehicle.make} {currentVehicle.model}
-                </span>
-              )}
             </div>
             {renderView()}
           </div>

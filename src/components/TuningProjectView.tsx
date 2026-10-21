@@ -206,8 +206,8 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
           }}
           className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
             selectedTuningMetric === "budget"
-              ? "bg-purple-50/90 border-purple-400 ring-2 ring-purple-500 shadow-md scale-[1.01]"
-              : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-purple-200"
+              ? "bg-brand-soft/90 border-brand-light ring-2 ring-brand shadow-md scale-[1.01]"
+              : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-brand-border"
           }`}
           title="Нажмите, чтобы выделить плановый бюджет проекта"
         >
@@ -218,7 +218,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
             <span
               className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
                 selectedTuningMetric === "budget"
-                  ? "bg-purple-600 text-white"
+                  ? "bg-brand-strong text-white"
                   : "bg-neutral-100 text-neutral-600"
               }`}
             >
@@ -278,7 +278,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                         e.stopPropagation();
                         setSelectedTuningMetric(null);
                       }}
-                      className="hover:text-red-300 ml-1 font-bold text-xs cursor-pointer"
+                      className="hover:text-brand-light ml-1 font-bold text-xs cursor-pointer"
                       title="Сбросить выделение"
                     >
                       ×
@@ -343,7 +343,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                         : selectedTuningMetric === "spent" && ((stage.actualCost || 0) > 0 || isInstalled)
                         ? "border-blue-400 ring-2 ring-blue-500/50 bg-blue-50/30 scale-[1.005]"
                         : selectedTuningMetric === "budget"
-                        ? "border-purple-300 ring-1 ring-purple-400/40 bg-purple-50/20"
+                        ? "border-brand-light ring-1 ring-brand/40 bg-brand-soft/20"
                         : isInstalled
                         ? "border-emerald-300 bg-emerald-50/10 hover:border-emerald-400"
                         : isInProgress
@@ -373,7 +373,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                             </span>
                           )}
                           {stage.sku && (
-                            <span className="text-[11px] font-mono text-red-700 bg-red-50 border border-red-200/60 px-2 py-0.5 rounded-md font-bold">
+                            <span className="text-[11px] font-mono text-brand-hover bg-brand-soft border border-brand-border/60 px-2 py-0.5 rounded-md font-bold">
                               {stage.sku}
                             </span>
                           )}
@@ -424,7 +424,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                             type="button"
                             onClick={() => handleDeleteStage(stage.id)}
 
-                            className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
+                            className="p-2 text-neutral-400 hover:text-brand-strong hover:bg-brand-soft rounded-xl transition cursor-pointer"
                             title="Удалить доработку"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -526,7 +526,7 @@ export const TuningProjectView: React.FC<TuningProjectViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl"
+                  className="px-5 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl"
                 >
                   Добавить в проект
                 </button>

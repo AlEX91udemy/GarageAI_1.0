@@ -170,8 +170,8 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold text-red-600 uppercase tracking-wider">
-            Гаражное управление (GarageHub)
+          <div className="text-xs font-bold text-brand-strong uppercase tracking-wider">
+            Гаражное управление (Garage AI)
           </div>
           <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">
             Склад запчастей и список To-Fix
@@ -186,7 +186,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
           {activeTab === "inventory" ? (
             <button
               onClick={() => setShowAddPartModal(true)}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-strong/30 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Положить деталь на склад</span>
@@ -194,7 +194,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
           ) : (
             <button
               onClick={() => setShowAddTaskModal(true)}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-strong/30 active:scale-95"
             >
               <Plus className="w-4 h-4" />
               <span>Добавить задачу в To-Fix</span>
@@ -537,7 +537,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
 
             <div className="bg-white rounded-3xl p-4 border border-neutral-200/80 shadow-sm">
               <div className="text-[11px] text-neutral-500">Стоимость запасов</div>
-              <div className="text-xl font-extrabold text-red-600 font-mono mt-0.5">
+              <div className="text-xl font-extrabold text-brand-strong font-mono mt-0.5">
                 {totalInventoryValue.toLocaleString("ru-RU")} ₽
               </div>
             </div>
@@ -635,7 +635,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
                           >
                             {isInStock ? "В наличии" : "Установлено на авто"}
                           </span>
-                          <span className="text-xs font-mono font-bold text-red-600">
+                          <span className="text-xs font-mono font-bold text-brand-strong">
                             {part.partNumber}
                           </span>
                         </div>
@@ -665,7 +665,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
                         {isInStock && (
                           <button
                             onClick={() => onInstallInService(part)}
-                            className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-red-600/20 active:scale-95"
+                            className="px-3.5 py-2 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-brand-strong/20 active:scale-95"
                           >
                             <Wrench className="w-3.5 h-3.5" />
                             <span>Установить в ремонт</span>
@@ -769,7 +769,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl"
+                  className="px-5 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl"
                 >
                   Сохранить на склад
                 </button>
@@ -988,7 +988,7 @@ export const GarageInventoryToFixView: React.FC<GarageInventoryToFixViewProps> =
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl cursor-pointer shadow-sm active:scale-95"
+                  className="px-5 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl cursor-pointer shadow-sm active:scale-95"
                 >
                   Создать задачу
                 </button>

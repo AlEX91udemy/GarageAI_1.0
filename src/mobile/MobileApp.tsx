@@ -290,10 +290,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         if (vehicles.length === 0 && currentVehicle.id === "empty-garage") {
           return (
             <div className="h-full w-full bg-neutral-950 text-white flex flex-col items-center justify-center px-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-red-600/15 text-red-400 flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
+              <div className="w-16 h-16 rounded-2xl bg-brand-strong/15 text-brand-on-dark flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
               <h2 className="text-xl font-black">Гараж пока пуст</h2>
               <p className="text-sm text-neutral-400 mt-2 max-w-xs">Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.</p>
-              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-red-600 px-5 py-3 text-sm font-bold">Добавить автомобиль</button>
+              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-brand-strong px-5 py-3 text-sm font-bold">Добавить автомобиль</button>
             </div>
           );
         }
@@ -874,7 +874,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   return (
     <div
       className={`h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
-        isWeb ? "bg-[#06090e]" : "bg-neutral-950 sm:py-6"
+        isWeb ? "bg-[#0D131D]" : "bg-neutral-950 sm:py-6"
       }`}
     >
       {/* Top Floating Control Bar (Desktop/Preview mode toggle) */}

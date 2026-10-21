@@ -25,8 +25,8 @@ export const AuthGate: React.FC<
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#06090e] text-slate-200 flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#EF4444]" />
+      <div className="min-h-screen bg-[#0D131D] text-slate-200 flex items-center justify-center">
+        <Loader2 className="animate-spin text-brand" />
       </div>
     );
   }
@@ -48,18 +48,18 @@ export const AuthGate: React.FC<
     };
 
     return (
-      <main className="min-h-screen bg-[#06090e] text-slate-200 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-[#0D131D] text-slate-200 flex items-center justify-center p-4">
         <form
           onSubmit={submit}
-          className="w-full max-w-md rounded-2xl bg-[#0B0E14] border border-[#1E293B] p-7 shadow-2xl shadow-black/40 space-y-5"
+          className="w-full max-w-md rounded-2xl bg-[#17202E] border border-[#243044] p-7 shadow-2xl shadow-black/40 space-y-5"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#F97316] to-[#EF4444] flex items-center justify-center font-black text-sm text-white shadow-sm">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#EF3038] flex items-center justify-center font-black text-sm text-white shadow-sm">
               GH
             </div>
             <div>
               <h1 className="text-lg font-black tracking-tight text-white leading-none">
-                Garage<span className="text-[#F97316]">Hub</span>
+                Garage<span className="text-[#EF3038]">AI</span>
               </h1>
               <p className="mt-1 text-xs text-slate-400">
                 Личный гараж и история обслуживания
@@ -67,13 +67,13 @@ export const AuthGate: React.FC<
             </div>
           </div>
 
-          <div className="flex gap-2 rounded-xl bg-[#111827] p-1">
+          <div className="flex gap-2 rounded-xl bg-[#0D131D] p-1">
             <button
               type="button"
               onClick={() => setMode("login")}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                 mode === "login"
-                  ? "bg-[#EF4444] text-[#06090e] shadow-sm"
+                  ? "bg-[#B91C1C] text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -84,7 +84,7 @@ export const AuthGate: React.FC<
               onClick={() => setMode("register")}
               className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                 mode === "register"
-                  ? "bg-[#EF4444] text-[#06090e] shadow-sm"
+                  ? "bg-[#B91C1C] text-white shadow-sm"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -98,7 +98,7 @@ export const AuthGate: React.FC<
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              className="mt-1 w-full rounded-lg bg-[#111827] border border-[#1E293B] px-3 py-2 text-slate-100 outline-none focus:border-[#EF4444]/60"
+              className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60"
               required
             />
           </label>
@@ -109,7 +109,7 @@ export const AuthGate: React.FC<
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete={mode === "login" ? "current-password" : "new-password"}
-              className="mt-1 w-full rounded-lg bg-[#111827] border border-[#1E293B] px-3 py-2 text-slate-100 outline-none focus:border-[#EF4444]/60"
+              className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60"
               required
               minLength={8}
             />
@@ -122,14 +122,14 @@ export const AuthGate: React.FC<
           {error && (
             <p
               role="alert"
-              className="rounded-lg bg-red-950/50 border border-red-900 px-3 py-2 text-sm text-red-200"
+              className="rounded-lg bg-brand-deep/50 border border-brand-hover px-3 py-2 text-sm text-brand-border"
             >
               {error}
             </p>
           )}
           <button
             disabled={busy}
-            className="w-full rounded-lg bg-[#F97316] hover:bg-[#EA580C] py-3 font-semibold text-white transition disabled:opacity-50"
+            className="w-full rounded-lg bg-[#B91C1C] hover:bg-[#991B1B] py-3 font-semibold text-white transition disabled:opacity-50"
           >
             {busy ? (
               <Loader2 className="mx-auto animate-spin" />
@@ -156,7 +156,7 @@ export const AuthGate: React.FC<
           void logout().finally(() => setSession(null));
         }}
         title="Выйти из аккаунта"
-        className="fixed bottom-4 right-4 z-[70] rounded-lg bg-[#0B0E14]/95 border border-[#1E293B] px-3 py-2 text-xs text-slate-300 shadow-lg hover:border-[#EF4444]/40 hover:text-white transition"
+        className="fixed bottom-4 right-4 z-[70] rounded-lg bg-[#17202E]/95 border border-[#243044] px-3 py-2 text-xs text-slate-300 shadow-lg hover:border-brand/40 hover:text-white transition"
       >
         <LogOut className="inline w-4 h-4 mr-1" />
         {session.username}

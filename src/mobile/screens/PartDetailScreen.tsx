@@ -47,7 +47,7 @@ export const PartDetailScreen: React.FC<PartDetailScreenProps> = ({
             onDelete?.(part.id);
             onBack?.();
           }}
-          className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer transition border border-rose-200"
+          className="w-8 h-8 rounded-full bg-brand-soft hover:bg-brand-soft-strong text-brand-strong flex items-center justify-center cursor-pointer transition border border-brand-border"
           title="Удалить деталь"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -101,7 +101,7 @@ export const PartDetailScreen: React.FC<PartDetailScreenProps> = ({
           <div className="flex justify-between items-center py-1">
             <span className="text-neutral-500">Место хранения:</span>
             <span className="flex items-center gap-1 font-semibold text-neutral-800">
-              <MapPin className="w-3.5 h-3.5 text-red-600" />
+              <MapPin className="w-3.5 h-3.5 text-brand-strong" />
               {part.location || "Гараж (Основной бокс)"}
             </span>
           </div>
@@ -126,7 +126,7 @@ export const PartDetailScreen: React.FC<PartDetailScreenProps> = ({
               onInstall?.(part);
               onBack?.();
             }}
-            className="w-full py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-red-600/30 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-3.5 px-4 rounded-2xl bg-brand-strong hover:bg-brand text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-strong/30 active:scale-[0.98] transition cursor-pointer"
           >
             <Wrench className="w-4 h-4" />
             <span>Установить на автомобиль (Внести в ТО)</span>

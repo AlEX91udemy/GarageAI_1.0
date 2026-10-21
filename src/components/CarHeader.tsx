@@ -151,13 +151,13 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
             <button
               aria-expanded={isSwitchingCar} onClick={() => setIsSwitchingCar(!isSwitchingCar)}
               className={`flex items-center gap-1.5 text-xs transition cursor-pointer group ${
-                isLight ? "hover:text-red-600" : "hover:text-white"
+                isLight ? "hover:text-brand-strong" : "hover:text-white"
               }`}
               title="Переключить автомобиль или открыть гараж"
             >
               <span
-                className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.8)]"
-                style={{ backgroundColor: "#dc2626" }}
+                className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_6px_rgba(239,48,56,0.8)]"
+                style={{ backgroundColor: "#EF3038" }}
               />
               <span className={isLight ? "text-slate-500 font-medium" : "text-neutral-400 font-medium"}>
                 Гараж:
@@ -194,7 +194,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                       setIsSwitchingCar(false);
                       onOpenVehicleModal?.();
                     }}
-                    className="text-[10px] text-red-500 hover:text-red-600 font-semibold cursor-pointer"
+                    className="text-[10px] text-brand-strong hover:text-brand-strong font-semibold cursor-pointer"
                   >
                     Управление
                   </button>
@@ -210,7 +210,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                       }}
                       className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs transition cursor-pointer ${
                         v.id === vehicle.id
-                          ? "bg-red-600/20 text-red-600 border border-red-500/40 font-bold"
+                          ? "bg-brand-strong/20 text-brand-strong border border-brand/40 font-bold"
                           : isLight
                           ? "hover:bg-slate-100 text-slate-700 border border-transparent"
                           : "hover:bg-neutral-800 text-neutral-300 border border-transparent"
@@ -219,7 +219,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                       <div className="flex items-center gap-2">
                         <span
                           className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: "#dc2626" }}
+                          style={{ backgroundColor: "#EF3038" }}
                         />
                         <span className={`font-semibold ${isLight ? "text-slate-900" : "text-white"}`}>
                           {v.make} {v.model} {v.generation && `(${v.generation})`}
@@ -240,7 +240,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                       setIsSwitchingCar(false);
                       onOpenAddVehicle?.();
                     }}
-                    className="w-full py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1"
+                    className="w-full py-1 bg-brand-strong hover:bg-brand text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Добавить авто в гараж</span>
@@ -303,7 +303,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
           <div className={`flex items-center gap-1.5 shrink-0 text-[11px] font-medium ${
             isLight ? "text-slate-500" : "text-neutral-400"
           }`}>
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500" />
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand" />
             <span>{getBodyTypeLabel(vehicle.bodyType)}</span>
           </div>
         </div>
@@ -332,8 +332,8 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
             }`}
           >
             <span
-              className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(239,68,68,0.8)]"
-              style={{ backgroundColor: "#dc2626" }}
+              className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(239,48,56,0.8)]"
+              style={{ backgroundColor: "#EF3038" }}
             />
             <span className={isLight ? "text-slate-500 font-medium" : "text-neutral-300 font-medium"}>
               Гараж:
@@ -381,7 +381,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                     }}
                     className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left text-xs transition cursor-pointer ${
                       v.id === vehicle.id
-                        ? "bg-red-600/20 text-red-600 border border-red-500/50 shadow-inner font-bold"
+                        ? "bg-brand-strong/20 text-brand-strong border border-brand/50 shadow-inner font-bold"
                         : isLight
                         ? "hover:bg-slate-100 text-slate-700 border border-transparent"
                         : "hover:bg-neutral-800/80 text-neutral-300 border border-transparent"
@@ -390,7 +390,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                     <div className="flex items-center gap-2.5">
                       <span
                         className="w-3 h-3 rounded-full shrink-0 border border-white/40 shadow-sm"
-                        style={{ backgroundColor: "#dc2626" }}
+                        style={{ backgroundColor: "#EF3038" }}
                       />
                       <div>
                         <div className={`font-bold flex items-center gap-1.5 ${
@@ -444,7 +444,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                       onOpenVehicleModal?.();
                     }
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition cursor-pointer shadow-md shadow-red-600/20"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-white bg-brand-strong hover:bg-brand rounded-xl transition cursor-pointer shadow-md shadow-brand-strong/20"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Добавить автомобиль
@@ -472,7 +472,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
             }`}
             title="Добавить новый автомобиль в гараж"
           >
-            <Plus className="w-3.5 h-3.5 text-red-500" />
+            <Plus className="w-3.5 h-3.5 text-brand-strong" />
             <span>Авто</span>
           </button>
 
@@ -503,7 +503,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                 ? "bg-slate-100 text-slate-700 border-slate-200"
                 : "text-neutral-400 bg-neutral-900/90 border-neutral-800"
             }`}>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
               {getBodyTypeLabel(vehicle.bodyType)}
             </span>
 
@@ -538,7 +538,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
             ) : (
               <button
                 onClick={() => onOpenVehicleModal?.()}
-                className="text-[11px] text-red-500 hover:text-red-600 underline underline-offset-2"
+                className="text-[11px] text-brand-strong hover:text-brand-strong underline underline-offset-2"
               >
                 + Добавить VIN
               </button>
@@ -585,7 +585,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
               : "bg-neutral-900/85 border border-neutral-800 shadow-inner"
           }`}>
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-red-500 shrink-0 shadow-xs ${
+              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center text-brand-strong shrink-0 shadow-xs ${
                 isLight ? "bg-white border-slate-200" : "bg-neutral-800/90 border-neutral-700/60"
               }`}>
                 <Gauge className="w-4 h-4" />
@@ -614,7 +614,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                   setTempMileage(vehicle.currentMileage);
                   setShowMileageModal(true);
                 }}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-red-600/25 active:scale-95"
+                className="px-3 py-1.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-brand-strong/25 active:scale-95"
               >
                 <RefreshCw className="w-3 h-3" />
                 <span>Обновить пробег</span>
@@ -689,7 +689,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                     step="10"
                     value={tempMileage}
                     onChange={(e) => setTempMileage(Number(e.target.value))}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-2.5 text-lg font-mono font-bold text-white focus:outline-none focus:border-red-500"
+                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-2.5 text-lg font-mono font-bold text-white focus:outline-none focus:border-brand"
                     autoFocus
                   />
                   <span className="absolute right-3 top-3 text-xs text-neutral-400">
@@ -708,7 +708,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition cursor-pointer shadow-lg shadow-red-600/30"
+                  className="px-5 py-2 text-xs font-bold text-white bg-brand-strong hover:bg-brand rounded-xl transition cursor-pointer shadow-lg shadow-brand-strong/30"
                 >
                   Сохранить
                 </button>

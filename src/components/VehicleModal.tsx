@@ -147,7 +147,7 @@ const ModernSelect: React.FC<ModernSelectProps> = ({ id, value, options, placeho
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`w-full flex items-center justify-between gap-2 bg-neutral-50 border border-neutral-200 rounded-2xl px-3 py-2 text-xs text-left transition focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 ${value ? "text-neutral-800" : "text-neutral-400"}`}
+        className={`w-full flex items-center justify-between gap-2 bg-neutral-50 border border-neutral-200 rounded-2xl px-3 py-2 text-xs text-left transition focus:outline-none focus:border-brand-light focus:ring-2 focus:ring-brand-border ${value ? "text-neutral-800" : "text-neutral-400"}`}
       >
         <span className="truncate">{value || placeholder}</span>
         <ChevronDown className={`w-4 h-4 shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -397,11 +397,11 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white">
           <div className="flex items-center justify-between pb-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-red-600/10 text-red-600 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-brand-strong/10 text-brand-strong flex items-center justify-center shrink-0">
                 <Car className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-brand-strong uppercase tracking-wider">
                   Управление автопарком
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
@@ -448,7 +448,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             <button
               onClick={handleStartAdd}
               className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                mode === "add" ? "bg-red-600 text-white shadow-sm" : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                mode === "add" ? "bg-brand-strong text-white shadow-sm" : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
               }`}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -467,7 +467,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                     setShowDeleteConfirm(false);
                     onClose();
                   }}
-                  className="text-xs text-white bg-red-600 hover:bg-red-700 font-bold px-2 py-1 rounded-lg transition"
+                  className="text-xs text-white bg-brand-strong hover:bg-brand-hover font-bold px-2 py-1 rounded-lg transition"
                 >
                   Да
                 </button>
@@ -483,7 +483,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
-                className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-1 transition cursor-pointer"
+                className="text-xs text-brand-strong hover:text-brand-hover font-semibold flex items-center gap-1 transition cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Удалить</span>
@@ -500,7 +500,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center border border-neutral-200 shadow-sm"
-              style={{ backgroundColor: colorHex ? `${colorHex}18` : "#f5f5f5" }}
+              style={{ backgroundColor: colorHex ? `${colorHex}18` : "#F8FAFC" }}
             >
               <Car className="w-6 h-6" style={{ color: colorHex || "#dc2626" }} />
             </div>
@@ -530,7 +530,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => applyPreset(p)}
-                className="p-2 bg-white hover:bg-neutral-100 hover:border-red-400 border border-neutral-200 rounded-xl text-left text-xs transition cursor-pointer shadow-xs"
+                className="p-2 bg-white hover:bg-neutral-100 hover:border-brand-light border border-neutral-200 rounded-xl text-left text-xs transition cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span
@@ -602,7 +602,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                     value={licensePlate}
                     onChange={(e) => setLicensePlate(e.target.value.toUpperCase())}
                     placeholder="О 742 УМ 197 или М777ММ 777"
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-red-500"
+                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-brand"
                   />
                 ) : (
                   <input
@@ -634,7 +634,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 value={vin}
                 onChange={(e) => setVin(e.target.value.toUpperCase())}
                 placeholder="JN1TBNT31U0048123"
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-red-500"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-brand"
               />
               {vin && (
                 <div className="text-[10px] text-neutral-500 mt-1 flex items-center gap-1">
@@ -654,7 +654,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
-                Год выпуска <span className="text-red-500">*</span>
+                Год выпуска <span className="text-brand-strong">*</span>
               </label>
               <input
                 type="number"
@@ -696,7 +696,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
-                Двигатель <span className="text-red-500">*</span>
+                Двигатель <span className="text-brand-strong">*</span>
               </label>
               <ModernSelect
                 value={engine}
@@ -721,7 +721,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             </div>
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
-                Текущий пробег (км) <span className="text-red-500">*</span>
+                Текущий пробег (км) <span className="text-brand-strong">*</span>
               </label>
               <input
                 type="number"
@@ -745,7 +745,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition cursor-pointer"
+              className="px-6 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl shadow-lg shadow-brand-strong/30 transition cursor-pointer"
             >
               {mode === "edit" ? "Сохранить параметры" : "Добавить автомобиль в гараж"}
             </button>

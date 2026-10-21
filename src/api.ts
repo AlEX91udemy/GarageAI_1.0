@@ -419,6 +419,19 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
   return res.json();
 }
 
+export async function requestDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<{ text: string; sources?: { vision: string | null; local: string; confidence: number }; preprocessing?: { variants: string[]; mimeType: string }; warning?: string | null }> {
+  const res = await authenticatedFetch("/api/ai/scan-document", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось распознать документ");
+  }
+  return res.json();
+}
+
 export async function requestOemScheduleAi(payload: {
   make: string;
   model: string;

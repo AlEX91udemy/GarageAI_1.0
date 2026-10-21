@@ -53,7 +53,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
     <div
       className={`sticky bottom-0 z-40 w-full select-none transition-colors duration-200 border-t ${
         isDark
-          ? "bg-[#0d131d]/95 backdrop-blur-xl border-[#202c3e] text-white"
+          ? "bg-[#0d131d]/95 backdrop-blur-xl border-[#243044] text-white"
           : "bg-white/95 backdrop-blur-xl border-neutral-200/90 text-neutral-900 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
       }`}
     >
@@ -64,7 +64,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           onClick={() => handleSelect("home")}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
             isHomeActive
-              ? "text-red-500 font-bold scale-105"
+              ? "text-brand-strong font-bold scale-105"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-neutral-500 hover:text-neutral-900"
@@ -80,7 +80,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           onClick={() => handleSelect("history")}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer relative ${
             isHistoryActive
-              ? "text-red-500 font-bold scale-105"
+              ? "text-brand-strong font-bold scale-105"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-neutral-500 hover:text-neutral-900"
@@ -89,7 +89,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           <BookOpen className="w-5 h-5 mb-0.5" strokeWidth={isHistoryActive ? 2.5 : 1.9} />
           <span className="text-[11px] font-medium tracking-tight">История</span>
           {Boolean(badgeCounts?.service) && (
-            <span className="absolute top-0.5 right-1 px-1 min-w-3.5 h-3.5 rounded-full bg-red-600 text-white font-black text-[9px] flex items-center justify-center leading-none">
+            <span className="absolute top-0.5 right-1 px-1 min-w-3.5 h-3.5 rounded-full bg-brand-strong text-white font-black text-[9px] flex items-center justify-center leading-none">
               {badgeCounts?.service}
             </span>
           )}
@@ -100,7 +100,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           <button
             id="tab-btn-quick-action"
             onClick={handleAction}
-            className={`w-12 h-12 rounded-full bg-red-600 hover:bg-red-500 active:scale-95 text-white flex items-center justify-center shadow-lg shadow-red-600/35 transition-all cursor-pointer border-4 ${
+            className={`w-12 h-12 rounded-full bg-brand-strong hover:bg-brand active:scale-95 text-white flex items-center justify-center shadow-lg shadow-brand-strong/35 transition-all cursor-pointer border-4 ${
               isDark ? "border-[#0d131d]" : "border-[#F4F5F8]"
             }`}
             title="Добавить запись"
@@ -115,7 +115,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           onClick={() => handleSelect("expenses")}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer relative ${
             isExpensesActive
-              ? "text-red-500 font-bold scale-105"
+              ? "text-brand-strong font-bold scale-105"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-neutral-500 hover:text-neutral-900"
@@ -131,7 +131,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
           onClick={() => handleSelect("profile")}
           className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all cursor-pointer ${
             isProfileActive
-              ? "text-red-500 font-bold scale-105"
+              ? "text-brand-strong font-bold scale-105"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-neutral-500 hover:text-neutral-900"

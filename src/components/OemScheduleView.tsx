@@ -156,7 +156,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             Заводской регламент
           </div>
           <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">
-            Регламент ТО • {vehicle.make} {vehicle.model}
+            Регламент ТО
           </h2>
           <p className="text-xs text-neutral-500">
             Ориентиры интервалов замены для двигателя {vehicle.engine} при пробеге{" "}
@@ -196,12 +196,12 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
       </div>
 
       {aiError && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-2xl font-medium flex items-center justify-between">
+        <div className="p-3 bg-brand-soft border border-brand-border text-brand-hover text-xs rounded-2xl font-medium flex items-center justify-between">
           <span>{aiError}</span>
           <button
             type="button"
             onClick={() => setAiError(null)}
-            className="text-red-500 hover:text-red-700 font-bold px-2 py-0.5"
+            className="text-brand-strong hover:text-brand-hover font-bold px-2 py-0.5"
           >
             ✕
           </button>
@@ -218,18 +218,18 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
           }}
           className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 select-none ${
             statusFilter === "overdue"
-              ? "bg-red-50/80 border-red-400 ring-2 ring-red-500 shadow-md scale-[1.01]"
-              : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-red-200"
+              ? "bg-brand-soft/80 border-brand-light ring-2 ring-brand-border shadow-md scale-[1.01]"
+              : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-brand-border"
           }`}
           title={statusFilter === "overdue" ? "Нажмите, чтобы сбросить фильтр" : "Показать только требующие внимания"}
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-brand-soft-strong text-brand-strong flex items-center justify-center shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
               <div className="text-xs text-neutral-500 font-medium">Требуют внимания сейчас</div>
-              <div className="text-lg font-extrabold text-red-600 font-mono">
+              <div className="text-lg font-extrabold text-brand-strong font-mono">
                 {overdueCount} {overdueCount === 1 ? "пункт" : "пунктов"}
               </div>
             </div>
@@ -237,8 +237,8 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
           <span
             className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
               statusFilter === "overdue"
-                ? "bg-red-600 text-white"
-                : "bg-neutral-100 text-neutral-500 hover:bg-red-100 hover:text-red-700"
+                ? "bg-brand-strong text-white"
+                : "bg-neutral-100 text-neutral-500 hover:bg-brand-soft-strong hover:text-brand-hover"
             }`}
           >
             {statusFilter === "overdue" ? "Активен ✓" : "Фильтр"}
@@ -339,7 +339,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                 <span>Регламентные позиции</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono ${
                   statusFilter === "overdue"
-                    ? "bg-red-100 text-red-800"
+                    ? "bg-brand-soft-strong text-brand-hover"
                     : statusFilter === "soon"
                     ? "bg-amber-100 text-amber-800"
                     : "bg-emerald-100 text-emerald-800"
@@ -445,7 +445,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                       key={item.id}
                       className={`bg-white rounded-3xl p-4 sm:p-5 border transition-all duration-200 shadow-sm flex flex-col gap-3 ${
                         isOverdue
-                          ? "border-red-300 bg-red-50/20"
+                          ? "border-brand-light bg-brand-soft/20"
                           : isSoon
                           ? "border-amber-300 bg-amber-50/10"
                           : "border-emerald-300 bg-emerald-50/10 hover:border-emerald-400"
@@ -457,7 +457,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                             <span
                               className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
                                 isOverdue
-                                  ? "bg-red-100 text-red-700"
+                                  ? "bg-brand-soft-strong text-brand-hover"
                                   : isSoon
                                   ? "bg-amber-100 text-amber-700"
                                   : "bg-emerald-100 text-emerald-700"
@@ -494,7 +494,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                             <div
                               className={`text-sm font-extrabold ${
                                 isOverdue
-                                  ? "text-red-600"
+                                  ? "text-brand-strong"
                                   : isSoon
                                   ? "text-amber-600"
                                   : "text-emerald-600"
@@ -537,7 +537,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                           <div
                             className={`h-2 rounded-full transition-all duration-500 ${
                               isOverdue
-                                ? "bg-red-600"
+                                ? "bg-brand-strong"
                                 : isSoon
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
@@ -653,7 +653,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl"
+                  className="px-5 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl"
                 >
                   Сохранить
                 </button>

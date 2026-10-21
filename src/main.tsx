@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary name="GarageHub">
+    <ErrorBoundary name="Garage AI">
       <ConnectionNotice />
       <App />
     </ErrorBoundary>

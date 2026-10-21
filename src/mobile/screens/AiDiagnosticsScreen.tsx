@@ -131,7 +131,7 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
           <div className="space-y-3">
             {intelligence.overdueMaintenance.map((item) => (
               <div key={item.title} className="p-4 rounded-2xl bg-neutral-900 border border-neutral-800 space-y-2">
-                <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                <div className="flex items-center gap-2 text-brand-on-dark text-xs font-bold">
                   <AlertTriangle className="w-4 h-4 shrink-0" />
                   <span>Просрочено по регламенту: {item.title}</span>
                 </div>

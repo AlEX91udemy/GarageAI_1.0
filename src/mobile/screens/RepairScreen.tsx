@@ -46,7 +46,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
 
     if (kmLeft <= 0) {
       status = "overdue";
-      badgeColor = "bg-rose-100 text-rose-700 border-rose-200";
+      badgeColor = "bg-brand-soft-strong text-brand-hover border-brand-border";
       label = "Просрочено";
     } else if (kmLeft < 1500) {
       status = "soon";
@@ -83,14 +83,14 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
               </span>
             </h2>
             <div className="text-xs text-neutral-500 mt-0.5 flex items-center gap-1.5">
-              <Car className="w-3.5 h-3.5 text-red-600" />
+              <Car className="w-3.5 h-3.5 text-brand-strong" />
               <span>{vehicle.make} {vehicle.model} • {formatDistance(vehicle.currentMileage)}</span>
             </div>
           </div>
 
           <button
             onClick={onAddScheduleItem}
-            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-strong/30 transition cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Регламент</span>
@@ -119,7 +119,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 <span
                   className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
                     f.id === "overdue"
-                      ? "bg-rose-100 text-rose-700"
+                      ? "bg-brand-soft-strong text-brand-hover"
                       : f.id === "soon"
                       ? "bg-amber-100 text-amber-800"
                       : "bg-neutral-100 text-neutral-700"
@@ -136,13 +136,13 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
       <div className="p-4 space-y-3.5">
         {/* Urgent alert if overdue */}
         {overdueCount > 0 && (
-          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+          <div className="p-3.5 rounded-2xl bg-brand-soft border border-brand-border flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-brand-strong shrink-0" />
             <div className="text-xs">
-              <span className="font-bold text-rose-900">
+              <span className="font-bold text-brand-hover">
                 Требуется техническое обслуживание!
               </span>
-              <p className="text-[11px] text-rose-700 mt-0.5">
+              <p className="text-[11px] text-brand-hover mt-0.5">
                 {overdueCount} {overdueCount === 1 ? "процедура" : "процедуры"} превысили рекомендованный заводом интервал.
               </p>
             </div>
@@ -153,7 +153,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
         {onOpenAiDiagnostic && (
           <div
             onClick={onOpenAiDiagnostic}
-            className="p-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 text-white border border-red-500/30 flex items-center justify-between cursor-pointer active:scale-[0.99] transition shadow-md shadow-red-600/25"
+            className="p-3.5 rounded-2xl bg-gradient-to-r from-brand-strong to-brand-hover text-white border border-brand/30 flex items-center justify-between cursor-pointer active:scale-[0.99] transition shadow-md shadow-brand-strong/25"
           >
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white">
@@ -163,7 +163,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                 <h4 className="text-xs font-bold text-white">
                   Диагностика и регламент завода (AI)
                 </h4>
-                <p className="text-[10px] text-red-100">
+                <p className="text-[10px] text-brand-soft-strong">
                   Рекомендации по замене узлов для двигателя {vehicle.engine || "авто"}
                 </p>
               </div>
@@ -231,7 +231,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between text-[11px] font-mono text-neutral-500">
                       <span>Интервал: {formatDistance(item.intervalKm)}</span>
-                      <span className={status === "overdue" ? "text-rose-600 font-bold" : "text-neutral-700 font-semibold"}>
+                      <span className={status === "overdue" ? "text-brand-strong font-bold" : "text-neutral-700 font-semibold"}>
                         {kmLeft <= 0
                           ? `Просрочено на ${formatDistance(Math.abs(kmLeft))}`
                           : `Осталось: ${formatDistance(kmLeft)}`}
@@ -242,7 +242,7 @@ export const RepairScreen: React.FC<RepairScreenProps> = ({
                       <div
                         className={`h-full rounded-full transition-all ${
                           status === "overdue"
-                            ? "bg-rose-600"
+                            ? "bg-brand-strong"
                             : status === "soon"
                             ? "bg-amber-500"
                             : "bg-emerald-500"

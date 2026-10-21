@@ -135,7 +135,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `GarageHub_backup_${new Date().toISOString().split("T")[0]}.json`;
+      a.download = `Garage AI_backup_${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -223,7 +223,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
             {isAdmin && (
               <button
                 onClick={handleAdminLogout}
-                className="p-2 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-red-600 transition cursor-pointer"
+                className="p-2 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-brand-strong transition cursor-pointer"
                 title="Выйти из режима администратора"
               >
                 <LogOut className="w-4 h-4" />
@@ -247,13 +247,13 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
               className={`p-3 rounded-2xl text-xs flex items-center gap-2 ${
                 statusMessage.type === "success"
                   ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                  : "bg-red-50 text-red-800 border border-red-200"
+                  : "bg-brand-soft text-brand-hover border border-brand-border"
               }`}
             >
               {statusMessage.type === "success" ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               ) : (
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <AlertCircle className="w-4 h-4 text-brand-strong shrink-0" />
               )}
               <span>{statusMessage.text}</span>
             </div>
@@ -324,7 +324,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                     </button>
                   </div>
                   {authError && (
-                    <div className="text-xs text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <div className="text-xs text-brand-strong font-semibold mt-1.5 flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                       <span>{authError}</span>
                     </div>
@@ -364,7 +364,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                 <div className="flex items-center justify-between text-xs font-semibold text-neutral-700">
                   <div className="flex items-center gap-2">
                     <Server className="w-4 h-4 text-neutral-500" />
-                    <span>Хранилище GarageHub Engine</span>
+                    <span>Хранилище Garage AI Engine</span>
                   </div>
                   <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-bold">
                     JSON Persistence • data/garage_store.json
@@ -378,7 +378,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                       <div className="text-[10px] text-neutral-500 uppercase font-bold">Автомобили</div>
                     </div>
                     <div className="bg-white p-2 rounded-xl border border-neutral-200/60">
-                      <div className="text-lg font-black text-red-600">{dbStats.services}</div>
+                      <div className="text-lg font-black text-brand-strong">{dbStats.services}</div>
                       <div className="text-[10px] text-neutral-500 uppercase font-bold">Записей ТО</div>
                     </div>
                     <div className="bg-white p-2 rounded-xl border border-neutral-200/60">
@@ -436,8 +436,8 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
                 {/* Reset Demo Data */}
                 {confirmReset ? (
-                  <div className="p-3.5 bg-red-50 border border-red-200 rounded-2xl text-xs space-y-2.5">
-                    <div className="font-bold text-red-900">
+                  <div className="p-3.5 bg-brand-soft border border-brand-border rounded-2xl text-xs space-y-2.5">
+                    <div className="font-bold text-brand-hover">
                       Вы действительно хотите сбросить данные текущего гаража?
                     </div>
                     <div className="flex items-center gap-2">
@@ -445,7 +445,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                         type="button"
                         onClick={handleResetDemo}
                         disabled={isProcessing}
-                        className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition cursor-pointer"
+                        className="px-3.5 py-1.5 bg-brand-strong hover:bg-brand-hover text-white font-bold rounded-xl transition cursor-pointer"
                       >
                         Да, сбросить всё
                       </button>
@@ -464,20 +464,20 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                     type="button"
                     onClick={() => setConfirmReset(true)}
                     disabled={isProcessing}
-                    className="w-full flex items-center justify-between p-3.5 bg-red-50/60 hover:bg-red-50 text-red-700 border border-red-200/80 rounded-2xl text-xs font-bold transition cursor-pointer group"
+                    className="w-full flex items-center justify-between p-3.5 bg-brand-soft/60 hover:bg-brand-soft text-brand-hover border border-brand-border/80 rounded-2xl text-xs font-bold transition cursor-pointer group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center group-hover:scale-105 transition-transform">
-                        <RotateCcw className="w-4 h-4 text-red-600" />
+                      <div className="w-8 h-8 rounded-xl bg-brand-soft-strong flex items-center justify-center group-hover:scale-105 transition-transform">
+                        <RotateCcw className="w-4 h-4 text-brand-strong" />
                       </div>
                       <div className="text-left">
-                        <div className="text-red-900 font-extrabold">Сбросить данные</div>
-                        <div className="text-[11px] text-red-600 font-normal">
+                        <div className="text-brand-hover font-extrabold">Сбросить данные</div>
+                        <div className="text-[11px] text-brand-strong font-normal">
                           Очистить данные текущего гаража
                         </div>
                       </div>
                     </div>
-                    <span className="text-[11px] text-red-600 font-mono">Сбросить</span>
+                    <span className="text-[11px] text-brand-strong font-mono">Сбросить</span>
                   </button>
                 )}
               </div>
@@ -487,7 +487,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
         {/* Fixed Footer */}
         <div className="p-3.5 sm:px-6 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400 shrink-0 bg-neutral-50/80">
-          <span>GarageHub Server v2.4 • Защита администратора активна</span>
+          <span>Garage AI Server v2.4 • Защита администратора активна</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-neutral-200/80 hover:bg-neutral-200 text-neutral-800 rounded-xl font-bold transition cursor-pointer"

@@ -97,7 +97,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
       {/* Header & Quick Action Buttons */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold text-red-600 uppercase tracking-wider">
+          <div className="text-xs font-bold text-brand-strong uppercase tracking-wider">
             Журнал обслуживания
           </div>
           <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">
@@ -111,22 +111,22 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={handleExportPdf}
-            className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-300 dark:bg-[#1a2333] dark:hover:bg-[#222e42] dark:border-[#2f3d54] dark:text-neutral-100 text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
+            className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-300 dark:bg-[#17202E] dark:hover:bg-[#1E293B] dark:border-[#243044] dark:text-neutral-100 text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-xs active:scale-95"
             title="Выгрузить сервисную книжку и историю автомобиля в PDF"
           >
-            <FileDown className="w-4 h-4 text-red-600" />
+            <FileDown className="w-4 h-4 text-brand-strong" />
             <span>Экспорт в PDF</span>
           </button>
           <button
             onClick={onScanReceipt}
             className="flex-1 sm:flex-initial px-3.5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
-            <Camera className="w-4 h-4 text-red-400" />
+            <Camera className="w-4 h-4 text-brand-on-dark" />
             <span>Чек / OCR</span>
           </button>
           <button
             onClick={onAddRecord}
-            className="flex-1 sm:flex-initial px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95"
+            className="flex-1 sm:flex-initial px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-strong/30 active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Добавить запись</span>
@@ -143,7 +143,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
             placeholder="Поиск по работам, сервису, запчастям или артикулу (например Mann, Brembo, NS-2)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl pl-10 pr-4 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500"
+            className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl pl-10 pr-4 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand"
           />
         </div>
 
@@ -168,7 +168,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition cursor-pointer ${
                   selectedCategory === cat
-                    ? "bg-red-600 text-white"
+                    ? "bg-brand-strong text-white"
                     : "bg-neutral-100 hover:bg-neutral-200 text-neutral-600"
                 }`}
               >
@@ -180,7 +180,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
       </div>
 
       {/* Unified Monolithic History Block (Matching To-Fix Design System) */}
-      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-red-200/80 shadow-sm transition-all duration-200">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-brand-border/80 shadow-sm transition-all duration-200">
         <div
           onClick={() => setIsHistoryListCollapsed((prev) => !prev)}
           className="flex items-center justify-between cursor-pointer select-none"
@@ -192,15 +192,15 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                 e.stopPropagation();
                 setIsHistoryListCollapsed((prev) => !prev);
               }}
-              className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200/60 flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 shrink-0"
+              className="w-8 h-8 rounded-xl bg-brand-soft hover:bg-brand-soft-strong text-brand-strong border border-brand-border/60 flex items-center justify-center transition cursor-pointer shadow-xs active:scale-95 shrink-0"
               title={!isHistoryListCollapsed ? "Свернуть историю" : "Развернуть историю"}
             >
-              <History className="w-4 h-4 text-red-600 stroke-[2.2]" />
+              <History className="w-4 h-4 text-brand-strong stroke-[2.2]" />
             </button>
             <div>
               <h4 className="text-sm font-bold text-neutral-900 flex items-center gap-1.5">
                 <span>История ремонтов</span>
-                <span className="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded-full font-mono">
+                <span className="text-[10px] bg-brand-soft-strong text-brand-hover font-bold px-2 py-0.5 rounded-full font-mono">
                   {filteredRecords.length}
                 </span>
               </h4>
@@ -234,14 +234,14 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                 e.stopPropagation();
                 handleExportPdf();
               }}
-              className="text-xs font-semibold px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-900 border border-red-200/60 rounded-xl transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
+              className="text-xs font-semibold px-2.5 py-1.5 bg-brand-soft hover:bg-brand-soft-strong text-brand-hover border border-brand-border/60 rounded-xl transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
               title="Экспорт истории обслуживания в PDF"
             >
-              <FileDown className="w-3.5 h-3.5 text-red-600" />
+              <FileDown className="w-3.5 h-3.5 text-brand-strong" />
               <span className="hidden sm:inline">Экспорт в PDF</span>
             </button>
 
-            <span className="text-xs font-semibold px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-900 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm border border-red-200/60">
+            <span className="text-xs font-semibold px-3 py-1.5 bg-brand-soft hover:bg-brand-soft-strong text-brand-hover rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm border border-brand-border/60">
               {!isHistoryListCollapsed ? (
                 <>
                   <ChevronUp className="w-3.5 h-3.5" />
@@ -259,7 +259,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
 
         {/* Content list within the monolithic block (identical to To-Fix and OEM tasks layout) */}
         {!isHistoryListCollapsed && (
-          <div className="space-y-3 pt-3 mt-3 border-t border-red-100">
+          <div className="space-y-3 pt-3 mt-3 border-t border-brand-soft-strong">
             {filteredRecords.length === 0 ? (
               <div className="bg-white rounded-3xl p-8 text-center border border-neutral-200/80 shadow-sm space-y-2">
                 <Wrench className="w-10 h-10 text-neutral-300 mx-auto mb-2" />
@@ -283,7 +283,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                           <span className="text-[10px] font-mono font-bold text-neutral-800 bg-neutral-100 px-2 py-0.5 rounded-full">
                             {record.date}
                           </span>
-                          <span className="text-[11px] font-mono font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">
+                          <span className="text-[11px] font-mono font-bold text-brand-hover bg-brand-soft px-2 py-0.5 rounded-md">
                             {record.mileage.toLocaleString("ru-RU")} км
                           </span>
                           <span className="text-[10px] bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md font-medium">
@@ -407,7 +407,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                             </div>
                             <div>
                               <span className="text-neutral-400">Итого:</span>{" "}
-                              <strong className="text-red-600 font-bold">
+                              <strong className="text-brand-strong font-bold">
                                 {record.totalCost.toLocaleString("ru-RU")} ₽
                               </strong>
                             </div>
@@ -422,7 +422,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                               }}
                               className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer"
                             >
-                              <FileImage className="w-3.5 h-3.5 text-red-400" />
+                              <FileImage className="w-3.5 h-3.5 text-brand-on-dark" />
                               <span>Посмотреть чек</span>
                             </button>
                           )}
@@ -443,7 +443,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                                   onDeleteRecord(record.id);
                                   setConfirmDeleteId(null);
                                 }}
-                                className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg cursor-pointer transition shadow-xs"
+                                className="text-xs font-bold text-white bg-brand-strong hover:bg-brand-hover px-2.5 py-1 rounded-lg cursor-pointer transition shadow-xs"
                               >
                                 Да
                               </button>
@@ -462,7 +462,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                                 e.stopPropagation();
                                 setConfirmDeleteId(record.id);
                               }}
-                              className="text-xs text-red-600 hover:text-red-700 flex items-center gap-1 p-1 cursor-pointer transition font-medium"
+                              className="text-xs text-brand-strong hover:text-brand-hover flex items-center gap-1 p-1 cursor-pointer transition font-medium"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               <span>Удалить</span>

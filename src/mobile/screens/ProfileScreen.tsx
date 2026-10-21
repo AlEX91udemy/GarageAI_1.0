@@ -15,10 +15,13 @@ import {
   FileText,
   Plus,
   Monitor,
+  LogIn,
+  UserPlus,
+  Loader2,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { restoreSession } from "../../api";
+import { login, register, restoreSession } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -51,6 +54,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
+  const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
+  const [authUsername, setAuthUsername] = React.useState("");
+  const [authPassword, setAuthPassword] = React.useState("");
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [authBusy, setAuthBusy] = React.useState(false);
 
   React.useEffect(() => {
     restoreSession().then((session) => {
@@ -65,10 +73,31 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     0
   );
 
+  const submitAuth = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!authMode) return;
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const session = authMode === "login"
+        ? await login(authUsername.trim(), authPassword)
+        : await register(authUsername.trim(), authPassword);
+      setIsAuthenticated(true);
+      setSessionUsername(session.username);
+      setAuthMode(null);
+      setAuthPassword("");
+      onAuthSuccess?.();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Ошибка авторизации");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/90 dark:bg-[#0d131d]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-200/80 dark:border-[#1f2c3f] shadow-xs">
+      <div className="sticky top-0 z-30 bg-white/90 dark:bg-[#0d131d]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-200/80 dark:border-[#243044] shadow-xs">
         <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight">
           Профиль владельца
         </h2>
@@ -83,7 +112,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <div className="p-4 space-y-3.5">
         {/* User Card */}
         <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs flex items-center gap-3.5">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-600 to-neutral-900 flex items-center justify-center font-black text-lg text-white shadow-sm">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-strong to-neutral-900 flex items-center justify-center font-black text-lg text-white shadow-sm">
             AS
           </div>
           <div className="flex-1 min-w-0">
@@ -101,6 +130,70 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </div>
           </div>
         </div>
+
+        {!isAuthenticated && (
+          <div className="rounded-3xl bg-white border border-neutral-200/90 shadow-xs p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-black text-neutral-900">Синхронизация гаража</h3>
+              <p className="mt-1 text-xs text-neutral-500">
+                Войдите или создайте аккаунт, чтобы сохранить данные на сервере.
+              </p>
+            </div>
+            {!authMode ? (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                  className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
+                >
+                  <LogIn className="mr-1 inline h-4 w-4" />
+                  Войти
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                  className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
+                >
+                  <UserPlus className="mr-1 inline h-4 w-4" />
+                  Регистрация
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={submitAuth} className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-neutral-700">
+                    {authMode === "login" ? "Вход в аккаунт" : "Новый аккаунт"}
+                  </span>
+                  <button type="button" onClick={() => setAuthMode(null)} className="text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                    Отмена
+                  </button>
+                </div>
+                <input
+                  value={authUsername}
+                  onChange={(event) => setAuthUsername(event.target.value)}
+                  placeholder="Логин"
+                  autoComplete="username"
+                  required
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="Пароль"
+                  autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                  minLength={8}
+                  required
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                />
+                {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
+                <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "login" ? "Войти" : "Создать аккаунт"}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         {isAuthenticated && (<>
         {/* Global Garage Statistics */}
@@ -185,7 +278,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             className="w-full p-3.5 flex items-center justify-between hover:bg-neutral-50 transition cursor-pointer text-left"
           >
             <div className="flex items-center gap-3 text-neutral-800 font-semibold">
-              <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-brand-soft text-brand-strong flex items-center justify-center">
                 <Sparkles className="w-4 h-4" />
               </div>
               <span>Garage AI Core Engine & Диагностика</span>
@@ -209,11 +302,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
 
           <button
-            onClick={() => onLogout?.()}
-            className="w-full p-3.5 flex items-center justify-between hover:bg-neutral-50 transition cursor-pointer text-left text-rose-600"
+            onClick={() => {
+              setIsAuthenticated(false);
+              setSessionUsername(null);
+              setAuthMode(null);
+              onLogout?.();
+            }}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-neutral-50 transition cursor-pointer text-left text-brand-strong"
           >
             <div className="flex items-center gap-3 font-semibold">
-              <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-brand-soft text-brand-strong flex items-center justify-center">
                 <LogOut className="w-4 h-4" />
               </div>
               <span>Выйти из аккаунта</span>

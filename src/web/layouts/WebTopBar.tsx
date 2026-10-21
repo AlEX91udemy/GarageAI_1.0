@@ -45,7 +45,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
     <header
       className={`sticky top-0 z-30 h-16 flex items-center justify-between px-6 border-b backdrop-blur-md ${
         isDark
-          ? "bg-[#0B0E14]/95 border-[#1E293B] text-slate-200"
+          ? "bg-[#17202E]/95 border-[#243044] text-slate-200"
           : "bg-white/95 border-slate-200 text-slate-900"
       }`}
     >
@@ -56,7 +56,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
             onClick={() => setShowVehicleDropdown(!showVehicleDropdown)}
             className={`flex items-center gap-3 px-4 py-2 rounded-lg border transition-all group ${
               isDark
-                ? "bg-[#1E293B] border-[#334155] hover:border-[#EF4444]/40"
+                ? "bg-[#1E293B] border-[#243044] hover:border-[#EF3038]/40"
                 : "bg-slate-50 border-slate-200 hover:border-slate-300"
             }`}
           >
@@ -85,7 +85,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
               <div
                 className={`absolute top-full left-0 mt-2 w-80 rounded-xl border shadow-2xl overflow-hidden z-50 ${
                   isDark
-                    ? "bg-[#0F172A] border-[#1E293B]"
+                    ? "bg-[#1E293B] border-[#243044]"
                     : "bg-white border-slate-200"
                 }`}
               >
@@ -102,7 +102,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
                           isActive
                             ? isDark
-                              ? "bg-[#EF4444]/10 text-[#EF4444]"
+                              ? "bg-[#EF3038]/10 text-[#EF3038]"
                               : "bg-slate-100 text-slate-900"
                             : isDark
                             ? "hover:bg-[#1E293B] text-slate-300"
@@ -135,7 +135,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
                 </div>
 
                 {(onOpenAddVehicle || onOpenEditVehicle) && (
-                  <div className={`p-2 border-t space-y-1 ${isDark ? "border-[#1E293B]" : "border-slate-200"}`}>
+                  <div className={`p-2 border-t space-y-1 ${isDark ? "border-[#243044]" : "border-slate-200"}`}>
                     {onOpenEditVehicle && (
                       <button
                         onClick={() => {
@@ -157,7 +157,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
                           onOpenAddVehicle();
                           setShowVehicleDropdown(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all font-semibold text-sm bg-[#F97316] hover:bg-[#EA580C] text-white"
+                        className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all font-semibold text-sm bg-[#B91C1C] hover:bg-[#991B1B] text-white"
                       >
                         <Plus className="w-4 h-4" />
                         Добавить автомобиль
@@ -180,7 +180,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
             onClick={onOpenScan}
             className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
               isDark
-                ? "bg-[#1E293B] border-[#334155] text-slate-400 hover:text-[#EF4444] hover:border-[#EF4444]/40"
+                ? "bg-[#1E293B] border-[#243044] text-slate-400 hover:text-[#EF3038] hover:border-[#EF3038]/40"
                 : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
             }`}
             title="Сканер"
@@ -192,7 +192,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
         {onSwitchToMobile && (
           <button
             onClick={onSwitchToMobile}
-            className="w-10 h-10 rounded-lg border flex items-center justify-center transition-all bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-[#1E293B] dark:border-[#334155] dark:text-slate-400 dark:hover:text-[#EF4444]"
+            className="w-10 h-10 rounded-lg border flex items-center justify-center transition-all bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 dark:bg-[#1E293B] dark:border-[#243044] dark:text-slate-400 dark:hover:text-[#EF3038]"
             title="Открыть мобильную версию"
             aria-label="Открыть мобильную версию"
           >
@@ -205,14 +205,14 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
           onClick={onOpenNotifications}
           className={`relative w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
             isDark
-              ? "bg-[#1E293B] border-[#334155] text-slate-400 hover:text-slate-200"
+              ? "bg-[#1E293B] border-[#243044] text-slate-400 hover:text-slate-200"
               : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
           }`}
           title="Уведомления"
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#EF4444] text-white text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#EF3038] text-white text-[10px] font-bold flex items-center justify-center">
               {unreadCount}
             </span>
           )}
@@ -223,7 +223,7 @@ export const WebTopBar: React.FC<WebTopBarProps> = ({
           onClick={onToggleTheme}
           className={`w-10 h-10 rounded-lg border flex items-center justify-center transition-all ${
             isDark
-              ? "bg-[#1E293B] border-[#334155] text-slate-400 hover:text-[#F59E0B]"
+              ? "bg-[#1E293B] border-[#243044] text-slate-400 hover:text-[#F59E0B]"
               : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
           }`}
           title="Переключить тему"

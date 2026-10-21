@@ -47,7 +47,7 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
               onDelete?.(record.id);
               onBack?.();
             }}
-            className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center cursor-pointer transition border border-rose-200"
+            className="w-8 h-8 rounded-full bg-brand-soft hover:bg-brand-soft-strong text-brand-strong flex items-center justify-center cursor-pointer transition border border-brand-border"
             title="Удалить запись"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -60,7 +60,7 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
       {/* Main summary card */}
       <div className="p-4 space-y-3.5">
         <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs">
-          <span className="text-[10px] font-mono text-red-600 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 border border-red-200 inline-block mb-1.5">
+          <span className="text-[10px] font-mono text-brand-strong font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-soft border border-brand-border inline-block mb-1.5">
             {record.category}
           </span>
           <h2 className="text-xl font-black text-neutral-900 tracking-tight leading-snug">

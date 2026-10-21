@@ -56,17 +56,17 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="w-full max-w-xl bg-white dark:bg-[#111722] text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-[#243044] overflow-hidden flex flex-col max-h-[92vh] outline-none"
+        className="w-full max-w-xl bg-white dark:bg-[#17202E] text-slate-900 dark:text-slate-100 rounded-2xl shadow-2xl border border-slate-200 dark:border-[#243044] overflow-hidden flex flex-col max-h-[92vh] outline-none"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-[#243044] bg-slate-50/75 dark:bg-[#16202e]/60">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-[#243044] bg-slate-50/75 dark:bg-[#17202E]/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md shadow-red-600/30">
+            <div className="w-10 h-10 rounded-xl bg-brand-strong text-white flex items-center justify-center shadow-md shadow-brand-strong/30">
               <Monitor className="w-5 h-5" />
             </div>
             <div>
               <h2 id="install-pc-modal-title" className="text-base font-bold text-slate-900 dark:text-white leading-tight">
-                Установка GarageHub на компьютер (ПК)
+                Установка Garage AI на компьютер (ПК)
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Автономное приложение Windows / macOS / Linux без рамок браузера
@@ -87,9 +87,9 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
         <div className="p-5 overflow-y-auto space-y-4 text-xs sm:text-sm">
           {/* Quick One-Click Install Banner if browser supports beforeinstallprompt */}
           {deferredPrompt && !installed && (
-            <div className="p-4 rounded-xl bg-gradient-to-r from-red-600/10 via-red-500/10 to-transparent border border-red-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-brand-strong/10 via-brand/10 to-transparent border border-brand/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <div className="font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5 text-sm">
+                <div className="font-bold text-brand-strong dark:text-brand-on-dark flex items-center gap-1.5 text-sm">
                   <Zap className="w-4 h-4 text-amber-500" />
                   Ваш браузер готов к быстрой установке
                 </div>
@@ -101,7 +101,7 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
                 type="button"
                 onClick={handleNativeInstall}
                 disabled={isInstalling}
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-red-600/25 transition shrink-0 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-brand-strong/25 transition shrink-0 cursor-pointer disabled:opacity-50"
               >
                 <Download className="w-4 h-4" />
                 <span>{isInstalling ? "Установка..." : "Установить в 1 клик"}</span>
@@ -121,13 +121,13 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
               Инструкция для вашего браузера:
             </div>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-[#131b26] rounded-xl border border-slate-200 dark:border-[#243044]">
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-[#0D131D] rounded-xl border border-slate-200 dark:border-[#243044]">
               <button
                 type="button"
                 onClick={() => setActiveTab("chrome")}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === "chrome"
-                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#334155]"
+                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#243044]"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
@@ -140,11 +140,11 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
                 onClick={() => setActiveTab("edge")}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === "edge"
-                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#334155]"
+                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#243044]"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
-                <Compass className="w-3.5 h-3.5 text-cyan-500" />
+                <Compass className="w-3.5 h-3.5 text-brand-strong" />
                 <span>Microsoft Edge</span>
               </button>
 
@@ -153,46 +153,46 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
                 onClick={() => setActiveTab("yandex")}
                 className={`py-2 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === "yandex"
-                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#334155]"
+                    ? "bg-white dark:bg-[#1e293b] text-slate-900 dark:text-white shadow-xs border border-slate-200/80 dark:border-[#243044]"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 }`}
               >
-                <Monitor className="w-3.5 h-3.5 text-red-500" />
+                <Monitor className="w-3.5 h-3.5 text-brand-strong" />
                 <span>Яндекс / Другие</span>
               </button>
             </div>
           </div>
 
           {/* Tab Content Step-by-Step */}
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#243044] bg-slate-50/50 dark:bg-[#131b26]/50 space-y-3">
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-[#243044] bg-slate-50/50 dark:bg-[#0D131D]/50 space-y-3">
             {activeTab === "chrome" && (
               <div className="space-y-2.5">
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     1
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">Способ через адресную строку (самый быстрый):</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      В правой части адресной строки браузера (рядом со значком закладки «★») нажмите на иконку <strong className="text-red-600 dark:text-red-400">«Установить приложение GarageHub»</strong> (монитор со стрелкой вниз).
+                      В правой части адресной строки браузера (рядом со значком закладки «★») нажмите на иконку <strong className="text-brand-strong dark:text-brand-on-dark">«Установить приложение Garage AI»</strong> (монитор со стрелкой вниз).
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     2
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">Способ через меню Chrome:</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      Нажмите кнопку меню <strong className="font-mono">⋮</strong> (три точки в правом верхнем углу) → выберите пункт <strong className="text-red-600 dark:text-red-400">«Сохранить и поделиться»</strong> → <strong className="text-red-600 dark:text-red-400">«Установить приложение GarageHub...»</strong>.
+                      Нажмите кнопку меню <strong className="font-mono">⋮</strong> (три точки в правом верхнем углу) → выберите пункт <strong className="text-brand-strong dark:text-brand-on-dark">«Сохранить и поделиться»</strong> → <strong className="text-brand-strong dark:text-brand-on-dark">«Установить приложение Garage AI...»</strong>.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     3
                   </div>
                   <div>
@@ -208,31 +208,31 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
             {activeTab === "edge" && (
               <div className="space-y-2.5">
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-cyan-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     1
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">Значок в адресной строке:</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      В правой части адресной строки нажмите на иконку из трёх квадратов и плюса <strong className="text-cyan-600 dark:text-cyan-400">«Доступно приложение: установить GarageHub»</strong>.
+                      В правой части адресной строки нажмите на иконку из трёх квадратов и плюса <strong className="text-brand-strong dark:text-brand-on-dark">«Доступно приложение: установить Garage AI»</strong>.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-cyan-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     2
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">Через меню Edge:</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      Нажмите меню <strong className="font-mono">…</strong> (три точки) → выберите <strong className="text-cyan-600 dark:text-cyan-400">«Приложения»</strong> → <strong className="text-cyan-600 dark:text-cyan-400">«Установить GarageHub»</strong>.
+                      Нажмите меню <strong className="font-mono">…</strong> (три точки) → выберите <strong className="text-brand-strong dark:text-brand-on-dark">«Приложения»</strong> → <strong className="text-brand-strong dark:text-brand-on-dark">«Установить Garage AI»</strong>.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-cyan-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     3
                   </div>
                   <div>
@@ -248,19 +248,19 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
             {activeTab === "yandex" && (
               <div className="space-y-2.5">
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     1
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">В Яндекс.Браузере:</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      В конце адресной строки нажмите на значок <strong className="text-red-600 dark:text-red-400">«Установить приложение»</strong> или нажмите меню (≡) → <strong className="text-red-600 dark:text-red-400">«Дополнительно»</strong> → <strong className="text-red-600 dark:text-red-400">«Создать ярлык...»</strong>.
+                      В конце адресной строки нажмите на значок <strong className="text-brand-strong dark:text-brand-on-dark">«Установить приложение»</strong> или нажмите меню (≡) → <strong className="text-brand-strong dark:text-brand-on-dark">«Дополнительно»</strong> → <strong className="text-brand-strong dark:text-brand-on-dark">«Создать ярлык...»</strong>.
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     2
                   </div>
                   <div>
@@ -272,13 +272,13 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
                 </div>
 
                 <div className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-red-600 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-strong text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                     3
                   </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white">Готово:</span>
                     <p className="text-slate-600 dark:text-slate-300 text-xs mt-0.5">
-                      Ярлык GarageHub появится на вашем рабочем столе. При запуске он откроется в собственном окне без вкладок и адресной строки.
+                      Ярлык Garage AI появится на вашем рабочем столе. При запуске он откроется в собственном окне без вкладок и адресной строки.
                     </p>
                   </div>
                 </div>
@@ -288,7 +288,7 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
 
           {/* Advantages of PC Installation */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#131b26] border border-slate-200 dark:border-[#243044]">
+            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#0D131D] border border-slate-200 dark:border-[#243044]">
               <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
                 <HardDrive className="w-3.5 h-3.5 text-blue-500" />
                 <span>Работа офлайн</span>
@@ -298,7 +298,7 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
               </p>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#131b26] border border-slate-200 dark:border-[#243044]">
+            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#0D131D] border border-slate-200 dark:border-[#243044]">
               <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
                 <Monitor className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Чистый экран</span>
@@ -308,7 +308,7 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
               </p>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#131b26] border border-slate-200 dark:border-[#243044]">
+            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#0D131D] border border-slate-200 dark:border-[#243044]">
               <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 dark:text-slate-200">
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
                 <span>Авто-сохранение</span>
@@ -321,14 +321,14 @@ export function InstallPcModal({ onClose, deferredPrompt, onInstallSuccess }: In
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 dark:border-[#243044] bg-slate-50 dark:bg-[#131b26]">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 dark:border-[#243044] bg-slate-50 dark:bg-[#0D131D]">
           <span className="text-[11px] text-slate-500 dark:text-slate-400">
             Версия PWA 2.4 · Windows, macOS, Linux
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-[#1e293b] dark:hover:bg-[#28374d] text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs transition cursor-pointer"
+            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-[#1e293b] dark:hover:bg-[#1E293B] text-slate-800 dark:text-slate-200 font-bold rounded-xl text-xs transition cursor-pointer"
           >
             Понятно
           </button>

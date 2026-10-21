@@ -15,14 +15,14 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   return (
     <div
       onClick={onFinish}
-      className="relative flex flex-col items-center justify-between h-full w-full bg-gradient-to-b from-neutral-950 via-neutral-900 to-black p-8 text-white select-none cursor-pointer overflow-hidden"
+      className="relative flex flex-col items-center justify-between h-full w-full bg-gradient-to-b from-[#090D14] via-[#0D131D] to-[#090D14] p-8 text-white select-none cursor-pointer overflow-hidden"
     >
       {/* Background ambient lighting */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#B7F34A]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-brand/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top micro badge */}
-      <div className="pt-8 flex items-center gap-1.5 text-xs text-neutral-400 font-mono tracking-widest uppercase">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#B7F34A] animate-ping" />
+      <div className="pt-8 flex items-center gap-1.5 text-xs text-slate-400 font-mono tracking-widest uppercase">
+        <span className="w-1.5 h-1.5 rounded-full bg-brand animate-ping" />
         GARAGE OPERATING SYSTEM v2.0
       </div>
 
@@ -33,21 +33,21 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         </div>
 
         <h1 className="text-3xl font-black tracking-tight text-white mb-2">
-          Garage<span className="text-[#B7F34A]"> AI</span>
+          Garage<span className="text-brand"> AI</span>
         </h1>
-        <p className="text-xs text-neutral-400 tracking-wide max-w-xs leading-relaxed">
+        <p className="text-xs text-slate-400 tracking-wide max-w-xs leading-relaxed">
           Цифровой гараж, телеметрия обслуживания и AI-диагностика вашего автомобиля
         </p>
       </div>
 
       {/* Bottom loading indicator */}
       <div className="w-full max-w-xs flex flex-col items-center pb-6">
-        <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden mb-3">
-          <div className="h-full bg-gradient-to-r from-[#B7F34A] to-[#8CBF32] rounded-full animate-[pulse_1.2s_ease-in-out_infinite]" style={{ width: "85%" }} />
+        <div className="w-full h-1 bg-[#1E293B] rounded-full overflow-hidden mb-3">
+          <div className="h-full bg-gradient-to-r from-brand to-brand-strong rounded-full animate-[pulse_1.2s_ease-in-out_infinite]" style={{ width: "85%" }} />
         </div>
-        <div className="flex items-center justify-between w-full text-[11px] text-neutral-500 font-mono">
+        <div className="flex items-center justify-between w-full text-[11px] text-slate-500 font-mono">
           <span>Синхронизация с автомобилем...</span>
-          <span className="text-neutral-400">OK</span>
+          <span className="text-slate-400">OK</span>
         </div>
       </div>
     </div>

@@ -2,25 +2,44 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-brand: #ef3038;
+  --color-brand-strong: #b91c1c;
+  --color-brand-hover: #991b1b;
+  --color-brand-deep: #7f1d1d;
+  --color-brand-soft: #fef2f2;
+  --color-brand-soft-strong: #fee2e2;
+  --color-brand-border: #fecaca;
+  --color-brand-light: #fca5a5;
+  --color-brand-on-dark: #f87171;
+  --color-chart-5: #8b5cf6;
+  --color-chart-5-strong: #6d28d9;
+  --color-chart-6: #06b6d4;
+  --color-chart-6-strong: #0e7490;
+  --color-chart-7: #ec4899;
+  --color-chart-7-strong: #be185d;
+}
+
 /* Theme variables */
 :root {
-  --app-bg: #f3f4f6;
+  --app-bg: #f4f5f8;
   --app-card: #ffffff;
   --app-subcard: #f8fafc;
   --app-border: #e2e8f0;
   --app-text: #0f172a;
   --app-text-muted: #536171;
   --app-accent: #b91c1c;
+  --app-brand-mark: #ef3038;
 }
 
 html.dark, :root.dark, .dark {
-  --app-bg: #15191f;
-  --app-card: #20262e;
-  --app-subcard: #15191f;
-  --app-border: #3c4654;
+  --app-bg: #0d131d;
+  --app-card: #17202e;
+  --app-subcard: #0d131d;
+  --app-border: #243044;
   --app-text: #f8fafc;
-  --app-text-muted: #a9b5c4;
-  --app-accent: #ef4444;
+  --app-text-muted: #94A3B8;
+  --app-accent: #ef3038;
 }
 
 body {
@@ -43,18 +62,18 @@ body {
 .dark .bg-neutral-50,
 .dark .bg-slate-50,
 .dark .bg-gray-50 {
-  background-color: #101724 !important;
+  background-color: var(--app-subcard) !important;
 }
 
 .dark .bg-neutral-100,
 .dark .bg-slate-100,
 .dark .bg-gray-100 {
-  background-color: #131c2b !important;
+  background-color: var(--app-card) !important;
 }
 
 .dark .bg-neutral-900,
 .dark .bg-slate-900 {
-  background-color: #0d131d !important;
+  background-color: var(--app-bg) !important;
 }
 
 .dark .bg-neutral-950,
@@ -106,34 +125,38 @@ body {
 
 .dark .text-neutral-400,
 .dark .text-slate-400 {
-  color: #a9b5c4 !important;
+  color: #94A3B8 !important;
 }
 
 /* Inputs in Dark Theme */
 .dark input,
 .dark textarea,
 .dark select {
-  background-color: #101724 !important;
+  background-color: var(--app-subcard) !important;
   color: #f8fafc !important;
   border-color: #243044 !important;
 }
 
 .dark input::placeholder,
 .dark textarea::placeholder {
-  color: #a9b5c4 !important;
+  color: #94A3B8 !important;
 }
 
 /* Accent Badges in Dark Theme */
-.dark .bg-red-50 {
-  background-color: rgba(239, 68, 68, 0.12) !important;
+.text-brand-strong {
+  color: #b91c1c;
 }
-.dark .border-red-200,
-.dark .border-red-200\/80,
-.dark .border-red-200\/60 {
-  border-color: rgba(239, 68, 68, 0.25) !important;
+
+.dark .text-brand-strong {
+  color: #f87171;
 }
-.dark .text-red-600 {
-  color: #f87171 !important;
+
+.dark .bg-brand-soft {
+  background-color: rgba(239, 48, 56, 0.12) !important;
+}
+
+.dark .border-brand-border {
+  border-color: rgba(239, 48, 56, 0.25) !important;
 }
 
 .dark .bg-emerald-50 {
@@ -217,11 +240,11 @@ html:not(.dark) .light-car-header {
 html { color-scheme: light; scroll-padding-top: 130px; }
 html.dark { color-scheme: dark; }
 body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; line-height: 1.5; }
-.connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: #ffedbf; color: #5c3900; font-size: 14px; text-align: center; }
+.connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: rgba(245, 158, 11, 0.12); color: #B45309; font-size: 14px; text-align: center; }
 button { transition-property: color, background-color, border-color, opacity, transform; }
 td, .font-mono { font-variant-numeric: tabular-nums; }
-.license-plate, .dark .license-plate { background: #fff !important; color: #17212b !important; border-color: #17212b !important; }
-.license-plate span, .dark .license-plate span { color: #17212b !important; }
+.license-plate, .dark .license-plate { background: #fff !important; color: #0F172A !important; border-color: #0F172A !important; }
+.license-plate span, .dark .license-plate span { color: #0F172A !important; }
 .dark .license-plate .bg-white { background: #fff !important; }
 button, input, select, textarea, a { -webkit-tap-highlight-color: transparent; }
 button, [role="button"], input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select {
@@ -274,7 +297,7 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .app-nav-utility > .w-1\.5 { width: 6px; height: 6px; }
 .app-nav-utility > svg { color: var(--app-text-muted); }
 .app-nav-utility:hover > svg { color: var(--app-text); }
-.app-nav-ai > svg { color: #d79b24; }
+.app-nav-ai > svg { color: #F59E0B; }
 .app-theme-option { gap: 6px; }
 .app-theme-option svg { width: 16px; height: 16px; flex-basis: 16px; stroke-width: 1.9; }
 .app-navigation-actions > button,
@@ -300,11 +323,11 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .vehicle-stage-media { position: relative; width: 100%; aspect-ratio: 640 / 360; }
 .vehicle-stage-photo { display: block; width: 100%; height: 100%; object-fit: contain; }
 .vehicle-stage-paint-layer { inset: 0; }
-.vehicle-model-renderer { width: 100%; max-height: 100%; min-height: 0; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; border-radius: inherit; background: radial-gradient(circle at 50% 35%, #f8fafc 0%, #eef2f6 58%, #e2e8f0 100%); }
+.vehicle-model-renderer { width: 100%; max-height: 100%; min-height: 0; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; border-radius: inherit; background: radial-gradient(circle at 50% 35%, #f8fafc 0%, #f1f5f9 58%, #e2e8f0 100%); }
 .vehicle-model-renderer svg { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .vehicle-card-renderer { height: 100%; aspect-ratio: auto; }
-html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35%, #28374d 0%, #141d2b 48%, #0d131d 100%); }
-.vehicle-model-renderer--placeholder { background: radial-gradient(circle at 50% 35%, #f8fafc 0%, #eef2f6 58%, #e2e8f0 100%); }
+html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35%, #1e293b 0%, #17202e 48%, #0d131d 100%); }
+.vehicle-model-renderer--placeholder { background: radial-gradient(circle at 50% 35%, #f8fafc 0%, #f1f5f9 58%, #e2e8f0 100%); }
 .car-viewer { color: #f8fafc; }
 .car-viewer [class*="text-["] { font-size: 11px; }
 .car-viewer button { min-width: 36px; min-height: 36px; }
@@ -313,7 +336,7 @@ html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35
 .car-viewer .model-toolbar > span:first-child { display: none; }
 .car-viewer .model-toolbar button:first-of-type { min-width: 0; }
 .car-viewer .text-white { color: #fff; }
-.car-viewer .model-error { position: absolute; top: 80px; left: 12px; right: 12px; z-index: 15; padding: 10px 12px; font-size: 12px; color: #fef3c7; background: #422f16; border: 1px solid #a38441; border-radius: 8px; }
+.car-viewer .model-error { position: absolute; top: 80px; left: 12px; right: 12px; z-index: 15; padding: 10px 12px; font-size: 12px; color: #FBBF24; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; }
 .dashboard-actions > button { min-height: 148px; border-radius: 14px; box-shadow: none; transform: none; }
 .dashboard-actions > button:first-child { background: #b91c1c; background-image: none; }
 .dashboard-actions > button:first-child .bg-white\/20 { background-color: rgb(255 255 255 / 15%) !important; }
@@ -324,17 +347,17 @@ html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35
 .dashboard .uppercase { text-transform: none; letter-spacing: .02em; }
 .dashboard [class*="blur-"] { filter: none; }
 .dashboard .animate-pulse { animation: none; }
-.app-main .bg-red-600, [role="dialog"] .bg-red-600 { background-color: #b91c1c; }
-.app-main .text-amber-500 { color: #926000; }
+.app-main .bg-brand-strong, [role="dialog"] .bg-brand-strong { background-color: #b91c1c; }
+.app-main .text-amber-500 { color: #B45309; }
 .dark .app-main .text-amber-500 { color: #fbbf24; }
-.app-main .text-red-500 { color: #b91c1c; }
-.dark .app-main .text-red-500 { color: #fda4a4; }
+.app-main .text-brand-strong { color: #b91c1c; }
+.dark .app-main .text-brand-strong { color: #f87171; }
 [role="dialog"] { overscroll-behavior: contain; }
 [role="dialog"] > div { max-height: calc(100dvh - 32px); border-radius: 18px; }
 [role="dialog"] :where(input, select, textarea) { max-width: 100%; min-width: 0; }
 .dark :is(.bg-neutral-50\/50, .bg-neutral-100\/50) { background-color: var(--app-subcard) !important; }
-.dark :is(.bg-amber-50\/50, .bg-amber-50\/70) { background-color: #332b1c !important; }
-.dark :is(.text-amber-800, .text-amber-900) { color: #f5cf83 !important; }
+.dark :is(.bg-amber-50\/50, .bg-amber-50\/70) { background-color: rgba(245, 158, 11, 0.12) !important; }
+.dark :is(.text-amber-800, .text-amber-900) { color: #FBBF24 !important; }
 :where(.app-main, [role="dialog"]) :where(.text-neutral-400, .text-slate-400) { color: var(--app-text-muted); }
 @media (max-width: 767px) {
   .app-navigation { position: relative; }

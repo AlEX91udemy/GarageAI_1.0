@@ -72,9 +72,9 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
   const dueSoonCount = upcomingItems.filter((i) => i.priority === "due_soon").length;
 
   return (
-    <div className="flex flex-col w-full pb-8 bg-neutral-100 dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
+    <div className="flex flex-col w-full pb-8 bg-[#F4F5F8] dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-[#1f2c3f] sticky top-0 z-20 shadow-xs">
+      <div className="px-4 pt-4 pb-3 flex items-center justify-between bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md border-b border-neutral-200/80 dark:border-[#243044] sticky top-0 z-20 shadow-xs">
         <div>
           <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight">
             Сервис и ТО
@@ -93,7 +93,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
             className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition cursor-pointer"
             title="Экспорт сервисной книжки в PDF"
           >
-            <FileDown className="w-4 h-4 text-red-600" />
+            <FileDown className="w-4 h-4 text-brand-strong" />
           </button>
           {onOpenScanBarcode && (
             <button
@@ -113,7 +113,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           </button>
           <button
             onClick={onOpenAddService}
-            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-brand-strong/30 transition cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Запись</span>
@@ -123,7 +123,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
 
       {/* Segmented Tab Controller (UPCOMING / HISTORY) */}
       <div className="px-4 py-3">
-        <div className="flex p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#2b3a50]">
+        <div className="flex p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#243044]">
           <button
             onClick={() => setActiveTab("upcoming")}
             className={`flex-1 py-2 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -134,7 +134,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           >
             <span>Ближайшие ТО</span>
             {(criticalCount > 0 || dueSoonCount > 0) && (
-              <span className="w-2 h-2 rounded-full bg-red-600" />
+              <span className="w-2 h-2 rounded-full bg-brand-strong" />
             )}
           </button>
 
@@ -163,7 +163,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-2 text-[11px] font-mono">
-              <span className="text-rose-600 font-bold">{criticalCount} критично</span>
+              <span className="text-brand-strong font-bold">{criticalCount} критично</span>
               <span className="text-neutral-300">•</span>
               <span className="text-amber-600 font-bold">{dueSoonCount} скоро</span>
             </div>
@@ -178,7 +178,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                 key={schedule.id}
                 className={`p-4 rounded-3xl border transition-all shadow-xs ${
                   isCritical
-                    ? "bg-white border-rose-200"
+                    ? "bg-white border-brand-border"
                     : isDueSoon
                     ? "bg-white border-amber-200"
                     : "bg-white border-neutral-200/90"
@@ -189,7 +189,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                     <span
                       className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full inline-block mb-1 ${
                         isCritical
-                          ? "bg-rose-100 text-rose-700"
+                          ? "bg-brand-soft-strong text-brand-hover"
                           : isDueSoon
                           ? "bg-amber-100 text-amber-800"
                           : "bg-neutral-100 text-neutral-600"
@@ -203,7 +203,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className={`text-xs font-mono font-bold ${isCritical ? "text-rose-600" : isDueSoon ? "text-amber-600" : "text-neutral-800"}`}>
+                    <div className={`text-xs font-mono font-bold ${isCritical ? "text-brand-strong" : isDueSoon ? "text-amber-600" : "text-neutral-800"}`}>
                       {remainingKm <= 0
                         ? "Просрочено"
                         : `через ${remainingKm.toLocaleString("ru-RU")} км`}
@@ -241,7 +241,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
           {/* Official Service Book & PDF Export Card */}
           <div className="p-3.5 rounded-3xl bg-white border border-neutral-200/90 shadow-xs flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider">
+              <div className="text-[10px] font-bold text-brand-strong uppercase tracking-wider">
                 Сервисная книжка авто
               </div>
               <div className="text-xs font-bold text-neutral-900 truncate">
@@ -253,7 +253,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                 if (onExportPdf) onExportPdf();
                 else exportServiceBookToPdf(vehicle, carRecords);
               }}
-              className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/20 active:scale-95 transition cursor-pointer shrink-0"
+              className="px-3 py-2 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-strong/20 active:scale-95 transition cursor-pointer shrink-0"
               title="Выгрузить сервисную историю в PDF для печати или сохранения"
             >
               <FileDown className="w-3.5 h-3.5" />
@@ -269,11 +269,11 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
                 className="relative bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-3xl p-4 transition shadow-xs active:scale-[0.99] cursor-pointer"
               >
                 {/* Timeline node */}
-                <div className="absolute -left-6 top-5 w-3.5 h-3.5 rounded-full bg-red-600 border-2 border-white shadow-xs" />
+                <div className="absolute -left-6 top-5 w-3.5 h-3.5 rounded-full bg-brand-strong border-2 border-white shadow-xs" />
 
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div>
-                    <span className="text-[10px] font-mono text-red-600 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] font-mono text-brand-strong font-bold uppercase tracking-wider">
                       {record.category}
                     </span>
                     <h3 className="text-sm font-bold text-neutral-900 leading-tight">
@@ -310,7 +310,7 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
 
                 <div className="flex items-center justify-between pt-2 border-t border-neutral-100 text-[11px] text-neutral-500">
                   <span>{record.mileage.toLocaleString("ru-RU")} км • {record.serviceCenter || "Сервис"}</span>
-                  <div className="flex items-center gap-1 text-red-600 font-bold">
+                  <div className="flex items-center gap-1 text-brand-strong font-bold">
                     <span>Подробнее</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>

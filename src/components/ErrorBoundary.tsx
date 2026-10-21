@@ -40,7 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="p-4 bg-neutral-900 border border-red-900/50 rounded-2xl text-white flex flex-col items-center justify-center gap-2 text-center my-2">
+        <div className="p-4 bg-neutral-900 border border-brand-hover/50 rounded-2xl text-white flex flex-col items-center justify-center gap-2 text-center my-2">
           <AlertTriangle className="w-6 h-6 text-amber-500" />
           <div className="text-xs font-semibold text-neutral-300">
             Не удалось загрузить визуализацию {this.props.name ? `(${this.props.name})` : ""}

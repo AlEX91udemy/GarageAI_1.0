@@ -73,7 +73,7 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
 
         <button
           onClick={onOpenBeforeAfter}
-          className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center text-cyan-400 hover:text-white cursor-pointer"
+          className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center text-brand-on-dark hover:text-white cursor-pointer"
           title="Сравнение До / После"
         >
           <Camera className="w-4 h-4" />
@@ -84,7 +84,7 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
         {/* Project Hero Card */}
         <div className="p-4 rounded-3xl bg-neutral-900 border border-neutral-800 shadow-xl space-y-3">
           <div>
-            <span className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 inline-block mb-1.5">
+            <span className="text-[10px] font-mono text-brand-on-dark font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 inline-block mb-1.5">
               {project.category}
             </span>
             <h2 className="text-xl font-black text-white tracking-tight leading-snug">
@@ -105,7 +105,7 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
             </div>
             <div className="w-full h-2.5 bg-neutral-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-red-600 via-amber-500 to-emerald-500 rounded-full"
+                className="h-full bg-gradient-to-r from-brand-strong via-amber-500 to-emerald-500 rounded-full"
                 style={{ width: `${project.progressPct}%` }}
               />
             </div>
@@ -215,10 +215,10 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
         {/* Before / After banner CTA */}
         <div
           onClick={onOpenBeforeAfter}
-          className="p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/40 to-neutral-900 border border-cyan-500/30 flex items-center justify-between cursor-pointer hover:border-cyan-500/50 transition active:scale-[0.99]"
+          className="p-3.5 rounded-2xl bg-gradient-to-r from-brand-deep/40 to-neutral-900 border border-brand/30 flex items-center justify-between cursor-pointer hover:border-brand/50 transition active:scale-[0.99]"
         >
           <div className="flex items-center gap-2.5">
-            <Camera className="w-5 h-5 text-cyan-400" />
+            <Camera className="w-5 h-5 text-brand-on-dark" />
             <div>
               <div className="text-xs font-bold text-white">
                 Фотосравнение До / После
@@ -228,7 +228,7 @@ export const ProjectDetailScreen: React.FC<ProjectDetailScreenProps> = ({
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-cyan-400" />
+          <ChevronRight className="w-4 h-4 text-brand-on-dark" />
         </div>
       </div>
     </div>

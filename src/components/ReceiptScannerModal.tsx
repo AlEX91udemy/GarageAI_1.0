@@ -50,19 +50,19 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         "data:image/svg+xml;utf8," +
         encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="380" height="420" viewBox="0 0 380 420">
-          <rect width="380" height="420" fill="#fafafa" rx="6" stroke="#e2e8f0"/>
-          <text x="190" y="45" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="16" fill="#dc2626">АЗС ЛУКОЙЛ № 512</text>
+          <rect width="380" height="420" fill="#FFFFFF" rx="6" stroke="#e2e8f0"/>
+          <text x="190" y="45" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="16" fill="#EF3038">АЗС ЛУКОЙЛ № 512</text>
           <text x="190" y="70" text-anchor="middle" font-family="monospace" font-size="11" fill="#64748b">ООО "ЛУКОЙЛ-Центрнефтепродукт"</text>
-          <line x1="30" y1="90" x2="350" y2="90" stroke="#cbd5e1" stroke-dasharray="3"/>
-          <text x="30" y="120" font-family="monospace" font-size="12" fill="#1e293b">Дата: 05.06.2026  14:32</text>
-          <text x="30" y="145" font-family="monospace" font-size="12" fill="#1e293b">Колонка № 4</text>
-          <line x1="30" y1="165" x2="350" y2="165" stroke="#cbd5e1"/>
+          <line x1="30" y1="90" x2="350" y2="90" stroke="#E2E8F0" stroke-dasharray="3"/>
+          <text x="30" y="120" font-family="monospace" font-size="12" fill="#0F172A">Дата: 05.06.2026  14:32</text>
+          <text x="30" y="145" font-family="monospace" font-size="12" fill="#0F172A">Колонка № 4</text>
+          <line x1="30" y1="165" x2="350" y2="165" stroke="#E2E8F0"/>
           <text x="30" y="195" font-family="monospace" font-weight="bold" font-size="13" fill="#0f172a">Топливо: АИ-95-К5 ЭКТО</text>
-          <text x="30" y="225" font-family="monospace" font-size="12" fill="#334155">Объем: 55.40 л</text>
-          <text x="30" y="250" font-family="monospace" font-size="12" fill="#334155">Цена за литр: 59.80 ₽</text>
+          <text x="30" y="225" font-family="monospace" font-size="12" fill="#0F172A">Объем: 55.40 л</text>
+          <text x="30" y="250" font-family="monospace" font-size="12" fill="#0F172A">Цена за литр: 59.80 ₽</text>
           <line x1="30" y1="280" x2="350" y2="280" stroke="#0f172a" stroke-width="1.5"/>
           <text x="30" y="315" font-family="monospace" font-weight="bold" font-size="16" fill="#0f172a">ИТОГ: 3 312.92 ₽</text>
-          <text x="190" y="360" text-anchor="middle" font-family="monospace" font-size="11" fill="#16a34a">✓ ОПЛАЧЕНО БЕЗНАЛИЧНО</text>
+          <text x="190" y="360" text-anchor="middle" font-family="monospace" font-size="11" fill="#047857">✓ ОПЛАЧЕНО БЕЗНАЛИЧНО</text>
           <text x="190" y="385" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8">ФП: 9812401824 • СПАСИБО ЗА ПОКУПКУ!</text>
         </svg>
       `),
@@ -184,7 +184,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       totalCost: scanResult.totalAmount || (laborCost + parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0)),
       serviceCenter: scanResult.merchantName || "Автосервис",
       receiptImages: imagePreview ? [imagePreview] : [],
-      notes: scanResult.notes || "Распознано через AI-сканер чеков GarageHub.",
+      notes: scanResult.notes || "Распознано через AI-сканер чеков Garage AI.",
     };
 
     onApplyService(recordData);
@@ -223,11 +223,11 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         {/* Fixed Header */}
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-red-600/10 text-red-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-brand-strong/10 text-brand-strong flex items-center justify-center shrink-0">
               <Camera className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1">
+              <div className="text-[11px] font-bold text-brand-strong uppercase tracking-wider flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> Gemini 3.8 Flash OCR
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
@@ -263,7 +263,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   }}
                   className={`p-2.5 rounded-2xl border text-left text-xs transition cursor-pointer ${
                     imagePreview === preset.dataUrl
-                      ? "border-red-500 bg-red-50/50 text-neutral-900"
+                      ? "border-brand bg-brand-soft/50 text-neutral-900"
                       : "border-neutral-200 bg-neutral-50 hover:bg-neutral-100 text-neutral-600"
                   }`}
                 >
@@ -275,7 +275,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
           </div>
 
           {/* Upload or Drop */}
-          <div className="border-2 border-dashed border-neutral-300 rounded-2xl p-4 text-center hover:border-red-400 transition bg-neutral-50/50">
+          <div className="border-2 border-dashed border-neutral-300 rounded-2xl p-4 text-center hover:border-brand-light transition bg-neutral-50/50">
             {imagePreview ? (
               <div className="space-y-3">
                 <div className="max-h-56 overflow-hidden rounded-xl border border-neutral-200 bg-white flex items-center justify-center p-2">
@@ -302,7 +302,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     type="button"
                     onClick={handleScan}
                     disabled={isScanning}
-                    className="px-5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-5 py-1.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
                   >
                     {isScanning ? (
                       <>
@@ -343,7 +343,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
           {/* Scan Error */}
           {scanError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-2xl flex items-center gap-2 text-xs text-red-700">
+            <div className="p-3 bg-brand-soft border border-brand-border rounded-2xl flex items-center gap-2 text-xs text-brand-hover">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{scanError}</span>
             </div>
@@ -398,7 +398,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                         <span className="font-medium text-neutral-800">
                           {p.name} {p.brand && `(${p.brand})`}
                           {p.partNumber && (
-                            <span className="font-mono text-red-600 font-bold ml-1">
+                            <span className="font-mono text-brand-strong font-bold ml-1">
                               [{p.partNumber}]
                             </span>
                           )}
@@ -437,7 +437,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   <button
                     type="button"
                     onClick={handleApplyToService}
-                    className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+                    className="w-full py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                   >
                     <Wrench className="w-4 h-4" />
                     <span>Создать запись ремонта с запчастями ({scanResult.totalAmount} ₽)</span>

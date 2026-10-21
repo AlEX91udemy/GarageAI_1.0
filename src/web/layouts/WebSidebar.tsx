@@ -5,6 +5,7 @@ import {
   Wallet,
   User,
   Settings,
+  LogOut,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -14,6 +15,7 @@ interface WebSidebarProps {
   onNavigate: (view: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onLogout?: () => void;
   theme?: "light" | "dark";
 }
 
@@ -22,6 +24,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
   onNavigate,
   isCollapsed = false,
   onToggleCollapse,
+  onLogout,
   theme = "dark",
 }) => {
   const isDark = theme === "dark";
@@ -43,7 +46,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
         isCollapsed ? "w-20" : "w-64"
       } ${
         isDark
-          ? "bg-[#0B0E14] border-[#1E293B] text-slate-200"
+          ? "bg-[#17202E] border-[#243044] text-slate-200"
           : "bg-white border-slate-200 text-slate-900"
       }`}
     >
@@ -75,7 +78,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group ${
                   isActive
                     ? isDark
-                      ? "bg-[#EF4444]/10 text-[#EF4444] font-semibold"
+                      ? "bg-[#EF3038]/10 text-[#EF3038] font-semibold"
                       : "bg-slate-100 text-slate-900 font-semibold"
                     : isDark
                     ? "text-slate-400 hover:bg-[#1E293B] hover:text-slate-200"
@@ -127,6 +130,18 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
             </button>
           );
         })}
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${isDark ? "text-slate-400 hover:bg-red-950/40 hover:text-red-300" : "text-slate-600 hover:bg-red-50 hover:text-red-700"}`}
+            title="Выйти"
+            aria-label="Выйти"
+          >
+            <LogOut className="w-5 h-5 shrink-0" />
+            {!isCollapsed && <span className="text-sm tracking-tight">Выйти</span>}
+          </button>
+        )}
 
         {onToggleCollapse && (
           <button

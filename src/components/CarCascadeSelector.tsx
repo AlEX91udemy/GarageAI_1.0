@@ -268,7 +268,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
       {/* Cascade Link Visual Breadcrumb */}
       <div className="flex items-center justify-between border-b border-neutral-200/60 pb-2">
         <div className="flex items-center gap-1.5 text-[11px] font-bold text-neutral-700">
-          <LinkIcon className="w-3.5 h-3.5 text-red-600" />
+          <LinkIcon className="w-3.5 h-3.5 text-brand-strong" />
           <span>Каталог автомобиля: Марка ➔ Модель ➔ Поколение</span>
         </div>
         {matchedGen && (
@@ -286,7 +286,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           <div className="flex items-center justify-between mb-1">
             <label className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
               <span>Марка автомобиля</span>
-              <span className="text-red-500">*</span>
+              <span className="text-brand-strong">*</span>
             </label>
             {customMakeMode ? (
               <button
@@ -295,7 +295,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                   setCustomMakeMode(false);
                   if (CAR_CATALOG[0]) handleSelectMake(CAR_CATALOG[0].name);
                 }}
-                className="text-[10px] text-red-600 hover:text-red-700 font-semibold cursor-pointer underline"
+                className="text-[10px] text-brand-strong hover:text-brand-hover font-semibold cursor-pointer underline"
               >
                 Выбрать из каталога
               </button>
@@ -313,7 +313,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                 value={make}
                 onChange={(e) => onChangeMake?.(e.target.value)}
                 placeholder="Введите марку вручную..."
-                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border"
                 required
               />
             </div>
@@ -322,7 +322,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
               <select
                 value={matchedMake ? matchedMake.name : make ? "__custom__" : ""}
                 onChange={(e) => handleSelectMake(e.target.value)}
-                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 cursor-pointer"
+                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border cursor-pointer"
                 required
               >
                 <option value="" disabled>
@@ -345,7 +345,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           <div className="flex items-center justify-between mb-1">
             <label className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
               <span>Модель</span>
-              <span className="text-red-500">*</span>
+              <span className="text-brand-strong">*</span>
               {matchedMake && (
                 <span className="text-[10px] font-normal text-neutral-500">
                   для {matchedMake.name}
@@ -359,7 +359,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                   setCustomModelMode(false);
                   if (availableModels.length > 0) handleSelectModel(availableModels[0].name);
                 }}
-                className="text-[10px] text-red-600 hover:text-red-700 font-semibold cursor-pointer underline"
+                className="text-[10px] text-brand-strong hover:text-brand-hover font-semibold cursor-pointer underline"
               >
                 Выбрать из списка
               </button>
@@ -378,7 +378,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                 onChange={(e) => onChangeModel?.(e.target.value)}
                 placeholder={matchedMake ? `Модель ${matchedMake.name}...` : "Сначала выберите марку..."}
                 disabled={!make && !customMakeMode}
-                className="w-full bg-white border border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                className="w-full bg-white border border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border"
                 required
               />
             </div>
@@ -388,7 +388,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                 value={matchedModel ? matchedModel.name : model ? "__custom__" : ""}
                 onChange={(e) => handleSelectModel(e.target.value)}
                 disabled={!make}
-                className="w-full bg-white border border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 cursor-pointer"
+                className="w-full bg-white border border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border cursor-pointer"
                 required
               >
                 <option value="" disabled>
@@ -425,7 +425,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
                     handleSelectGeneration(availableGenerations[0].name);
                   }
                 }}
-                className="text-[10px] text-red-600 hover:text-red-700 font-semibold cursor-pointer underline"
+                className="text-[10px] text-brand-strong hover:text-brand-hover font-semibold cursor-pointer underline"
               >
                 Из списка поколений
               </button>
@@ -442,14 +442,14 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
               value={generation}
               onChange={(e) => onChangeGeneration?.(e.target.value)}
               placeholder="T31, XG10, F30 LCI, NG..."
-              className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-red-500"
+              className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-900 focus:outline-none focus:border-brand"
             />
           ) : (
             <div className="relative">
               <select
                 value={matchedGen ? matchedGen.name : generation ? "__custom__" : ""}
                 onChange={(e) => handleSelectGeneration(e.target.value)}
-                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-red-500 cursor-pointer"
+                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand cursor-pointer"
               >
                 <option value="" disabled>
                   — Выберите поколение {model || "автомобиля"} —
