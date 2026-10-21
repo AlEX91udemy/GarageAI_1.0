@@ -208,7 +208,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
         {/* Fixed Header */}
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider">
+            <div className="text-[11px] font-bold text-brand-strong uppercase tracking-wider">
               {vehicle.make} {vehicle.model} • {vehicle.year}
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
@@ -263,7 +263,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand"
                 required
               />
             </div>
@@ -278,7 +278,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 step="10"
                 value={mileage}
                 onChange={(e) => setMileage(Number(e.target.value))}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-red-500"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-brand"
                 required
               />
             </div>
@@ -290,7 +290,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
               <select id="addservicemodal-field-4"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as MaintenanceCategory)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand"
               >
                 <option value="ТО и замена жидкостей">ТО и замена жидкостей</option>
                 <option value="Двигатель">Двигатель</option>
@@ -317,7 +317,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 placeholder="например: Замена масла ДВС и тормозных колодок"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500 font-medium"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand font-medium"
                 required
               />
             </div>
@@ -331,7 +331,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 placeholder="Fit Service, Официальный дилер, Гараж..."
                 value={serviceCenter}
                 onChange={(e) => setServiceCenter(e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand"
               />
             </div>
           </div>
@@ -346,7 +346,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
               placeholder="Что конкретно менялось, особенности ремонта, смазка суппортов, регулировка..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-red-500"
+              className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-brand"
             />
           </div>
 
@@ -354,7 +354,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
           <div className="border border-neutral-200 rounded-2xl p-3.5 bg-neutral-50/50 space-y-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-900">
-                <Package className="w-4 h-4 text-red-600" />
+                <Package className="w-4 h-4 text-brand-strong" />
                 <span>Использованные запчасти (Бренд + Артикулы)</span>
               </div>
 
@@ -466,7 +466,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                       aria-label={`Убрать деталь ${index + 1} из записи`}
                       type="button"
                       onClick={() => removePartRow(part.id)}
-                      className="p-1 text-neutral-400 hover:text-red-600 rounded-md transition"
+                      className="p-1 text-neutral-400 hover:text-brand-strong rounded-md transition"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -478,7 +478,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
             <button
               type="button"
               onClick={addPartRow}
-              className="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer pt-1"
+              className="text-xs font-semibold text-brand-strong hover:text-brand-hover flex items-center gap-1 cursor-pointer pt-1"
             >
               <Plus className="w-3.5 h-3.5" /> Добавить ещё деталь
             </button>
@@ -496,7 +496,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 step="100"
                 value={laborCost}
                 onChange={(e) => setLaborCost(Number(e.target.value))}
-                className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-red-500"
+                className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-brand"
               />
             </div>
 
@@ -504,7 +504,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
               <div className="text-[11px] text-neutral-500">
                 Детали: {partsCost.toLocaleString("ru-RU")} ₽ + Работы: {Number(laborCost).toLocaleString("ru-RU")} ₽
               </div>
-              <div className="text-lg font-extrabold text-red-600 font-mono mt-0.5">
+              <div className="text-lg font-extrabold text-brand-strong font-mono mt-0.5">
                 Итого: {totalCost.toLocaleString("ru-RU")} ₽
               </div>
             </div>
@@ -537,7 +537,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setReceiptImage(null)}
-                  className="text-xs text-red-600 hover:text-red-700 font-semibold p-1"
+                  className="text-xs text-brand-strong hover:text-brand-hover font-semibold p-1"
                 >
                   Удалить
                 </button>
@@ -567,7 +567,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
           </div>
 
           {formError && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl font-medium">
+            <div className="p-3 bg-brand-soft border border-brand-border text-brand-hover text-xs rounded-xl font-medium">
               {formError}
             </div>
           )}
@@ -583,7 +583,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-6 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition cursor-pointer shadow-lg shadow-red-600/30 active:scale-95"
+              className="px-6 py-2.5 text-xs font-bold text-white bg-brand-strong hover:bg-brand rounded-xl transition cursor-pointer shadow-lg shadow-brand-strong/30 active:scale-95"
             >
               Сохранить запись
             </button>

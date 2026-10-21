@@ -22,9 +22,9 @@ const vehicle = {
 let container: HTMLDivElement;
 let root: Root;
 
-function renderScreen(initialType: "service" | "part" | "fuel", handlers = {}) {
+function renderScreen(initialType: "service" | "repair" | "part" | "fuel", handlers = {}, vehicleOverride?: Partial<Vehicle>) {
   const props = {
-    vehicle,
+    vehicle: { ...vehicle, ...vehicleOverride },
     initialType,
     onBack: vi.fn(),
     onSaveService: vi.fn(),
@@ -81,6 +81,21 @@ afterEach(() => {
 });
 
 describe("AddEventScreen", () => {
+  it("does not show a redundant service or repair type selector", () => {
+    renderScreen("service");
+
+    expect(container.querySelector("[aria-label='Тип события']")).toBeNull();
+    expect(container.textContent).not.toContain("Установленные запчасти");
+  });
+
+  it("routes the repair shortcut into the same service form", () => {
+    renderScreen("repair");
+
+    expect(container.textContent).toContain("Добавить услугу (ТО)");
+    expect(container.textContent).toContain("Название события / Работы");
+    expect(container.querySelector("[aria-label='Тип события']")).toBeNull();
+  });
+
   it("keeps the purchase currency label and symbol in sync with the selected setting", () => {
     localStorage.setItem("garagehub_currency", "usd");
     renderScreen("part");
@@ -92,19 +107,41 @@ describe("AddEventScreen", () => {
 
   it("saves the selected fuel type, amount, and custom station", () => {
     const { onSaveFuel } = renderScreen("fuel");
-    setSelect(selectByLabel("Тип топлива"), "АИ-98");
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Цена за литр")?.click());
     setInput(container.querySelector<HTMLInputElement>("input[aria-label='Объем заправки в литрах']")!, "42.5");
     setSelect(container.querySelector<HTMLSelectElement>("select")!, "Другое");
     const stationInput = container.querySelector<HTMLInputElement>("input[placeholder='Название АЗС']");
     if (!stationInput) throw new Error("Missing custom station field");
     setInput(stationInput, "АЗС Тест");
     act(() => container.querySelector<HTMLButtonElement>("button.bg-red-600")?.click());
-    act(() => Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Зафиксировать в бортовом журнале"))?.click());
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Сохранить")?.click());
 
     expect(onSaveFuel).toHaveBeenCalledWith(expect.objectContaining({
       liters: 42.5,
-      fuelType: "АИ-98",
+      fuelType: "АИ-95",
       station: "АЗС Тест",
+    }));
+  });
+
+  it("limits fuel choices for gasoline and calculates total from price per liter", () => {
+    const { onSaveFuel } = renderScreen("fuel", {}, { fuelType: "Бензин (АИ-95)" });
+    expect(container.querySelector("select[aria-label='Тип топлива']")).toBeNull();
+    expect(container.textContent).not.toContain("ДТ");
+
+    act(() => container.querySelector<HTMLButtonElement>("button") &&
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent?.trim() === "Цена за литр")?.click());
+    setInput(container.querySelector<HTMLInputElement>("input[placeholder='0.00']")!, "62.5");
+    setInput(container.querySelector<HTMLInputElement>("input[aria-label='Объем заправки в литрах']")!, "40");
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Сохранить")?.click());
+
+    expect(onSaveFuel).toHaveBeenCalledWith(expect.objectContaining({
+      fuelType: "АИ-95",
+      liters: 40,
+      pricePerLiter: 62.5,
+      totalCost: 2500,
     }));
   });
 
@@ -125,7 +162,7 @@ describe("AddEventScreen", () => {
     expect(container.querySelector<HTMLInputElement>("input[aria-label='Артикул / SKU']")?.value).toBe("W67/1");
     expect(Array.from(container.querySelectorAll("select")).some((select) => select.value === "ТО и замена жидкостей")).toBe(true);
 
-    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Сохранить деталь на склад"))?.click());
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Сохранить")?.click());
     expect(onSavePart).toHaveBeenCalledWith(expect.objectContaining({
       name: "Масляный фильтр двигателя",
       brand: "Mann-Filter",
@@ -149,10 +186,11 @@ describe("AddEventScreen", () => {
     expect(titleInput.value).toBe("Замена тормозных колодок");
     expect(Array.from(container.querySelectorAll("select")).find((select) => select.value === "Тормозная система")).toBeDefined();
 
-    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Зафиксировать в бортовом журнале"))?.click());
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Сохранить")?.click());
     expect(onSaveService).toHaveBeenCalledWith(expect.objectContaining({
       title: "Замена тормозных колодок",
       category: "Тормозная система",
     }));
+    expect(onSaveService.mock.calls[0][0]).not.toHaveProperty("parts");
   });
 });

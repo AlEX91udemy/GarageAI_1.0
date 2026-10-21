@@ -10,7 +10,7 @@ export const knowledgeChunks: KnowledgeChunk[] = [
   },
   {
     id: "kb-provenance-001",
-    text: "Каталожные параметры GarageHub, импортированные из legacy-каталога, требуют проверки по руководству производителя для конкретного рынка, года, двигателя и коробки передач. При конфликте источников приоритет имеет официальный документ.",
+    text: "Каталожные параметры Garage AI, импортированные из legacy-каталога, требуют проверки по руководству производителя для конкретного рынка, года, двигателя и коробки передач. При конфликте источников приоритет имеет официальный документ.",
     metadata: { brand: null, model: null, generation: null, yearStart: null, yearEnd: null, engine: null, engineCode: null, transmission: null, category: "specifications", source: source.source, sourceType: source.sourceType, sourceId: source.id },
   },
 ];

@@ -23,10 +23,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       description:
         "Единое защищенное пространство для всех ваших автомобилей: пробеги, документы, технические паспорта и состояние узлов всегда под рукой.",
       badge: "Шаг 1 из 5",
-      icon: <Car className="w-12 h-12 text-red-500" />,
+      icon: <Car className="w-12 h-12 text-brand-strong" />,
       tag: "Мультиавтопарк",
-      color: "from-red-500/20 to-neutral-900",
-      accent: "border-red-500/30",
+      color: "from-brand/20 to-neutral-900",
+      accent: "border-brand/30",
     },
     {
       title: "Know your car",
@@ -67,10 +67,10 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
       description:
         "Встроенный Garage AI анализирует историю заказ-нарядов, ошибки OBD-II, симптомы стуков и выявляет скрытые риски до поломки.",
       badge: "Шаг 5 из 5",
-      icon: <Sparkles className="w-12 h-12 text-rose-400" />,
+      icon: <Sparkles className="w-12 h-12 text-brand-on-dark" />,
       tag: "Garage AI",
-      color: "from-rose-500/20 to-neutral-900",
-      accent: "border-rose-500/30",
+      color: "from-brand/20 to-neutral-900",
+      accent: "border-brand/30",
     },
   ];
 
@@ -119,7 +119,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         <h2 className="text-2xl font-black tracking-tight text-white mb-1">
           {current.title}
         </h2>
-        <div className="text-sm font-semibold text-red-400 mb-3">
+        <div className="text-sm font-semibold text-brand-on-dark mb-3">
           {current.subtitle}
         </div>
 
@@ -138,7 +138,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
               onClick={() => setCurrentStep(idx)}
               className={`h-1.5 rounded-full transition-all cursor-pointer ${
                 idx === currentStep
-                  ? "w-7 bg-red-500"
+                  ? "w-7 bg-brand"
                   : "w-1.5 bg-neutral-800 hover:bg-neutral-700"
               }`}
             />
@@ -148,7 +148,7 @@ export const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }
         {/* CTA Button */}
         <button
           onClick={handleNext}
-          className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-600 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-[0.98] transition cursor-pointer"
+          className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-brand-strong to-brand hover:from-brand hover:to-brand-strong text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-strong/30 active:scale-[0.98] transition cursor-pointer"
         >
           <span>{currentStep === steps.length - 1 ? "Войти в Гараж" : "Продолжить"}</span>
           <ArrowRight className="w-4 h-4" />

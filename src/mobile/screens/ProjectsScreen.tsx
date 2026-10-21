@@ -56,7 +56,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
 
         <button
           onClick={onAddProject}
-          className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-red-600/30 transition cursor-pointer active:scale-95"
+          className="px-3 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-strong/30 transition cursor-pointer active:scale-95"
         >
           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Проект</span>
@@ -75,7 +75,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <span className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 inline-block mb-1">
+                  <span className="text-[10px] font-mono text-brand-on-dark font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand/10 border border-brand/20 inline-block mb-1">
                     {proj.category}
                   </span>
                   <h3 className="text-base font-black text-white tracking-tight">
@@ -104,7 +104,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
                 </div>
                 <div className="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-red-600 to-emerald-500 rounded-full transition-all duration-500"
+                    className="h-full bg-gradient-to-r from-brand-strong to-emerald-500 rounded-full transition-all duration-500"
                     style={{ width: `${proj.progressPct}%` }}
                   />
                 </div>
@@ -119,7 +119,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right flex items-center gap-1 text-red-400 font-semibold">
+                <div className="text-right flex items-center gap-1 text-brand-on-dark font-semibold">
                   <span>{proj.completedStages}/{proj.stagesCount} этапов</span>
                   <ChevronRight className="w-4 h-4" />
                 </div>

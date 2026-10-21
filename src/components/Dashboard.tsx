@@ -142,8 +142,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Elevated Section Header with human, natural copywriting */}
       <div className="pt-2 flex flex-col sm:flex-row sm:items-end justify-between gap-1 border-b border-neutral-200/60 dark:border-neutral-800/80 pb-3">
         <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-widest">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+          <div className="inline-flex items-center gap-2 text-[11px] font-bold text-brand-strong dark:text-brand-on-dark uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-strong animate-pulse" />
             Бортовой журнал
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-neutral-900 dark:text-white tracking-tight mt-0.5">
@@ -160,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 1: Red vibrant card "Записать ремонт или ТО" */}
         <button
           onClick={onOpenAddService}
-          className="relative text-left p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white shadow-xl shadow-red-600/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group overflow-hidden border border-red-500/40"
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-brand-strong via-brand-strong to-brand-hover hover:from-brand hover:to-brand-strong text-white shadow-xl shadow-brand-strong/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group overflow-hidden border border-brand/40"
         >
           {/* Subtle geometric background glow */}
           <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
@@ -179,10 +179,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-lg font-black leading-tight tracking-tight">
               Записать ремонт или ТО
             </div>
-            <div className="text-xs text-red-100/90 mt-1 font-medium leading-snug">
+            <div className="text-xs text-brand-soft-strong/90 mt-1 font-medium leading-snug">
               Замена масла, колодок, запчасти и прикрепление чеков
             </div>
-            <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-red-100/80">
+            <div className="mt-2 pt-2 border-t border-white/20 flex items-center justify-between text-[11px] text-brand-soft-strong/80">
               <span>Внести с чеком или заказ-нарядом</span>
               <span className="font-bold underline">Заполнить →</span>
             </div>
@@ -192,10 +192,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 2: History */}
         <button
           onClick={onOpenHistory}
-          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1E293B] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
         >
           <div className="flex items-start justify-between w-full">
-            <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="w-11 h-11 rounded-2xl bg-brand-soft dark:bg-brand/15 text-brand-strong dark:text-brand-on-dark border border-brand-border/50 dark:border-brand/20 flex items-center justify-center group-hover:scale-110 transition-transform">
               <History className="w-5 h-5" />
             </div>
             <div className="flex items-center gap-1 text-xs font-semibold text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition">
@@ -213,7 +213,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
               <span>Всего в журнале:</span>
-              <span className="font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-md">
+              <span className="font-bold text-brand-strong dark:text-brand-on-dark bg-brand-soft dark:bg-brand/10 px-2 py-0.5 rounded-md">
                 {currentVehicleRecords.length} {currentVehicleRecords.length === 1 ? "запись" : "записей"}
               </span>
             </div>
@@ -223,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 3: AI Assistant */}
         <button
           onClick={onOpenAiDiagnostic}
-          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1E293B] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
         >
           <div className="flex items-start justify-between w-full">
             <div className="w-11 h-11 rounded-2xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -253,7 +253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 4: Expenses */}
         <button
           onClick={onOpenExpenses}
-          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1c2738] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
+          className="relative text-left p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#17202e] hover:bg-neutral-50 dark:hover:bg-[#1E293B] border border-neutral-200/80 dark:border-[#243044] text-neutral-900 dark:text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group"
         >
           <div className="flex items-start justify-between w-full">
             <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -285,13 +285,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* AI Quick Receipt Scanner Banner (OCR) */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 text-white p-4 sm:p-5 rounded-3xl border border-neutral-800 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-red-600/20 text-red-400 border border-red-500/30 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-brand-strong/20 text-brand-on-dark border border-brand/30 flex items-center justify-center shrink-0">
             <Camera className="w-6 h-6" />
           </div>
           <div>
             <div className="text-sm sm:text-base font-bold flex items-center gap-2">
               <span>Умный сканер чеков и заказ-нарядов</span>
-              <span className="text-[10px] bg-red-600 text-white font-bold px-2 py-0.5 rounded-full">
+              <span className="text-[10px] bg-brand-strong text-white font-bold px-2 py-0.5 rounded-full">
                 OCR + AI
               </span>
             </div>
@@ -303,13 +303,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <button
           onClick={onOpenScanReceipt}
-          className="w-full sm:w-auto px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-red-600/30 whitespace-nowrap active:scale-95"
+          className="w-full sm:w-auto px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-brand-strong/30 whitespace-nowrap active:scale-95"
         >
           Сканировать чек
         </button>
       </div>
 
-      {/* GarageHub Analytics Bar: Cost of 1 km, Fuel Consumption, Breakdown */}
+      {/* Garage AI Analytics Bar: Cost of 1 km, Fuel Consumption, Breakdown */}
       <div className="bg-white dark:bg-[#17202e] rounded-3xl p-5 border border-neutral-200/80 dark:border-[#243044] shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -344,7 +344,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
             <button
               onClick={onOpenExpenses}
-              className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold flex items-center gap-1 cursor-pointer"
+              className="text-xs text-brand-strong dark:text-brand-on-dark hover:text-brand-hover dark:hover:text-brand-light font-semibold flex items-center gap-1 cursor-pointer"
             >
               Все отчёты <ChevronRight className="w-3.5 h-3.5" />
             </button>
@@ -444,8 +444,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 }}
                 className={`rounded-2xl p-3.5 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                   selectedKilvoMetric === "service_total"
-                    ? "bg-red-50/90 border-red-400 ring-2 ring-red-500 shadow-md scale-[1.01]"
-                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-red-200"
+                    ? "bg-brand-soft/90 border-brand-light ring-2 ring-brand-border shadow-md scale-[1.01]"
+                    : "bg-neutral-50 hover:bg-neutral-100/80 border-neutral-200/80 shadow-sm hover:border-brand-border"
                 }`}
                 title="Нажмите, чтобы выделить сумму ремонтов и ТО"
               >
@@ -456,14 +456,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <span
                     className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
                       selectedKilvoMetric === "service_total"
-                        ? "bg-red-600 text-white"
-                        : "bg-red-100 text-red-800"
+                        ? "bg-brand-strong text-white"
+                        : "bg-brand-soft-strong text-brand-hover"
                     }`}
                   >
                     {selectedKilvoMetric === "service_total" ? "Активен ✓" : "Ремонты"}
                   </span>
                 </div>
-                <div className="text-lg sm:text-xl font-extrabold text-red-600 font-mono mt-1.5">
+                <div className="text-lg sm:text-xl font-extrabold text-brand-strong font-mono mt-1.5">
                   {totalServiceCost.toLocaleString("ru-RU")} ₽
                 </div>
                 <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
@@ -525,7 +525,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => setSelectedKilvoMetric(null)}
-                          className="hover:text-red-300 ml-1 font-bold text-xs cursor-pointer"
+                          className="hover:text-brand-light ml-1 font-bold text-xs cursor-pointer"
                           title="Сбросить выделение"
                         >
                           ×
@@ -535,7 +535,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                   <button
                     onClick={onOpenExpenses}
-                    className="text-red-600 hover:text-red-700 font-semibold cursor-pointer"
+                    className="text-brand-strong hover:text-brand-hover font-semibold cursor-pointer"
                   >
                     Подробная аналитика →
                   </button>
@@ -549,7 +549,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         key={rec.id}
                         className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all ${
                           isServiceSelected
-                            ? "bg-purple-50/70 border-purple-300 ring-1 ring-purple-400/50"
+                            ? "bg-brand-soft/70 border-brand-light ring-1 ring-brand/50"
                             : "bg-neutral-50 border-neutral-100"
                         }`}
                       >
@@ -661,7 +661,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         key={item.id}
                         className={`p-2.5 rounded-2xl border transition-all ${
                           isOverdue
-                            ? "bg-red-50/40 border-red-200"
+                            ? "bg-brand-soft/40 border-brand-border"
                             : isSoon
                             ? "bg-amber-50/40 border-amber-200"
                             : "bg-emerald-50/30 border-emerald-200"
@@ -674,7 +674,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               isOverdue
-                                ? "bg-red-100 text-red-700"
+                                ? "bg-brand-soft-strong text-brand-hover"
                                 : isSoon
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-emerald-100 text-emerald-700"
@@ -688,7 +688,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           <div
                             className={`h-1.5 rounded-full transition-all ${
                               isOverdue
-                                ? "bg-red-500"
+                                ? "bg-brand"
                                 : isSoon
                                 ? "bg-amber-500"
                                 : "bg-emerald-500"
@@ -838,7 +838,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => setIsRecentCollapsed((prev) => !prev)}
-              className="w-8 h-8 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              className="w-8 h-8 rounded-xl bg-brand-soft hover:bg-brand-soft-strong text-brand-strong flex items-center justify-center transition shrink-0 cursor-pointer shadow-sm hover:scale-105 active:scale-95"
               title={isRecentCollapsed ? "Развернуть недавние работы" : "Скрыть список (оставить оглавление)"}
             >
               <Wrench className="w-4 h-4" />
@@ -862,7 +862,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button
               onClick={onOpenHistory}
-              className="text-xs text-red-600 hover:text-red-700 font-semibold flex items-center gap-0.5 cursor-pointer"
+              className="text-xs text-brand-strong hover:text-brand-hover font-semibold flex items-center gap-0.5 cursor-pointer"
             >
               Все ({currentVehicleRecords.length}) <ChevronRight className="w-4 h-4" />
             </button>
@@ -891,7 +891,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       <span className="text-[11px] font-semibold bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded-md font-mono">
                         {record.mileage.toLocaleString("ru-RU")} км
                       </span>
-                      <span className="text-[10px] bg-red-50 text-red-700 font-medium px-2 py-0.5 rounded-md">
+                      <span className="text-[10px] bg-brand-soft text-brand-hover font-medium px-2 py-0.5 rounded-md">
                         {record.category}
                       </span>
                     </div>

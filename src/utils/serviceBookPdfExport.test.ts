@@ -82,7 +82,7 @@ describe("serviceBookPdfExport", () => {
 
     const normalizedHtml = html.replace(/\u00a0/g, " ");
     expect(normalizedHtml).toContain("<!DOCTYPE html>");
-    expect(normalizedHtml).toContain("GARAGEHUB SERVICE BOOK");
+    expect(normalizedHtml).toContain("GARAGEAI SERVICE BOOK");
     expect(normalizedHtml).toContain("Nissan");
     expect(normalizedHtml).toContain("X-Trail");
     expect(normalizedHtml).toContain("JN1TANT31U0018942");
@@ -92,7 +92,7 @@ describe("serviceBookPdfExport", () => {
     expect(normalizedHtml).toContain("KE900-90042");
     expect(normalizedHtml).toContain("Brembo");
     expect(normalizedHtml).toContain("14 000 ₽"); // total of 8500 + 5500
-    expect(normalizedHtml).toContain("Верифицировано GarageHub Cloud");
+    expect(normalizedHtml).toContain("Верифицировано Garage AI Cloud");
     expect(normalizedHtml).toContain("@media print");
   });
 

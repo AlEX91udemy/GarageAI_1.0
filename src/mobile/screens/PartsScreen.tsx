@@ -84,12 +84,12 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
               className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition cursor-pointer"
               title="Сканировать штрихкод детали"
             >
-              <ScanBarcode className="w-4 h-4 text-red-600" />
+              <ScanBarcode className="w-4 h-4 text-brand-strong" />
             </button>
           )}
           <button
             onClick={onAddPart}
-            className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-red-600/20 transition cursor-pointer active:scale-95"
+            className="px-3.5 py-1.5 rounded-xl bg-brand-strong hover:bg-brand-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-brand-strong/20 transition cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Деталь</span>
@@ -106,7 +106,7 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
             placeholder="Поиск по названию, артикулу или бренду..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-neutral-200/90 text-neutral-900 placeholder:text-neutral-400 text-xs focus:outline-none focus:border-red-500 shadow-xs"
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-neutral-200/90 text-neutral-900 placeholder:text-neutral-400 text-xs focus:outline-none focus:border-brand shadow-xs"
           />
         </div>
 
@@ -181,7 +181,7 @@ export const PartsScreen: React.FC<PartsScreenProps> = ({
                   <span>SKU: {part.partNumber}</span>
                   {part.location && (
                     <span className="flex items-center gap-1 text-neutral-700">
-                      <MapPin className="w-3 h-3 text-red-500" />
+                      <MapPin className="w-3 h-3 text-brand-strong" />
                       {part.location}
                     </span>
                   )}

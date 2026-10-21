@@ -138,11 +138,11 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
         {/* Fixed Header */}
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/30 shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-brand-strong text-white flex items-center justify-center shadow-lg shadow-brand-strong/30 shrink-0">
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider">
+              <div className="text-[11px] font-bold text-brand-strong uppercase tracking-wider">
                 {vehicle.make} {vehicle.model}
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
@@ -164,7 +164,7 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
           {/* Urgent items */}
           <div>
             <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+              <AlertTriangle className="w-3.5 h-3.5 text-brand-strong" />
               <span>Требует внимания в первую очередь ({urgentItems.length})</span>
             </div>
 
@@ -177,11 +177,11 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
                 urgentItems.map((item) => (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-2xl bg-red-50/60 border border-red-200 flex items-start justify-between gap-3 text-xs"
+                    className="p-3.5 rounded-2xl bg-brand-soft/60 border border-brand-border flex items-start justify-between gap-3 text-xs"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-red-600 text-white uppercase">
+                        <span className="text-[10px] font-bold px-2 py-0.2 rounded-full bg-brand-strong text-white uppercase">
                           {item.badge}
                         </span>
                         <span className="font-bold text-neutral-900 truncate">
@@ -199,7 +199,7 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
                           onResolveOem(item.rawItem);
                           onClose();
                         }}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl text-[11px] shrink-0 shadow-sm"
+                        className="px-3 py-1.5 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl text-[11px] shrink-0 shadow-sm"
                       >
                         Заменить
                       </button>
@@ -253,7 +253,7 @@ export const RemindersModal: React.FC<RemindersModalProps> = ({
             onClose();
             onOpenOemSchedule();
           }}
-          className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+          className="text-xs font-bold text-brand-strong hover:text-brand-hover flex items-center gap-1 cursor-pointer"
         >
           <span>В регламент ТО</span>
           <ChevronRight className="w-4 h-4" />

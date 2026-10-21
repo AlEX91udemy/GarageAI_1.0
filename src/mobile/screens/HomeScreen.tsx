@@ -169,14 +169,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <header
         className={`sticky top-0 z-30 flex items-center justify-between px-4 py-3 backdrop-blur-md border-b transition-colors duration-200 ${
           isDark
-            ? "bg-[#0d131d]/90 border-[#1f2c3f]"
+            ? "bg-[#0d131d]/90 border-[#243044]"
             : "bg-white/90 border-[#E2E8F0]"
         }`}
       >
         <div className="flex items-center gap-2">
           <img src="/garage-ai-mark.png" alt="GarageAI" className="w-8 h-8 rounded-xl object-contain" />
           <h1 className="text-base font-black tracking-tight leading-none">
-            Garage<span className="text-red-500">AI</span>
+            Garage<span className="text-brand-strong">AI</span>
           </h1>
         </div>
 
@@ -193,8 +193,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative active:scale-95 ${
               isDark
-                ? "bg-[#17202e] border-[#243044] text-red-400 hover:text-red-300 hover:border-red-500/40"
-                : "bg-white border-neutral-200 text-red-600 hover:bg-neutral-50 shadow-xs"
+                ? "bg-[#17202e] border-[#243044] text-brand-on-dark hover:text-brand-light hover:border-brand/40"
+                : "bg-white border-neutral-200 text-brand-strong hover:bg-neutral-50 shadow-xs"
             }`}
             title="Сканер штрихкодов запчастей и VIN"
           >
@@ -214,7 +214,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <Bell className="w-4 h-4" />
             {unreadNotificationsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold text-white flex items-center justify-center shadow-xs">
+              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-strong text-[10px] font-bold text-white flex items-center justify-center shadow-xs">
                 {unreadNotificationsCount}
               </span>
             )}
@@ -254,13 +254,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <div
         className={`flex items-center justify-between px-4 py-2 border-b transition-colors duration-200 ${
           isDark
-            ? "bg-[#101724] border-[#1b2535] text-slate-400"
-            : "bg-[#FAFAFC] border-[#E8ECF2] text-slate-600"
+            ? "bg-[#0D131D] border-[#1C2637] text-slate-400"
+            : "bg-[#F8FAFC] border-[#E2E8F0] text-slate-600"
         }`}
       >
         <button
           onClick={handlePrevVehicle}
-          className="p-1 hover:text-red-500 transition cursor-pointer active:scale-90"
+          className="p-1 hover:text-brand-strong transition cursor-pointer active:scale-90"
           title="Предыдущий автомобиль"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -268,7 +268,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <button
           onClick={() => setShowVehicleSwitcherModal(true)}
-          className="text-xs font-semibold hover:text-red-500 transition cursor-pointer flex items-center gap-1"
+          className="text-xs font-semibold hover:text-brand-strong transition cursor-pointer flex items-center gap-1"
         >
           <span>Мои автомобили</span>
           <ChevronDown className="w-3.5 h-3.5 opacity-60" />
@@ -276,7 +276,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <button
           onClick={handleNextVehicle}
-          className="p-1 hover:text-red-500 transition cursor-pointer active:scale-90"
+          className="p-1 hover:text-brand-strong transition cursor-pointer active:scale-90"
           title="Следующий автомобиль"
         >
           <ChevronRight className="w-4 h-4" />
@@ -311,7 +311,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div
           className={`relative w-full h-52 rounded-2xl overflow-hidden cursor-pointer group transition-all duration-200 border ${
             isDark
-              ? "bg-[radial-gradient(circle_at_50%_25%,#28374d_0%,#141d2b_43%,#0d131d_100%)] border-[#222f42]"
+              ? "bg-[radial-gradient(circle_at_50%_25%,#1E293B_0%,#17202E_43%,#0d131d_100%)] border-[#243044]"
               : "bg-white border-[#E2E8F0] shadow-xs"
           }`}
         >
@@ -349,12 +349,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-5 h-5 rounded-md bg-red-500/15 text-red-500 flex items-center justify-center">
+              <div className="w-5 h-5 rounded-md bg-brand/15 text-brand-strong flex items-center justify-center">
                 <Gauge className="w-3.5 h-3.5" />
               </div>
               <span className={`text-[10px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
@@ -376,7 +376,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={() => onNavigate("fuel")}
             className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
@@ -403,7 +403,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onClick={() => onNavigate("repair")}
             className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
@@ -446,7 +446,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               className="flex flex-col items-center gap-1.5 text-center cursor-pointer group"
             >
-              <div className="w-13 h-13 rounded-2xl bg-red-500/15 text-red-500 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-all">
+              <div className="w-13 h-13 rounded-2xl bg-brand/15 text-brand-strong flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-all">
                 <Wrench className="w-6 h-6" />
               </div>
               <span className={`text-[10px] font-semibold leading-tight ${isDark ? "text-slate-300" : "text-slate-700"}`}>
@@ -485,7 +485,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onClick={() => onOpenQuickAction?.("problem")}
               className="flex flex-col items-center gap-1.5 text-center cursor-pointer group"
             >
-              <div className="w-13 h-13 rounded-2xl bg-purple-500/15 text-purple-500 flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-all">
+              <div className="w-13 h-13 rounded-2xl bg-brand/15 text-brand-strong flex items-center justify-center group-hover:scale-105 group-active:scale-95 transition-all">
                 <FileText className="w-6 h-6" />
               </div>
               <span className={`text-[10px] font-semibold leading-tight ${isDark ? "text-slate-300" : "text-slate-700"}`}>
@@ -536,7 +536,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={() => onNavigate?.("repair")}
                 className={`p-3.5 rounded-2xl border flex flex-col justify-between cursor-pointer transition-all active:scale-[0.99] ${
                   isDark
-                    ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                    ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                     : "bg-white border-[#E2E8F0] shadow-xs"
                 }`}
               >
@@ -552,7 +552,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {/* Progress bar */}
                 <div className="mt-3">
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? "bg-slate-700" : "bg-neutral-200"}`}>
-                    <div className="w-1/2 h-full bg-red-500 rounded-full" />
+                    <div className="w-1/2 h-full bg-brand rounded-full" />
                   </div>
                   <div className={`flex justify-between text-[9px] font-mono mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
                     <span>202 000 км</span>
@@ -566,7 +566,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={() => onNavigate?.("expenses")}
                 className={`p-3.5 rounded-2xl border flex flex-col justify-between cursor-pointer transition-all active:scale-[0.99] ${
                   isDark
-                    ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                    ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                     : "bg-white border-[#E2E8F0] shadow-xs"
                 }`}
               >
@@ -596,7 +596,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={() => onNavigate?.("vehicle_profile")}
                 className={`p-3.5 rounded-2xl border flex flex-col justify-between cursor-pointer transition-all active:scale-[0.99] ${
                   isDark
-                    ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                    ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                     : "bg-white border-[#E2E8F0] shadow-xs"
                 }`}
               >
@@ -610,7 +610,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </div>
 
                 <div className="mt-2">
-                  <div className="text-xs font-bold text-red-500 truncate">
+                  <div className="text-xs font-bold text-brand-strong truncate">
                     {lastVehicleService ? lastVehicleService.title : "Нет записей"}
                   </div>
                   <div className={`text-[10px] mt-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
@@ -624,7 +624,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={() => onNavigate?.("expenses")}
                 className={`p-3.5 rounded-2xl border flex flex-col justify-between cursor-pointer transition-all active:scale-[0.99] ${
                   isDark
-                    ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                    ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                     : "bg-white border-[#E2E8F0] shadow-xs"
                 }`}
               >
@@ -669,7 +669,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 type="number"
                 value={newMileageInput}
                 onChange={(e) => setNewMileageInput(e.target.value)}
-                className={`w-full px-4 py-3 rounded-xl border text-xl font-bold font-mono focus:outline-none focus:ring-2 focus:ring-red-500 ${
+                className={`w-full px-4 py-3 rounded-xl border text-xl font-bold font-mono focus:outline-none focus:ring-2 focus:ring-brand-border ${
                   isDark ? "bg-[#0d131d] border-[#243044] text-white" : "bg-neutral-50 border-neutral-300 text-neutral-900"
                 }`}
                 placeholder="206000"
@@ -699,7 +699,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     setShowQuickMileageModal(false);
                   }
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition cursor-pointer shadow-md shadow-red-600/30"
+                className="flex-1 py-2.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold transition cursor-pointer shadow-md shadow-brand-strong/30"
               >
                 Сохранить
               </button>
@@ -724,7 +724,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     setShowVehicleSwitcherModal(false);
                     onOpenAddVehicle?.();
                   }}
-                  className="text-xs font-bold text-red-500 hover:text-red-400 flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-bold text-brand-strong hover:text-brand-on-dark flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Добавить авто</span>
@@ -744,7 +744,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                     className={`p-3 rounded-2xl border flex items-center justify-between text-left transition cursor-pointer ${
                       isSelected
-                        ? "border-red-500 bg-red-500/10"
+                        ? "border-brand bg-brand/10"
                         : isDark
                         ? "border-[#243044] bg-[#0d131d] hover:border-slate-600"
                         : "border-neutral-200 bg-neutral-50 hover:border-neutral-300"
@@ -763,7 +763,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         </div>
                       </div>
                     </div>
-                    {isSelected && <Check className="w-5 h-5 text-red-500 shrink-0" />}
+                    {isSelected && <Check className="w-5 h-5 text-brand-strong shrink-0" />}
                   </button>
                 );
               })}

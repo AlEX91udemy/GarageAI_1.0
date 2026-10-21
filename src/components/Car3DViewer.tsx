@@ -1410,7 +1410,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
       {/* Top Left Badges & Model Status */}
       {!minimal && <div className="model-toolbar absolute top-2 left-2 flex flex-wrap items-center gap-1.5 z-10">
         <span className="px-2 py-0.5 bg-black/80 backdrop-blur-md rounded-full text-[9px] font-semibold text-neutral-300 border border-neutral-700/80 shadow flex items-center gap-1">
-          <Eye className="w-2.5 h-2.5 text-red-500 shrink-0" />
+          <Eye className="w-2.5 h-2.5 text-brand-strong shrink-0" />
           <span>360° Обзор</span>
         </span>
 
@@ -1472,7 +1472,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
             onClick={() => setCameraPreset("front34")}
             className={`px-2 py-0.5 text-[9px] font-medium rounded transition cursor-pointer ${
               activeView === "front34"
-                ? "bg-red-600 text-white font-bold"
+                ? "bg-brand-strong text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -1483,7 +1483,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
             onClick={() => setCameraPreset("side")}
             className={`px-2 py-0.5 text-[9px] font-medium rounded transition cursor-pointer ${
               activeView === "side"
-                ? "bg-red-600 text-white font-bold"
+                ? "bg-brand-strong text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -1494,7 +1494,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
             onClick={() => setCameraPreset("rear")}
             className={`px-2 py-0.5 text-[9px] font-medium rounded transition cursor-pointer ${
               activeView === "rear"
-                ? "bg-red-600 text-white font-bold"
+                ? "bg-brand-strong text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -1505,7 +1505,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
             onClick={() => setCameraPreset("top")}
             className={`px-2 py-0.5 text-[9px] font-medium rounded transition cursor-pointer ${
               activeView === "top"
-                ? "bg-red-600 text-white font-bold"
+                ? "bg-brand-strong text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -1517,7 +1517,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
       {/* Loading Overlay */}
       {isLoadingModel && (
         <div role="status" className="absolute inset-0 z-30 bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2">
-          <Loader2 className="w-7 h-7 text-red-500 animate-spin" />
+          <Loader2 className="w-7 h-7 text-brand-strong animate-spin" />
           <span className="text-xs font-bold text-white tracking-wide">
             Загрузка 3D модели...
           </span>
@@ -1532,8 +1532,8 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
 
       {/* Drag & Drop Overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 z-30 bg-red-950/80 border-2 border-dashed border-red-500 rounded-2xl flex flex-col items-center justify-center gap-2 backdrop-blur-xs">
-          <Upload className="w-8 h-8 text-red-400 animate-bounce" />
+        <div className="absolute inset-0 z-30 bg-brand-deep/80 border-2 border-dashed border-brand rounded-2xl flex flex-col items-center justify-center gap-2 backdrop-blur-xs">
+          <Upload className="w-8 h-8 text-brand-on-dark animate-bounce" />
           <span className="text-xs font-bold text-white">
             Отпустите .GLB файл для загрузки
           </span>
@@ -1549,7 +1549,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-neutral-800 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-red-600/20 text-red-500 border border-red-500/30 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-brand-strong/20 text-brand-strong border border-brand/30 flex items-center justify-center">
                 <Layers className="w-4 h-4" />
               </div>
               <div>
@@ -1588,13 +1588,13 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
                   }}
                   className={`text-left p-2 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
                     isSelected
-                      ? "bg-red-950/40 border-red-500 shadow-sm"
+                      ? "bg-brand-deep/40 border-brand shadow-sm"
                       : "bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800 hover:border-neutral-700"
                   }`}
                 >
                   <div
                     className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                      isSelected ? "bg-red-600 text-white" : "bg-neutral-800 text-neutral-400"
+                      isSelected ? "bg-brand-strong text-white" : "bg-neutral-800 text-neutral-400"
                     }`}
                   >
                     <Car className="w-3.5 h-3.5" />
@@ -1612,7 +1612,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
                       {model.description}
                     </p>
                     {isSelected && (
-                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-400 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-brand-on-dark mt-1">
                         <Check className="w-2.5 h-2.5" />
                         Активно
                       </span>
@@ -1632,7 +1632,7 @@ const Car3DViewerInternal: React.FC<Car3DViewerProps> = ({
               }}
               className="px-2.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white rounded-lg border border-neutral-700 text-[10px] font-semibold flex items-center gap-1.5 transition cursor-pointer"
             >
-              <Upload className="w-3 h-3 text-red-400" />
+              <Upload className="w-3 h-3 text-brand-on-dark" />
               <span>Загрузить свой .GLB</span>
             </button>
 

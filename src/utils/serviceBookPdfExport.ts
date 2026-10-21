@@ -36,40 +36,40 @@ export function generateServiceBookHtml(
                   )} ₽)</div>`
               )
               .join("")
-          : `<span style="color:#888;">Без запчастей (диагностика / регулировка)</span>`;
+          : `<span style="color:#64748B;">Без запчастей (диагностика / регулировка)</span>`;
 
       return `
       <tr>
-        <td style="text-align:center; font-weight:bold; color:#555;">${index + 1}</td>
+        <td style="text-align:center; font-weight:bold; color:#64748B;">${index + 1}</td>
         <td>
-          <div style="font-weight:bold; color:#111;">${escapeHtml(record.date)}</div>
-          <div style="color:#d32f2f; font-weight:bold; font-family:monospace;">${record.mileage.toLocaleString(
+          <div style="font-weight:bold; color:#0F172A;">${escapeHtml(record.date)}</div>
+          <div style="color:#B91C1C; font-weight:bold; font-family:monospace;">${record.mileage.toLocaleString(
             "ru-RU"
           )} км</div>
         </td>
         <td>
-          <div style="font-weight:bold; color:#111; font-size:13px;">${escapeHtml(
+          <div style="font-weight:bold; color:#0F172A; font-size:13px;">${escapeHtml(
             record.title
           )}</div>
-          <div style="color:#666; font-size:11px; margin-top:2px;">
+          <div style="color:#64748B; font-size:11px; margin-top:2px;">
             ${escapeHtml(record.serviceCenter || "Сервис")} • ${escapeHtml(record.category)}
           </div>
           ${
             record.description
-              ? `<div style="color:#444; font-size:11px; margin-top:4px; font-style:italic;">${escapeHtml(
+              ? `<div style="color:#64748B; font-size:11px; margin-top:4px; font-style:italic;">${escapeHtml(
                   record.description
                 )}</div>`
               : ""
           }
         </td>
-        <td style="font-size:11px; color:#333;">
+        <td style="font-size:11px; color:#0F172A;">
           ${partsListHtml}
         </td>
-        <td style="text-align:right; font-family:monospace; font-size:11px; color:#555;">
+        <td style="text-align:right; font-family:monospace; font-size:11px; color:#64748B;">
           <div>Раб: ${record.laborCost.toLocaleString("ru-RU")} ₽</div>
           <div>Зап: ${(record.totalCost - record.laborCost).toLocaleString("ru-RU")} ₽</div>
         </td>
-        <td style="text-align:right; font-family:monospace; font-weight:bold; font-size:13px; color:#111; white-space:nowrap;">
+        <td style="text-align:right; font-family:monospace; font-weight:bold; font-size:13px; color:#0F172A; white-space:nowrap;">
           ${record.totalCost.toLocaleString("ru-RU")} ₽
         </td>
       </tr>
@@ -83,7 +83,7 @@ export function generateServiceBookHtml(
   <meta charset="UTF-8">
   <title>Электронная сервисная книжка — ${escapeHtml(vehicle.make)} ${escapeHtml(
     vehicle.model
-  )} (${escapeHtml(vehicle.vin || vehicle.licensePlate || "GarageHub")})</title>
+  )} (${escapeHtml(vehicle.vin || vehicle.licensePlate || "Garage AI")})</title>
   <style>
     @page {
       size: A4 portrait;
@@ -98,7 +98,7 @@ export function generateServiceBookHtml(
       margin: 0;
       padding: 20px;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #111;
+      color: #0F172A;
       background: #fff;
       font-size: 12px;
       line-height: 1.4;
@@ -107,7 +107,7 @@ export function generateServiceBookHtml(
       margin-bottom: 20px;
       padding: 12px 18px;
       background: #f1f5f9;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #E2E8F0;
       border-radius: 12px;
       display: flex;
       align-items: center;
@@ -115,7 +115,7 @@ export function generateServiceBookHtml(
       gap: 12px;
     }
     .print-btn {
-      background: #d32f2f;
+      background: #B91C1C;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -125,10 +125,10 @@ export function generateServiceBookHtml(
       cursor: pointer;
     }
     .print-btn:hover {
-      background: #b71c1c;
+      background: #991B1B;
     }
     .passport-header {
-      border: 2px solid #111;
+      border: 2px solid #0F172A;
       border-radius: 12px;
       padding: 16px;
       margin-bottom: 16px;
@@ -150,7 +150,7 @@ export function generateServiceBookHtml(
     }
     .doc-badge {
       display: inline-block;
-      background: #d32f2f;
+      background: #B91C1C;
       color: #fff;
       font-size: 10px;
       font-weight: bold;
@@ -237,7 +237,7 @@ export function generateServiceBookHtml(
       vertical-align: top;
     }
     tr:nth-child(even) td {
-      background: #fbfcfe;
+      background: #F8FAFC;
     }
     tr {
       page-break-inside: avoid;
@@ -288,12 +288,12 @@ export function generateServiceBookHtml(
     <div class="header-top">
       <div>
         <div class="doc-badge">Официальный сервисный паспорт автомобиля</div>
-        <div class="brand-title">GARAGEHUB SERVICE BOOK</div>
+        <div class="brand-title">GARAGEAI SERVICE BOOK</div>
         <div style="color:#64748b; font-size:11px;">Электронный реестр регламентных работ и заказ-нарядов</div>
       </div>
       <div style="text-align:right;">
         <div style="font-weight:bold; color:#0f172a; font-size:12px;">Дата выгрузки: ${todayStr}</div>
-        <div style="color:#16a34a; font-weight:bold; font-size:11px; margin-top:3px;">✓ Верифицировано GarageHub Cloud</div>
+        <div style="color:#047857; font-weight:bold; font-size:11px; margin-top:3px;">✓ Верифицировано Garage AI Cloud</div>
       </div>
     </div>
 
@@ -301,7 +301,7 @@ export function generateServiceBookHtml(
       <div class="vehicle-title">${escapeHtml(vehicle.make)} ${escapeHtml(vehicle.model)} ${escapeHtml(
     vehicle.generation || ""
   )}</div>
-      <div style="font-size:12px; color:#475569;">
+      <div style="font-size:12px; color:#64748B;">
         Год выпуска: <strong>${vehicle.year}</strong> • Двигатель: <strong>${escapeHtml(
     vehicle.engine
   )}</strong>
@@ -323,7 +323,7 @@ export function generateServiceBookHtml(
       </div>
       <div class="prop-item">
         <div class="prop-label">Статус записей</div>
-        <div class="prop-value" style="color:#16a34a;">Подтверждены</div>
+        <div class="prop-value" style="color:#047857;">Подтверждены</div>
       </div>
     </div>
   </div>
@@ -339,7 +339,7 @@ export function generateServiceBookHtml(
     </div>
     <div class="stat-card">
       <div class="stat-label">Суммарный подтверждённый бюджет</div>
-      <div class="stat-val" style="color:#d32f2f;">${totalSpent.toLocaleString("ru-RU")} ₽</div>
+      <div class="stat-val" style="color:#B91C1C;">${totalSpent.toLocaleString("ru-RU")} ₽</div>
     </div>
   </div>
 
@@ -359,26 +359,26 @@ export function generateServiceBookHtml(
       </tr>
     </thead>
     <tbody>
-      ${rowsHtml || `<tr><td colspan="6" style="text-align:center; padding:20px; color:#999;">Записей обслуживания пока нет</td></tr>`}
+      ${rowsHtml || `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94A3B8;">Записей обслуживания пока нет</td></tr>`}
     </tbody>
     <tfoot>
       <tr style="font-weight:bold; background:#f1f5f9; border-top:2px solid #0f172a;">
         <td colspan="4" style="text-align:right; text-transform:uppercase; font-size:11px;">Всего инвестиций в автомобиль:</td>
         <td style="text-align:right; font-family:monospace; font-size:11px;">Раб: ${totalLabor.toLocaleString("ru-RU")} ₽</td>
-        <td style="text-align:right; font-family:monospace; font-size:14px; color:#d32f2f; white-space:nowrap;">${totalSpent.toLocaleString("ru-RU")} ₽</td>
+        <td style="text-align:right; font-family:monospace; font-size:14px; color:#B91C1C; white-space:nowrap;">${totalSpent.toLocaleString("ru-RU")} ₽</td>
       </tr>
     </tfoot>
   </table>
 
   <div class="doc-footer">
     <div>
-      <div>Документ сформирован автоматически цифровым сервисом <strong>GarageHub</strong>.</div>
+      <div>Документ сформирован автоматически цифровым сервисом <strong>Garage AI</strong>.</div>
       <div>Данная сервисная история содержит проверенные данные о пробеге, замененных деталях и регламентных ТО.</div>
       <div style="margin-top:3px; font-family:monospace;">ID выгрузки: GH-EXP-${Date.now().toString(36).toUpperCase()}</div>
     </div>
     <div class="stamp-box">
       <div>М.П. / ШТАМП</div>
-      <div style="font-size:9px; margin-top:2px;">GARAGEHUB VERIFIED</div>
+      <div style="font-size:9px; margin-top:2px;">Garage AI VERIFIED</div>
     </div>
   </div>
 </body>
@@ -467,7 +467,7 @@ export function downloadServiceBookHtml(
   a.href = url;
   const safeMake = (vehicle.make || "Car").replace(/\s+/g, "_");
   const safeModel = (vehicle.model || "Vehicle").replace(/\s+/g, "_");
-  a.download = `GarageHub_${safeMake}_${safeModel}_ServiceBook.html`;
+  a.download = `Garage AI_${safeMake}_${safeModel}_ServiceBook.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

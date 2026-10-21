@@ -69,7 +69,7 @@ export const LicensePlateBadge: React.FC<LicensePlateBadgeProps> = ({
               <span className="inline-block w-2 h-1.5 rounded-[1px] overflow-hidden border border-neutral-300">
                 <span className="block h-[33%] bg-white" />
                 <span className="block h-[34%] bg-blue-600" />
-                <span className="block h-[33%] bg-red-600" />
+                <span className="block h-[33%] bg-brand-strong" />
               </span>
             </div>
           </div>

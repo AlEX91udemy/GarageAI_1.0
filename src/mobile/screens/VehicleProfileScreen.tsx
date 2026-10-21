@@ -124,8 +124,8 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
     switch (category) {
       case "Система охлаждения":
         return {
-          bg: "bg-red-500/15",
-          text: "text-red-500",
+          bg: "bg-brand/15",
+          text: "text-brand-strong",
           icon: <Wrench className="w-5 h-5" />,
         };
       case "Двигатель":
@@ -136,8 +136,8 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         };
       case "Ходовая часть":
         return {
-          bg: "bg-purple-500/15",
-          text: "text-purple-400",
+          bg: "bg-brand/15",
+          text: "text-brand-on-dark",
           icon: <Wrench className="w-5 h-5" />,
         };
       case "Тормозная система":
@@ -148,14 +148,14 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         };
       case "Климатическая система":
         return {
-          bg: "bg-cyan-500/15",
-          text: "text-cyan-400",
+          bg: "bg-brand/15",
+          text: "text-brand-on-dark",
           icon: <Sparkles className="w-5 h-5" />,
         };
       default:
         return {
-          bg: "bg-red-500/15",
-          text: "text-red-500",
+          bg: "bg-brand/15",
+          text: "text-brand-strong",
           icon: <Wrench className="w-5 h-5" />,
         };
     }
@@ -177,7 +177,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
       <header
         className={`sticky top-0 z-30 flex items-center justify-between px-4 py-3 backdrop-blur-md border-b transition-colors duration-200 ${
           isDark
-            ? "bg-[#0d131d]/90 border-[#1f2c3f]"
+            ? "bg-[#0d131d]/90 border-[#243044]"
             : "bg-white/90 border-[#E2E8F0]"
         }`}
       >
@@ -236,14 +236,14 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
       {/* 2. SUB-TABS NAVIGATION (Обзор, Работы, Расходы, Заправки, Документы) */}
       <div
         className={`flex items-center justify-around border-b px-2 overflow-x-auto no-scrollbar transition-colors duration-200 ${
-          isDark ? "bg-[#101724] border-[#1b2535]" : "bg-white border-[#E2E8F0]"
+          isDark ? "bg-[#0D131D] border-[#1C2637]" : "bg-white border-[#E2E8F0]"
         }`}
       >
         <button
           onClick={() => setActiveTab("overview")}
           className={`py-3 px-3 text-xs font-bold transition-all relative whitespace-nowrap cursor-pointer ${
             activeTab === "overview"
-              ? "text-red-500"
+              ? "text-brand-strong"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-slate-600 hover:text-neutral-900"
@@ -251,7 +251,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         >
           <span>Обзор</span>
           {activeTab === "overview" && (
-            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-500 rounded-t-full" />
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-t-full" />
           )}
         </button>
 
@@ -259,7 +259,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
           onClick={() => setActiveTab("works")}
           className={`py-3 px-3 text-xs font-bold transition-all relative whitespace-nowrap cursor-pointer ${
             activeTab === "works"
-              ? "text-red-500"
+              ? "text-brand-strong"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-slate-600 hover:text-neutral-900"
@@ -267,7 +267,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         >
           <span>Работы</span>
           {activeTab === "works" && (
-            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-500 rounded-t-full" />
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-t-full" />
           )}
         </button>
 
@@ -275,7 +275,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
           onClick={() => setActiveTab("expenses")}
           className={`py-3 px-3 text-xs font-bold transition-all relative whitespace-nowrap cursor-pointer ${
             activeTab === "expenses"
-              ? "text-red-500"
+              ? "text-brand-strong"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-slate-600 hover:text-neutral-900"
@@ -283,7 +283,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         >
           <span>Расходы</span>
           {activeTab === "expenses" && (
-            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-500 rounded-t-full" />
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-t-full" />
           )}
         </button>
 
@@ -291,7 +291,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
           onClick={() => setActiveTab("fuel")}
           className={`py-3 px-3 text-xs font-bold transition-all relative whitespace-nowrap cursor-pointer ${
             activeTab === "fuel"
-              ? "text-red-500"
+              ? "text-brand-strong"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-slate-600 hover:text-neutral-900"
@@ -299,7 +299,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         >
           <span>Заправки</span>
           {activeTab === "fuel" && (
-            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-500 rounded-t-full" />
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-t-full" />
           )}
         </button>
 
@@ -307,7 +307,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
           onClick={() => setActiveTab("documents")}
           className={`py-3 px-3 text-xs font-bold transition-all relative whitespace-nowrap cursor-pointer ${
             activeTab === "documents"
-              ? "text-red-500"
+              ? "text-brand-strong"
               : isDark
               ? "text-slate-400 hover:text-white"
               : "text-slate-600 hover:text-neutral-900"
@@ -315,7 +315,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         >
           <span>Документы</span>
           {activeTab === "documents" && (
-            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-red-500 rounded-t-full" />
+            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-brand rounded-t-full" />
           )}
         </button>
       </div>
@@ -328,8 +328,8 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
             <div
               className={`flex-1 flex items-center gap-2 px-3 py-2.5 rounded-2xl border transition-all ${
                 isDark
-                  ? "bg-[#17202e] border-[#243044] text-white focus-within:border-red-500"
-                  : "bg-white border-[#E2E8F0] text-neutral-900 focus-within:border-red-500 shadow-xs"
+                  ? "bg-[#17202e] border-[#243044] text-white focus-within:border-brand"
+                  : "bg-white border-[#E2E8F0] text-neutral-900 focus-within:border-brand shadow-xs"
               }`}
             >
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
@@ -364,8 +364,8 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
                 <div key={record.id} className="flex flex-col gap-1.5">
                   {/* Timeline Header Date & Mileage */}
                   <div className="flex items-center justify-between text-xs font-semibold px-1">
-                    <div className="flex items-center gap-2 text-red-500">
-                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <div className="flex items-center gap-2 text-brand-strong">
+                      <span className="w-2 h-2 rounded-full bg-brand" />
                       <span className={`${isDark ? "text-slate-300" : "text-slate-700"}`}>
                         {formattedDate}
                       </span>
@@ -379,7 +379,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
                   <div
                     className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all cursor-pointer active:scale-[0.99] group ${
                       isDark
-                        ? "bg-[#17202e] border-[#243044] hover:border-[#2d3d57]"
+                        ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                         : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
                     }`}
                   >
@@ -399,7 +399,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
 
                       {/* Text info */}
                       <div>
-                        <div className="text-sm font-extrabold tracking-tight leading-tight group-hover:text-red-500 transition">
+                        <div className="text-sm font-extrabold tracking-tight leading-tight group-hover:text-brand-strong transition">
                           {record.title}
                         </div>
                         <div className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
@@ -502,10 +502,10 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
             <button
               onClick={() => onOpenServiceBook?.()}
               className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition cursor-pointer active:scale-98 ${
-                isDark ? "bg-[#17202e] border-[#243044] hover:border-red-500/50" : "bg-white border-[#E2E8F0] shadow-xs"
+                isDark ? "bg-[#17202e] border-[#243044] hover:border-brand/50" : "bg-white border-[#E2E8F0] shadow-xs"
               }`}
             >
-              <FileText className="w-5 h-5 text-red-500 mb-2" />
+              <FileText className="w-5 h-5 text-brand-strong mb-2" />
               <div className="text-xs font-bold">Сервисная книга</div>
               <div className="text-[10px] text-slate-400 mt-0.5">Печать и экспорт</div>
             </button>
@@ -513,7 +513,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
             <button
               onClick={() => onOpenReminders?.()}
               className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition cursor-pointer active:scale-98 ${
-                isDark ? "bg-[#17202e] border-[#243044] hover:border-red-500/50" : "bg-white border-[#E2E8F0] shadow-xs"
+                isDark ? "bg-[#17202e] border-[#243044] hover:border-brand/50" : "bg-white border-[#E2E8F0] shadow-xs"
               }`}
             >
               <ShieldCheck className="w-5 h-5 text-amber-500 mb-2" />
@@ -594,7 +594,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
               onOpenAddEvent();
             }
           }}
-          className="w-full py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-red-600/35 transition-all cursor-pointer border border-red-500/40"
+          className="w-full py-3.5 px-4 rounded-2xl bg-brand-strong hover:bg-brand active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-brand-strong/35 transition-all cursor-pointer border border-brand/40"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
           <span>Добавить работу</span>
