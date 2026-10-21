@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { AsyncLocalStorage } from "async_hooks";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { v1 as documentai } from "@google-cloud/documentai";
 import dotenv from "dotenv";
 
 import {
@@ -45,7 +46,9 @@ import {
 } from "./src/catalog/database";
 import { searchKnowledge } from "./src/catalog/knowledge";
 import { verifyModification } from "./src/catalog/verification";
+import { prepareDocumentImage, recognizeDocumentImage } from "./server/documentOcr";
 import { GarageStore, emptyGarage, type GarageData } from "./server/store";
+import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -72,7 +75,24 @@ const app = express();
 const PORT = 3000;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const OPENROUTER_RECEIPT_MODEL = process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL;
+const OPENROUTER_DOCUMENT_MODEL = process.env.OPENROUTER_DOCUMENT_MODEL || OPENROUTER_MODEL;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+let documentAiClient: documentai.DocumentProcessorServiceClient | null = null;
+function getDocumentAiClient() {
+  if (!documentAiClient) documentAiClient = new documentai.DocumentProcessorServiceClient();
+  return documentAiClient;
+}
+function documentProcessorName(id: string) {
+  return `projects/${process.env.GOOGLE_CLOUD_PROJECT}/locations/${process.env.DOCUMENT_AI_LOCATION || "us"}/processors/${id}`;
+}
+async function processWithDocumentAi(content: Buffer, mimeType: string, processorId: string) {
+  const [result] = await getDocumentAiClient().processDocument({
+    name: documentProcessorName(processorId),
+    rawDocument: { content, mimeType },
+  });
+  return result.document;
+}
 
 // Middleware for parsing JSON with 25mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
@@ -244,14 +264,24 @@ function getAi(): GoogleGenAI {
   return aiClient;
 }
 
-async function requestOpenRouterVision(imageBase64: string, mimeType: string, prompt: string): Promise<string> {
-  const key = process.env.OPENROUTER_API_KEY;
+type OpenRouterPurpose = "receipt" | "document";
+
+function getOpenRouterConfig(purpose: OpenRouterPurpose = "receipt") {
+  const key = purpose === "document"
+    ? process.env.OPENROUTER_DOCUMENT_API_KEY || process.env.OPENROUTER_API_KEY
+    : process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY;
+  const model = purpose === "document" ? OPENROUTER_DOCUMENT_MODEL : OPENROUTER_RECEIPT_MODEL;
+  return { key, model };
+}
+
+async function requestOpenRouterVision(imageBase64: string, mimeType: string, prompt: string, purpose: OpenRouterPurpose = "receipt"): Promise<string> {
+  const { key, model } = getOpenRouterConfig(purpose);
   if (!key) throw new Error("OpenRouter API key is not configured");
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "GarageHub" },
-    body: JSON.stringify({ model: OPENROUTER_MODEL, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }),
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI" },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error?.message || "OpenRouter request failed (" + response.status + ")");
@@ -259,6 +289,39 @@ async function requestOpenRouterVision(imageBase64: string, mimeType: string, pr
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("OpenRouter returned an empty response");
   return content;
+}
+
+async function requestOpenRouterDocumentText(imageBase64: string, mimeType: string): Promise<string> {
+  const { key, model } = getOpenRouterConfig("document");
+  if (!key) throw new Error("Document OpenRouter API key is not configured");
+  const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
+  const response = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI OCR" },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: [
+        { type: "text", text: "You are a document OCR engine. Transcribe every visible character and word in natural reading order. Preserve spelling, numbers, punctuation and line breaks. Do not summarize, translate, correct or omit anything. Return only the transcription as plain text." },
+        { type: "image_url", image_url: { url: imageUrl } },
+      ] }],
+      temperature: 0,
+      max_tokens: 4000,
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error?.message || "Document OCR request failed (" + response.status + ")");
+  const content = payload?.choices?.[0]?.message?.content;
+  if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
+  if (typeof content !== "string") throw new Error("Document OCR returned an empty response");
+  return content.trim();
+}
+
+function mergeOcrText(...texts: string[]) {
+  const lines = new Set<string>();
+  for (const text of texts) {
+    for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) lines.add(line);
+  }
+  return [...lines].join("\n");
 }
 
 function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T): T {
@@ -1521,7 +1584,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_RECEIPT_API_KEY && !process.env.OPENROUTER_DOCUMENT_API_KEY) {
     return res.status(503).json({ error: "AI-функции не настроены на сервере." });
   }
 
@@ -1644,6 +1707,7 @@ app.get("/api/backup/export", requireAuth, (req, res) => {
   const exported = vehicleId ? {
     ...dbMemory,
     vehicles: dbMemory.vehicles.filter((vehicle) => vehicle.id === vehicleId),
+    reminders: dbMemory.reminders.filter((record) => record.vehicleId === vehicleId),
     serviceRecords: dbMemory.serviceRecords.filter((record) => record.vehicleId === vehicleId),
     fuelRecords: dbMemory.fuelRecords.filter((record) => record.vehicleId === vehicleId),
     oemSchedules: dbMemory.oemSchedules.filter((record) => record.vehicleId === vehicleId),
@@ -1651,38 +1715,14 @@ app.get("/api/backup/export", requireAuth, (req, res) => {
     toFixTasks: dbMemory.toFixTasks.filter((record) => record.vehicleId === vehicleId),
     tuningStages: dbMemory.tuningStages.filter((record) => record.vehicleId === vehicleId),
   } : dbMemory;
-  res.setHeader("Content-Disposition", `attachment; filename="garagehub_backup_${Date.now()}.json"`);
+  res.setHeader("Content-Disposition", `attachment; filename="Garage AI_backup_${Date.now()}.json"`);
   res.setHeader("Content-Type", "application/json");
   res.json(exported);
 });
 
 app.post("/api/backup/import", requireAuth, (req, res) => {
   try {
-    const data = req.body;
-    if (!data || !Array.isArray(data.vehicles)) {
-      return res.status(400).json({ error: "Некорректный формат файла резервной копии" });
-    }
-
-    // Лёгкая валидация структуры элементов перед заменой базы:
-    // каждый автомобиль обязан иметь строковый id и марку.
-    const vehicles = data.vehicles.filter(
-      (v: unknown): v is Vehicle =>
-        Boolean(v) && typeof v === "object" && typeof (v as Vehicle).id === "string" && typeof (v as Vehicle).make === "string"
-    );
-    if (data.vehicles.length > 0 && vehicles.length === 0) {
-      return res.status(400).json({ error: "В копии нет ни одного корректного автомобиля (нужны поля id и make)" });
-    }
-
-    const imported = {
-      vehicles,
-      serviceRecords: Array.isArray(data.serviceRecords) ? data.serviceRecords : [],
-      fuelRecords: Array.isArray(data.fuelRecords) ? data.fuelRecords : [],
-      oemSchedules: Array.isArray(data.oemSchedules) ? data.oemSchedules : [],
-      garageParts: Array.isArray(data.garageParts) ? data.garageParts : [],
-      toFixTasks: Array.isArray(data.toFixTasks) ? data.toFixTasks : [],
-      tuningStages: Array.isArray(data.tuningStages) ? data.tuningStages : [],
-      lastUpdated: new Date().toISOString(),
-    };
+    const imported = { ...validateGarageBackup(req.body), lastUpdated: new Date().toISOString() };
     Object.assign(currentContext().garage, imported);
 
     saveDatabase();
@@ -1691,7 +1731,7 @@ app.post("/api/backup/import", requireAuth, (req, res) => {
       services: dbMemory.serviceRecords.length,
     }});
   } catch (err: any) {
-    res.status(500).json({ error: "Ошибка импорта", details: err.message });
+    res.status(400).json({ error: err.message || "Ошибка импорта" });
   }
 });
 
@@ -1744,7 +1784,7 @@ app.post("/api/ai/diagnose", requireAiAccess, async (req, res) => {
       : "Подходящих подтверждённых фрагментов локальной базы нет. Не выдавай предположения за факт.";
 
     const ai = getAi();
-    const prompt = `Ты — ведущий профессиональный автомеханик и диагност в сервисной системе "GarageHub Rev".
+    const prompt = `Ты — ведущий профессиональный автомеханик и диагност в сервисной системе "Garage AI Rev".
 Твоя задача: на основе точного профиля автомобиля, его пробега, истории недавних ремонтов и описанных симптомов дать структурированную, практически полезную и объективную диагностику.
 
 ДАННЫЕ АВТОМОБИЛЯ:
@@ -1875,8 +1915,16 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
   "parts": [{ "name": "Масло моторное 5W-40", "brand": "Motul", "partNumber": "102784", "quantity": 1, "price": 5400 }],
   "notes": "важные примечания"
 }`;
-    const responseText = process.env.OPENROUTER_API_KEY
-      ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt)
+    const documentReceiptId = process.env.DOCUMENT_AI_RECEIPT_PROCESSOR_ID;
+    if (documentReceiptId && process.env.GOOGLE_CLOUD_PROJECT) {
+      try {
+        const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), supportedMime, documentReceiptId);
+        if (doc?.text) return res.json({ merchantName: null, date: null, totalAmount: null, category: "other", description: doc.text, notes: doc.text, _source: "google-document-ai" });
+      } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
+    }
+    const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
+    const responseText = hasReceiptOpenRouter
+      ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
       : (await getAi().models.generateContent({
           model: GEMINI_MODEL,
           contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
@@ -1889,6 +1937,37 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     res.status(500).json({
       error: "Не удалось распознать чек.",
     });
+  }
+});
+
+// 2b. Full document OCR with image preprocessing and local OCR fallback
+app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (typeof imageBase64 !== "string" || !imageBase64) return res.status(400).json({ error: "Изображение документа не предоставлено." });
+    if (imageBase64.length > 9_000_000) return res.status(413).json({ error: "Изображение документа слишком большое." });
+    const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
+    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное base64-изображение." });
+    const prepared = await prepareDocumentImage(Buffer.from(cleanBase64, "base64"));
+    const documentOcrId = process.env.DOCUMENT_AI_OCR_PROCESSOR_ID;
+    if (documentOcrId && process.env.GOOGLE_CLOUD_PROJECT) {
+      try {
+        const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), detectedMime, documentOcrId);
+        if (doc?.text) return res.json({ text: doc.text, sources: { vision: doc.text, local: "", confidence: 1 }, preprocessing: { variants: ["google-document-ai"], mimeType: detectedMime }, warning: null });
+      } catch (error) { console.warn("Document AI OCR failed, using fallback:", error); }
+    }
+    const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+    let vision = "";
+    let visionError: string | null = null;
+    if (process.env.OPENROUTER_DOCUMENT_API_KEY || process.env.OPENROUTER_API_KEY) {
+      try { vision = await requestOpenRouterDocumentText(prepared[0].image.toString("base64"), "image/png"); } catch (error: any) { visionError = error?.message || "Document vision OCR failed"; }
+    }
+    const text = mergeOcrText(vision, local.text);
+    res.json({ text, sources: { vision: vision || null, local: local.text, confidence: local.confidence }, preprocessing: { variants: prepared.map(item => item.name), mimeType: detectedMime }, warning: visionError });
+  } catch (error: any) {
+    console.error("Document OCR error:", error);
+    res.status(500).json({ error: "Не удалось распознать документ." });
   }
 });
 
@@ -2017,7 +2096,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`GarageHub Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Garage AI Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

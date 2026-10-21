@@ -7,6 +7,9 @@ coverage/
 .env*
 !.env.example
 data/users.json
+data/garage_store.json
+data/sessions.json
+data/*.tmp
 
 # AI Studio debug artifacts (temporary media storage, brain artifacts)
 artifacts/
