@@ -13,38 +13,38 @@ export const SAMPLE_RECEIPT_IMAGE =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" width="400" height="520" viewBox="0 0 400 520">
-    <rect width="400" height="520" fill="#fafafa" rx="8" stroke="#e2e8f0" stroke-width="2"/>
-    <rect x="20" y="20" width="360" height="480" fill="#ffffff" rx="4" stroke="#cbd5e1" stroke-dasharray="4"/>
+    <rect width="400" height="520" fill="#FFFFFF" rx="8" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="20" y="20" width="360" height="480" fill="#ffffff" rx="4" stroke="#E2E8F0" stroke-dasharray="4"/>
     <text x="200" y="60" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="18" fill="#0f172a">FIT SERVICE • АВТОЦЕНТР</text>
     <text x="200" y="85" text-anchor="middle" font-family="monospace" font-size="12" fill="#64748b">Заказ-наряд № FS-782194 от 14.05.2026</text>
     <line x1="40" y1="105" x2="360" y2="105" stroke="#94a3b8" stroke-dasharray="3"/>
-    <text x="40" y="130" font-family="monospace" font-size="12" fill="#334155">Авто: Nissan X-Trail T31 (2008)</text>
-    <text x="40" y="150" font-family="monospace" font-size="12" fill="#334155">Пробег: 204 100 км</text>
-    <line x1="40" y1="170" x2="360" y2="170" stroke="#cbd5e1"/>
+    <text x="40" y="130" font-family="monospace" font-size="12" fill="#0F172A">Авто: Nissan X-Trail T31 (2008)</text>
+    <text x="40" y="150" font-family="monospace" font-size="12" fill="#0F172A">Пробег: 204 100 км</text>
+    <line x1="40" y1="170" x2="360" y2="170" stroke="#E2E8F0"/>
     
     <text x="40" y="195" font-family="monospace" font-weight="bold" font-size="12" fill="#0f172a">ВЫПОЛНЕННЫЕ РАБОТЫ:</text>
-    <text x="40" y="215" font-family="monospace" font-size="11" fill="#334155">Замена масла ДВС + фильтр</text>
+    <text x="40" y="215" font-family="monospace" font-size="11" fill="#0F172A">Замена масла ДВС + фильтр</text>
     <text x="360" y="215" text-anchor="end" font-family="monospace" font-size="11" fill="#0f172a">1 800 ₽</text>
-    <text x="40" y="235" font-family="monospace" font-size="11" fill="#334155">Замена передних колодок</text>
+    <text x="40" y="235" font-family="monospace" font-size="11" fill="#0F172A">Замена передних колодок</text>
     <text x="360" y="235" text-anchor="end" font-family="monospace" font-size="11" fill="#0f172a">2 200 ₽</text>
     
-    <line x1="40" y1="255" x2="360" y2="255" stroke="#cbd5e1"/>
+    <line x1="40" y1="255" x2="360" y2="255" stroke="#E2E8F0"/>
     <text x="40" y="280" font-family="monospace" font-weight="bold" font-size="12" fill="#0f172a">ЗАПЧАСТИ И РАСХОДНИКИ:</text>
-    <text x="40" y="300" font-family="monospace" font-size="11" fill="#334155">Масло Motul 8100 X-cess 5W-40 (4.5л)</text>
+    <text x="40" y="300" font-family="monospace" font-size="11" fill="#0F172A">Масло Motul 8100 X-cess 5W-40 (4.5л)</text>
     <text x="360" y="300" text-anchor="end" font-family="monospace" font-size="11" fill="#0f172a">6 200 ₽</text>
-    <text x="40" y="320" font-family="monospace" font-size="11" fill="#334155">Фильтр масляный Mann W67/1</text>
+    <text x="40" y="320" font-family="monospace" font-size="11" fill="#0F172A">Фильтр масляный Mann W67/1</text>
     <text x="360" y="320" text-anchor="end" font-family="monospace" font-size="11" fill="#0f172a">750 ₽</text>
-    <text x="40" y="340" font-family="monospace" font-size="11" fill="#334155">Колодки передние Brembo P56062</text>
+    <text x="40" y="340" font-family="monospace" font-size="11" fill="#0F172A">Колодки передние Brembo P56062</text>
     <text x="360" y="340" text-anchor="end" font-family="monospace" font-size="11" fill="#0f172a">3 950 ₽</text>
     
     <line x1="40" y1="370" x2="360" y2="370" stroke="#0f172a" stroke-width="1.5"/>
     <text x="40" y="400" font-family="monospace" font-weight="bold" font-size="14" fill="#0f172a">ИТОГО К ОПЛАТЕ:</text>
-    <text x="360" y="400" text-anchor="end" font-family="monospace" font-weight="bold" font-size="16" fill="#e11d48">14 900 ₽</text>
+    <text x="360" y="400" text-anchor="end" font-family="monospace" font-weight="bold" font-size="16" fill="#EF3038">14 900 ₽</text>
     
-    <text x="200" y="445" text-anchor="middle" font-family="monospace" font-size="11" fill="#16a34a">✓ ОПЛАЧЕНО КАРТОЙ МИР *4108</text>
+    <text x="200" y="445" text-anchor="middle" font-family="monospace" font-size="11" fill="#047857">✓ ОПЛАЧЕНО КАРТОЙ МИР *4108</text>
     <text x="200" y="465" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8">Гарантия на работы и запчасти: 12 мес. / 20 000 км</text>
     <rect x="170" y="475" width="60" height="20" fill="#e2e8f0" rx="3"/>
-    <text x="200" y="489" text-anchor="middle" font-family="monospace" font-size="9" fill="#475569">QR-ЧЕК ФНС</text>
+    <text x="200" y="489" text-anchor="middle" font-family="monospace" font-size="9" fill="#64748B">QR-ЧЕК ФНС</text>
   </svg>
 `);
 

@@ -75,7 +75,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   localStorage.setItem(DISTANCE_UNIT_KEY, "km");
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  distanceUnit === "km" ? "bg-red-600 text-white" : "text-neutral-500"
+                  distanceUnit === "km" ? "bg-brand-strong text-white" : "text-neutral-500"
                 }`}
               >
                 Км (km)
@@ -86,7 +86,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   localStorage.setItem(DISTANCE_UNIT_KEY, "mi");
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  distanceUnit === "mi" ? "bg-red-600 text-white" : "text-neutral-500"
+                  distanceUnit === "mi" ? "bg-brand-strong text-white" : "text-neutral-500"
                 }`}
               >
                 Мили (mi)
@@ -103,7 +103,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   localStorage.setItem(VOLUME_UNIT_KEY, "l");
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  volumeUnit === "l" ? "bg-red-600 text-white" : "text-neutral-500"
+                  volumeUnit === "l" ? "bg-brand-strong text-white" : "text-neutral-500"
                 }`}
               >
                 Литры (L)
@@ -114,7 +114,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   localStorage.setItem(VOLUME_UNIT_KEY, "gal");
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                  volumeUnit === "gal" ? "bg-red-600 text-white" : "text-neutral-500"
+                  volumeUnit === "gal" ? "bg-brand-strong text-white" : "text-neutral-500"
                 }`}
               >
                 Галлоны (Gal)
@@ -133,7 +133,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     localStorage.setItem(GARAGE_CURRENCY_KEY, cur);
                   }}
                   className={`px-2.5 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
-                    currency === cur ? "bg-red-600 text-white" : "text-neutral-500"
+                    currency === cur ? "bg-brand-strong text-white" : "text-neutral-500"
                   }`}
                 >
                   {cur === "rub" ? "₽" : cur === "usd" ? "$" : "€"}
@@ -163,7 +163,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 setNotifyService(e.target.checked);
                 localStorage.setItem(NOTIFY_SERVICE_KEY, String(e.target.checked));
               }}
-              className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-brand-strong rounded cursor-pointer"
             />
           </div>
 
@@ -181,7 +181,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 setNotifyAi(e.target.checked);
                 localStorage.setItem(NOTIFY_AI_KEY, String(e.target.checked));
               }}
-              className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+              className="w-4 h-4 accent-brand-strong rounded cursor-pointer"
             />
           </div>
         </div>
@@ -204,7 +204,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onClick={() => handleThemeVariant(th.id)}
                 className={`p-2.5 rounded-xl border text-center font-bold text-[11px] transition cursor-pointer ${
                   variantActive(th.id)
-                    ? "bg-red-600 text-white border-red-500 shadow-md shadow-red-600/30"
+                    ? "bg-brand-strong text-white border-brand shadow-md shadow-brand-strong/30"
                     : "bg-neutral-950 text-neutral-400 border-neutral-800"
                 }`}
               >

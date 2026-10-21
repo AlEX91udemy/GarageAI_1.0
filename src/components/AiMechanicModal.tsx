@@ -153,7 +153,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
             </div>
             <div>
               <div className="text-[11px] font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1">
-                GarageHub Rev • Диагностический AI-ассистент
+                Garage AI Rev • Диагностический AI-ассистент
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
                 Есть проблема? Разберёмся
@@ -271,7 +271,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 <span
                   className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
                     diagnosticResult.urgency === "high"
-                      ? "bg-red-100 text-red-700"
+                      ? "bg-brand-soft-strong text-brand-hover"
                       : "bg-amber-100 text-amber-700"
                   }`}
                 >
@@ -321,7 +321,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
               {diagnosticResult.recommendedParts && diagnosticResult.recommendedParts.length > 0 && (
                 <div>
                   <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Package className="w-3 h-3 text-red-600" />
+                    <Package className="w-3 h-3 text-brand-strong" />
                     <span>Рекомендуемые запчасти и проверенные бренды:</span>
                   </div>
                   <div className="space-y-1 text-xs">
@@ -334,7 +334,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                           <span className="font-semibold text-neutral-900">{part.name}</span>{" "}
                           <span className="text-neutral-500">({part.brand})</span>
                         </div>
-                        <span className="font-mono text-xs font-bold text-red-600">
+                        <span className="font-mono text-xs font-bold text-brand-strong">
                           {part.partNumber}
                         </span>
                       </div>

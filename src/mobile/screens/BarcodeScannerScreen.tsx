@@ -472,7 +472,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-neutral-950 text-white select-none relative overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-[#F4F5F8] text-neutral-900 select-none relative overflow-hidden">
       {/* Hidden processing canvas & file input */}
       <canvas ref={canvasRef} className="hidden" />
       <input
@@ -485,18 +485,18 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       />
 
       {/* TOP HEADER */}
-      <header className="sticky top-0 z-30 bg-neutral-950/85 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-800">
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-neutral-200">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-neutral-300 hover:text-white cursor-pointer active:scale-95 transition"
+          className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 cursor-pointer active:scale-95 transition"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Назад</span>
         </button>
 
         <div className="flex items-center gap-1.5">
-          <Scan className="w-4 h-4 text-red-500 animate-pulse" />
-          <span className="text-xs font-black text-white tracking-tight">
+          <Scan className="w-4 h-4 text-brand-strong animate-pulse" />
+          <span className="text-xs font-black text-neutral-900 tracking-tight">
             Сканер штрихкодов & VIN
           </span>
         </div>
@@ -504,7 +504,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         {/* Upload from gallery fallback button */}
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="w-8 h-8 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 flex items-center justify-center transition cursor-pointer"
+          className="w-8 h-8 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 flex items-center justify-center transition cursor-pointer border border-neutral-200"
           title="Загрузить фото из галереи"
         >
           <Upload className="w-4 h-4" />
@@ -512,17 +512,17 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       </header>
 
       {/* TARGET FORM SELECTOR TABS */}
-      <div className="px-4 py-2 bg-neutral-900/90 border-b border-neutral-800/80 flex items-center justify-between gap-2 z-20">
-        <span className="text-[11px] font-bold text-neutral-400 shrink-0">
+      <div className="px-4 py-2 bg-white border-b border-neutral-200 flex items-center justify-between gap-2 z-20">
+        <span className="text-[11px] font-bold text-neutral-500 shrink-0">
           Заполнить форму:
         </span>
-        <div className="flex p-0.5 bg-neutral-950 rounded-xl border border-neutral-800">
+        <div className="flex p-0.5 bg-neutral-100 rounded-xl border border-neutral-200">
           <button
             onClick={() => setTargetForm("part")}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
               targetForm === "part"
-                ? "bg-red-600 text-white shadow-xs"
-                : "text-neutral-400 hover:text-white"
+                ? "bg-brand-strong text-white shadow-xs"
+                : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
             <Package className="w-3 h-3" />
@@ -533,7 +533,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             className={`px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
               targetForm === "service"
                 ? "bg-blue-600 text-white shadow-xs"
-                : "text-neutral-400 hover:text-white"
+                : "text-neutral-600 hover:text-neutral-900"
             }`}
           >
             <Wrench className="w-3 h-3" />
@@ -543,7 +543,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       </div>
 
       {/* SCANNER VIEWPORT AREA */}
-      <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-black">
+      <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-neutral-200">
         {/* Live Camera Video */}
         <video
           ref={videoRef}
@@ -555,27 +555,27 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
 
         {/* Camera Permission / Error Warning Fallback */}
         {hasCameraPermission === false && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-neutral-950/90 text-center backdrop-blur-md">
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 bg-white/95 text-center backdrop-blur-md">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mb-3">
               <Camera className="w-7 h-7" />
             </div>
-            <h3 className="text-sm font-bold text-white mb-1">
+            <h3 className="text-sm font-bold text-neutral-900 mb-1">
               {cameraError || "Камера недоступна"}
             </h3>
-            <p className="text-xs text-neutral-400 max-w-xs mb-4">
+            <p className="text-xs text-neutral-600 max-w-xs mb-4">
               Вы можете загрузить фото упаковки со штрихкодом из файлов или нажать на готовый тестовый штрихкод ниже.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold flex items-center gap-2 border border-neutral-700 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold flex items-center gap-2 border border-neutral-300 cursor-pointer"
               >
-                <Upload className="w-4 h-4 text-red-400" />
+                <Upload className="w-4 h-4 text-brand-on-dark" />
                 <span>Загрузить фото</span>
               </button>
               <button
                 onClick={startCamera}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-2 cursor-pointer"
               >
                 <RefreshCw className="w-4 h-4" />
                 <span>Повторить</span>
@@ -587,48 +587,48 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         {/* Darkened Vignette Mask around target viewport */}
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
           {/* Top backdrop */}
-          <div className="w-full flex-1 bg-black/55 backdrop-blur-[1px]" />
+          <div className="w-full flex-1 bg-white/55 backdrop-blur-[1px]" />
 
           {/* Middle Row with Viewfinder */}
           <div className="w-full flex items-center justify-center">
-            <div className="w-6 sm:w-10 flex-1 h-64 bg-black/55 backdrop-blur-[1px]" />
+            <div className="w-6 sm:w-10 flex-1 h-64 bg-white/55 backdrop-blur-[1px]" />
 
             {/* Targeted Reticle Box */}
             <div
               className={`relative w-72 h-56 rounded-3xl border-2 transition-all duration-300 flex items-center justify-center overflow-hidden shadow-2xl ${
                 scannedResult
                   ? "border-emerald-500 shadow-emerald-500/30"
-                  : "border-red-500/80 shadow-red-500/20"
+                  : "border-brand/80 shadow-brand/20"
               }`}
             >
               {/* Corner Brackets */}
-              <div className="absolute top-2 left-2 w-6 h-6 border-t-3 border-l-3 border-red-500 rounded-tl-xl" />
-              <div className="absolute top-2 right-2 w-6 h-6 border-t-3 border-r-3 border-red-500 rounded-tr-xl" />
-              <div className="absolute bottom-2 left-2 w-6 h-6 border-b-3 border-l-3 border-red-500 rounded-bl-xl" />
-              <div className="absolute bottom-2 right-2 w-6 h-6 border-b-3 border-r-3 border-red-500 rounded-br-xl" />
+              <div className="absolute top-2 left-2 w-6 h-6 border-t-3 border-l-3 border-brand rounded-tl-xl" />
+              <div className="absolute top-2 right-2 w-6 h-6 border-t-3 border-r-3 border-brand rounded-tr-xl" />
+              <div className="absolute bottom-2 left-2 w-6 h-6 border-b-3 border-l-3 border-brand rounded-bl-xl" />
+              <div className="absolute bottom-2 right-2 w-6 h-6 border-b-3 border-r-3 border-brand rounded-br-xl" />
 
               {/* Scanning Laser Beam Line */}
               {!scannedResult && (
-                <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_14px_rgba(239,68,68,1)] animate-[pulse_1.5s_ease-in-out_infinite]" />
+                <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-brand to-transparent shadow-[0_0_14px_rgba(239,48,56,1)] animate-[pulse_1.5s_ease-in-out_infinite]" />
               )}
 
               {/* Central Target Crosshair */}
               <div className="w-8 h-8 rounded-full border border-dashed border-white/30 flex items-center justify-center pointer-events-none">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500/80" />
+                <div className="w-1.5 h-1.5 rounded-full bg-brand/80" />
               </div>
 
               {/* Target Format Hint */}
               <div className="absolute bottom-2 bg-neutral-950/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-neutral-700 text-[10px] text-neutral-300 font-mono flex items-center gap-1.5">
-                <Barcode className="w-3 h-3 text-red-400" />
+                <Barcode className="w-3 h-3 text-brand-on-dark" />
                 <span>EAN-13 • QR-код • VIN Code 39</span>
               </div>
             </div>
 
-            <div className="w-6 sm:w-10 flex-1 h-64 bg-black/55 backdrop-blur-[1px]" />
+            <div className="w-6 sm:w-10 flex-1 h-64 bg-white/55 backdrop-blur-[1px]" />
           </div>
 
           {/* Bottom backdrop */}
-          <div className="w-full flex-1 bg-black/55 backdrop-blur-[1px]" />
+          <div className="w-full flex-1 bg-white/55 backdrop-blur-[1px]" />
         </div>
 
         {/* Viewfinder Top Controls (Torch, Flip) */}
@@ -659,7 +659,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         {/* Current Vehicle Badge */}
         <div className="absolute top-3 left-3 z-20">
           <div className="px-2.5 py-1 rounded-xl bg-neutral-900/80 backdrop-blur-md border border-neutral-700 text-[11px] text-neutral-300 flex items-center gap-1.5">
-            <Car className="w-3.5 h-3.5 text-red-400" />
+            <Car className="w-3.5 h-3.5 text-brand-on-dark" />
             <span className="font-bold truncate max-w-[140px]">
               {vehicle.make} {vehicle.model}
             </span>
@@ -709,7 +709,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
               <div>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider font-mono">
+                    <span className="text-[10px] font-bold text-brand-on-dark uppercase tracking-wider font-mono">
                       {scannedResult.partInfo.brand}
                     </span>
                     <h4 className="text-sm font-black text-white leading-snug">
@@ -745,7 +745,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             {scannedResult.vinInfo && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-red-400 font-mono">
+                  <span className="text-xs font-bold text-brand-on-dark font-mono">
                     {scannedResult.vinInfo.vin}
                   </span>
                   <span className="text-[10px] text-neutral-400">
@@ -772,7 +772,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             {/* AUTOMATIC API VERIFICATION & STOCK STATUS CARD */}
             {isCheckingAvailability ? (
               <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center gap-2 text-xs text-neutral-400 animate-pulse">
-                <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                <Loader2 className="w-4 h-4 animate-spin text-brand-strong" />
                 <span>Автоматическая проверка наличия и цен в базе API...</span>
               </div>
             ) : availabilityInfo ? (
@@ -928,7 +928,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
               onClick={handleApplyAsPart}
               className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow-md ${
                 targetForm === "part"
-                  ? "bg-red-600 hover:bg-red-500 text-white shadow-red-600/30"
+                  ? "bg-brand-strong hover:bg-brand text-white shadow-brand-strong/30"
                   : "bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700"
               }`}
             >
@@ -974,7 +974,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                 onClick={() => handleDetectedCode(demo.code)}
                 className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-left shrink-0 text-xs transition cursor-pointer active:scale-95 flex items-center gap-2 group"
               >
-                <div className="w-6 h-6 rounded-lg bg-neutral-900 text-red-400 flex items-center justify-center font-mono text-[10px] group-hover:scale-110 transition-transform">
+                <div className="w-6 h-6 rounded-lg bg-neutral-900 text-brand-on-dark flex items-center justify-center font-mono text-[10px] group-hover:scale-110 transition-transform">
                   {demo.badge.includes("VIN") || demo.badge.includes("Кузов") ? (
                     <Car className="w-3.5 h-3.5" />
                   ) : demo.badge.includes("QR") ? (

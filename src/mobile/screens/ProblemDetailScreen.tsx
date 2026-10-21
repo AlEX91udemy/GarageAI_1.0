@@ -49,7 +49,7 @@ export const ProblemDetailScreen: React.FC<ProblemDetailScreenProps> = ({
         <span
           className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
             isHigh
-              ? "bg-rose-50 text-rose-700 border border-rose-200"
+              ? "bg-brand-soft text-brand-hover border border-brand-border"
               : "bg-amber-50 text-amber-700 border border-amber-200"
           }`}
         >
@@ -62,7 +62,7 @@ export const ProblemDetailScreen: React.FC<ProblemDetailScreenProps> = ({
         <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle
-              className={`w-5 h-5 ${isHigh ? "text-rose-600" : "text-amber-600"}`}
+              className={`w-5 h-5 ${isHigh ? "text-brand-strong" : "text-amber-600"}`}
             />
             <span className="text-xs font-mono text-neutral-500 uppercase">
               {task.category}
@@ -98,7 +98,7 @@ export const ProblemDetailScreen: React.FC<ProblemDetailScreenProps> = ({
               БОРТОВАЯ ДИАГНОСТИКА:
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-rose-600">
+              <span className="text-xs font-mono font-bold text-brand-strong">
                 P0171 / O2 Sensor Fuel Trim System Too Lean
               </span>
               <span className="text-[10px] text-neutral-500 font-mono bg-white px-2 py-0.5 rounded border border-neutral-200">
@@ -137,7 +137,7 @@ export const ProblemDetailScreen: React.FC<ProblemDetailScreenProps> = ({
         <div className="space-y-2 pt-2">
           <button
             onClick={() => onScheduleRepair?.(task)}
-            className="w-full py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-red-600/30 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-3.5 px-4 rounded-2xl bg-brand-strong hover:bg-brand text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-brand-strong/30 active:scale-[0.98] transition cursor-pointer"
           >
             <Wrench className="w-4 h-4" />
             <span>Записать в журнал ремонта / ТО</span>

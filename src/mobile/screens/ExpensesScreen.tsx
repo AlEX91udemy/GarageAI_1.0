@@ -6,6 +6,7 @@ import {
   Plus,
   Calendar,
   Gauge,
+  Wrench,
   Camera,
   Droplet,
   Trash2,
@@ -14,7 +15,7 @@ import { Vehicle, ServiceRecord, FuelRecord, GaragePart } from "../../types";
 import { formatGarageCurrency } from "../currency";
 import { formatDistance, formatVolume, formatConsumption, distanceUnitLabel, volumeUnitLabel } from "../units";
 
-const EXPENSE_COLORS = ["#ef4444", "#f59e0b", "#3b82f6"];
+const EXPENSE_COLORS = ["#EF3038", "#f59e0b", "#3b82f6"];
 
 function polarPoint(cx: number, cy: number, radius: number, angle: number) {
   return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
@@ -62,10 +63,18 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   );
 
   // Totals
-  const fuelTotal = vehicleFuel.reduce((sum, r) => sum + r.totalCost, 0);
-  const serviceTotal = vehicleServices.reduce((sum, r) => sum + r.totalCost, 0);
+  const finiteAmount = (value: unknown) => {
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount >= 0 ? amount : 0;
+  };
+  const finiteMileage = (value: unknown) => {
+    const mileage = Number(value);
+    return Number.isFinite(mileage) && mileage > 0 ? mileage : null;
+  };
+  const fuelTotal = vehicleFuel.reduce((sum, r) => sum + finiteAmount(r.totalCost), 0);
+  const serviceTotal = vehicleServices.reduce((sum, r) => sum + finiteAmount(r.totalCost), 0);
   const partsTotal = vehicleParts.reduce(
-    (sum, p) => sum + p.purchasePrice * p.quantity,
+    (sum, p) => sum + finiteAmount(p.purchasePrice) * Math.max(0, Number(p.quantity) || 0),
     0
   );
   const grandTotal = fuelTotal + serviceTotal + partsTotal;
@@ -91,12 +100,13 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   const mileagePoints = [
     ...vehicleServices.map((record) => record.mileage),
     ...vehicleFuel.map((record) => record.mileage),
-  ].filter((mileage) => Number.isFinite(mileage));
+  ].map(finiteMileage).filter((mileage): mileage is number => mileage !== null);
   const startMileage =
     mileagePoints.length > 0
       ? Math.min(...mileagePoints)
-      : Math.max(0, vehicle.currentMileage - 30000);
-  const trackedMileage = Math.max(1, vehicle.currentMileage - startMileage);
+      : Math.max(0, (finiteMileage(vehicle.currentMileage) || 0) - 30000);
+  const currentMileage = finiteMileage(vehicle.currentMileage) || 0;
+  const trackedMileage = Math.max(1, currentMileage - startMileage);
   const costPerKm = grandTotal > 0 ? (grandTotal / trackedMileage).toFixed(2) : "0.00";
   const fuelCostPerKm = fuelTotal > 0 ? (fuelTotal / trackedMileage).toFixed(2) : "0.00";
 
@@ -104,8 +114,8 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
     {
       name: "Топливо",
       cost: fuelTotal,
-      color: "bg-red-500",
-      textColor: "text-red-600",
+      color: "bg-brand",
+      textColor: "text-brand-strong",
       percent: grandTotal ? Math.round((fuelTotal / grandTotal) * 100) : 0,
     },
     {
@@ -132,9 +142,9 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
   };
 
   return (
-      <div className="flex flex-col w-full pb-10 bg-neutral-100 dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
+      <div className="flex flex-col w-full pb-10 bg-[#F4F5F8] dark:bg-[#0d131d] text-neutral-900 dark:text-white select-none">
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 dark:border-[#1f2c3f] bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md sticky top-0 z-20 shadow-xs">
+      <div className="px-4 pt-4 pb-3 border-b border-neutral-200/80 dark:border-[#243044] bg-white/90 dark:bg-[#17202e]/95 backdrop-blur-md sticky top-0 z-20 shadow-xs">
         <div>
           <div>
             <h2 className="text-xl font-black text-neutral-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -148,7 +158,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
         </div>
 
         {/* 2 Tabs: Сводка расходов vs Дневник заправок */}
-        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#2b3a50]">
+        <div className="mt-3 grid grid-cols-2 p-1 bg-neutral-200/70 dark:bg-[#1c2637] rounded-2xl border border-neutral-200 dark:border-[#243044]">
           <button
             onClick={() => setActiveTab("summary")}
             className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer ${
@@ -181,15 +191,15 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
           <div className="space-y-3.5">
             {/* SMART OCR RECEIPT SCANNER BANNER (Identical description moved from Home menu) */}
             {onScanReceipt && (
-              <div className="bg-white dark:bg-[#17202e] text-neutral-900 dark:text-white p-4 rounded-3xl border border-neutral-200 dark:border-[#233044] shadow-xs flex items-center justify-between gap-3">
+              <div className="bg-white dark:bg-[#17202e] text-neutral-900 dark:text-white p-4 rounded-3xl border border-neutral-200 dark:border-[#243044] shadow-xs flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-brand-soft dark:bg-brand-strong/20 text-brand-strong dark:text-brand-on-dark border border-brand-border dark:border-brand/30 flex items-center justify-center shrink-0">
                     <Camera className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
                       <span>Умный сканер</span>
-                      <span className="text-[9px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                      <span className="text-[9px] bg-brand-strong text-white font-bold px-1.5 py-0.5 rounded-full">
                         OCR + AI
                       </span>
                     </div>
@@ -202,7 +212,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                 <button
                   type="button"
                   onClick={onScanReceipt}
-                  className="px-3 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-red-600/30 whitespace-nowrap active:scale-95 shrink-0"
+                  className="px-3 py-2 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-brand-strong/30 whitespace-nowrap active:scale-95 shrink-0"
                 >
                   Скан
                 </button>
@@ -229,9 +239,9 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: "cost_per_km", label: "Стоимость 1 " + distanceUnitLabel(), value: formatGarageCurrency(Number(costPerKm)), icon: <Gauge className="w-3 h-3 text-emerald-600" /> },
-                  { key: "fuel_cost_km", label: "Средний расход", value: avgConsumption === "—" ? "—" : formatConsumption(parseFloat(avgConsumption)), icon: <Fuel className="w-3 h-3 text-red-600" /> },
-                  { key: "service_total", label: "ТО и ремонт", value: formatGarageCurrency(serviceTotal), icon: <Gauge className="w-3 h-3 text-amber-600" /> },
-                  { key: "fuel_total", label: "Всего топливо", value: formatGarageCurrency(fuelTotal), icon: <Fuel className="w-3 h-3 text-red-600" /> },
+                  { key: "fuel_cost_km", label: "Средний расход", value: avgConsumption === "—" ? "—" : formatConsumption(parseFloat(avgConsumption)), icon: <Fuel className="w-3 h-3 text-brand-strong" /> },
+                  { key: "service_total", label: "ТО и ремонт", value: formatGarageCurrency(serviceTotal), icon: <Wrench className="w-3 h-3 text-amber-600" /> },
+                  { key: "fuel_total", label: "Всего топливо", value: formatGarageCurrency(fuelTotal), icon: <Droplet className="w-3 h-3 text-brand-strong" /> },
                 ].map(({ key, label, value, icon }) => (
                   <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
                     <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-neutral-300" : "text-neutral-500"}`}>{icon}{label}</span>
@@ -331,7 +341,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   }}
                 >
                   {onDeleteFuel && (
-                    <button type="button" aria-label="Удалить запись о заправке" onClick={() => { onDeleteFuel(record.id); setSwipedRecordId(null); }} className="absolute inset-y-0 right-0 w-20 bg-red-600 text-white flex flex-col items-center justify-center gap-1 text-[10px] font-bold">
+                    <button type="button" aria-label="Удалить запись о заправке" onClick={() => { onDeleteFuel(record.id); setSwipedRecordId(null); }} className="absolute inset-y-0 right-0 w-20 bg-brand-strong text-white flex flex-col items-center justify-center gap-1 text-[10px] font-bold">
                       <Trash2 className="w-4 h-4" />
                       <span>Удалить</span>
                     </button>
@@ -340,7 +350,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 border border-red-200">
+                        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-brand-soft-strong text-brand-hover border border-brand-border">
                           {record.fuelType || "АИ-95"}
                         </span>
                         <span className="text-xs font-bold text-neutral-900">
@@ -370,7 +380,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                           aria-label="Удалить запись о заправке"
                           title="Удалить запись"
                           onClick={() => { onDeleteFuel(record.id); setSwipedRecordId(null); }}
-                          className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 flex items-center justify-center transition"
+                          className="w-7 h-7 rounded-lg text-brand-strong hover:bg-brand-soft hover:text-brand-hover flex items-center justify-center transition"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

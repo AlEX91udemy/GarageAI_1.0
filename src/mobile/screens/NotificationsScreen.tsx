@@ -109,8 +109,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
           onClick={handleMarkAllRead}
           className={`text-[11px] font-medium cursor-pointer ${
             isDark
-              ? "text-red-400 hover:text-red-300"
-              : "text-red-600 hover:text-red-500"
+              ? "text-brand-on-dark hover:text-brand-light"
+              : "text-brand-strong hover:text-brand-strong"
           }`}
         >
           Прочитать все
@@ -128,7 +128,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
               item.isRead
                 ? isDark
                   ? "bg-neutral-900/60 border-neutral-800 opacity-80"
-                  : "bg-[#FAFAFC] border-neutral-200 opacity-80"
+                  : "bg-[#F8FAFC] border-neutral-200 opacity-80"
                 : isDark
                   ? "bg-neutral-900 border-neutral-700 shadow-md"
                   : "bg-white border-[#E2E8F0] shadow-xs"
@@ -141,8 +141,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                     ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                     : "bg-amber-50 text-amber-600 border border-amber-200"
                   : isDark
-                    ? "bg-red-500/15 text-red-400 border border-red-500/30"
-                    : "bg-red-50 text-red-600 border border-red-200"
+                    ? "bg-brand/15 text-brand-on-dark border border-brand/30"
+                    : "bg-brand-soft text-brand-strong border border-brand-border"
               }`}
             >
               {item.category === "ai" ? (
@@ -168,7 +168,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                   {item.title}
                 </h4>
                 {!item.isRead && (
-                  <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
                 )}
               </div>
 
@@ -188,7 +188,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                 <span>{item.date}</span>
                 <span
                   className={`flex items-center gap-0.5 ${
-                    isDark ? "text-red-400" : "text-red-600"
+                    isDark ? "text-brand-on-dark" : "text-brand-strong"
                   }`}
                 >
                   Открыть <ChevronRight className="w-3 h-3" />

@@ -17,12 +17,12 @@ import { Vehicle, ServiceRecord, FuelRecord } from "../types";
 // Palette for expense category chart slices and badges
 const CATEGORY_PALETTE = [
   { hex: "#10b981", bg: "bg-emerald-500", text: "text-emerald-700", ring: "ring-emerald-400" },
-  { hex: "#ef4444", bg: "bg-red-500", text: "text-red-700", ring: "ring-red-400" },
+  { hex: "#EF3038", bg: "bg-brand", text: "text-brand-strong", ring: "ring-brand-border" },
   { hex: "#3b82f6", bg: "bg-blue-500", text: "text-blue-700", ring: "ring-blue-400" },
   { hex: "#f59e0b", bg: "bg-amber-500", text: "text-amber-700", ring: "ring-amber-400" },
-  { hex: "#8b5cf6", bg: "bg-purple-500", text: "text-purple-700", ring: "ring-purple-400" },
-  { hex: "#ec4899", bg: "bg-pink-500", text: "text-pink-700", ring: "ring-pink-400" },
-  { hex: "#06b6d4", bg: "bg-cyan-500", text: "text-cyan-700", ring: "ring-cyan-400" },
+  { hex: "#8b5cf6", bg: "bg-chart-5", text: "text-chart-5-strong", ring: "ring-chart-5" },
+  { hex: "#ec4899", bg: "bg-chart-7", text: "text-chart-7-strong", ring: "ring-chart-7" },
+  { hex: "#06b6d4", bg: "bg-chart-6", text: "text-chart-6-strong", ring: "ring-chart-6" },
   { hex: "#6b7280", bg: "bg-neutral-500", text: "text-neutral-700", ring: "ring-neutral-400" },
 ];
 
@@ -261,7 +261,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
             Финансовая аналитика и учёт топлива
           </div>
           <h2 className="text-2xl font-extrabold text-neutral-900 tracking-tight">
-            Аналитика затрат • {vehicle.make} {vehicle.model}
+            Аналитика затрат
           </h2>
           <p className="text-xs text-neutral-500">
             Всего учтено расходов на сумму{" "}
@@ -399,8 +399,8 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
               }
               className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-95 ${
                 selectedMetric === "service_total"
-                  ? "bg-red-50/90 border-red-400 ring-2 ring-red-500 shadow-md scale-[1.01]"
-                  : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-red-200"
+                  ? "bg-brand-soft/90 border-brand-light ring-2 ring-brand-border shadow-md scale-[1.01]"
+                  : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-brand-border"
               }`}
               title="Нажмите, чтобы выделить статьи ТО и ремонтов в структуре затрат"
             >
@@ -411,14 +411,14 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                 <span
                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase transition shrink-0 ${
                     selectedMetric === "service_total"
-                      ? "bg-red-600 text-white"
-                      : "bg-red-100 text-red-800"
+                      ? "bg-brand-strong text-white"
+                      : "bg-brand-soft-strong text-brand-hover"
                   }`}
                 >
                   {selectedMetric === "service_total" ? "Активен ✓" : "Ремонты"}
                 </span>
               </div>
-              <div className="text-xl font-extrabold text-red-600 font-mono mt-1">
+              <div className="text-xl font-extrabold text-brand-strong font-mono mt-1">
                 {totalServiceCost.toLocaleString("ru-RU")} ₽
               </div>
               <div className="text-[10px] text-neutral-400 mt-0.5">
@@ -756,7 +756,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                             cat === "Топливо"
                           ? "bg-emerald-50/90 border-emerald-400 ring-2 ring-emerald-500/70 scale-[1.02] shadow-sm"
                           : selectedMetric === "service_total" && cat !== "Топливо"
-                          ? "bg-red-50/90 border-red-400 ring-2 ring-red-400/60 scale-[1.01] shadow-xs"
+                          ? "bg-brand-soft/90 border-brand-light ring-2 ring-brand-border/60 scale-[1.01] shadow-xs"
                           : isHovered
                           ? "bg-neutral-100 border-neutral-300 ring-2 ring-neutral-400/30 scale-[1.01]"
                           : "bg-neutral-50 border-neutral-100 hover:bg-neutral-100/70"
@@ -787,7 +787,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                               </span>
                             )}
                             {selectedMetric === "service_total" && cat !== "Топливо" && (
-                              <span className="text-[9px] font-bold text-red-800 bg-red-100 px-1.5 py-0.5 rounded-full">
+                              <span className="text-[9px] font-bold text-brand-hover bg-brand-soft-strong px-1.5 py-0.5 rounded-full">
                                 ✓ Ремонты / ТО
                               </span>
                             )}

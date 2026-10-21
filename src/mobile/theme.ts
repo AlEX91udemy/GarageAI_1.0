@@ -31,17 +31,17 @@ export const THEME = {
   colors: {
     // Brand Accent
     brand: {
-      primary: "#B7F34A",
-      glow: "#D1FF83",
-      dark: "#8CBF32",
-      surface: "rgba(183, 243, 74, 0.12)",
-      gradient: "from-[#B7F34A] to-[#8CBF32]",
+      primary: "#EF3038",
+      glow: "#FCA5A5",
+      dark: "#B91C1C",
+      surface: "rgba(239, 48, 56, 0.12)",
+      gradient: "from-[#EF3038] to-[#B91C1C]",
     },
     dark: {
       canvas: "#0d131d",
       card: "#17202e",
       cardElevated: "#1e293b",
-      border: "#233044",
+      border: "#243044",
       borderSubtle: "#1c2637",
       textPrimary: "#FFFFFF",
       textSecondary: "#94A3B8",
@@ -59,9 +59,9 @@ export const THEME = {
     },
     status: {
       critical: {
-        bg: "bg-rose-500/10",
-        border: "border-rose-500/30",
-        text: "text-rose-500",
+        bg: "bg-brand/10",
+        border: "border-brand/30",
+        text: "text-brand-strong dark:text-brand-on-dark",
       },
       warning: {
         bg: "bg-amber-500/10",

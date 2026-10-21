@@ -47,7 +47,7 @@ export const BeforeAfterScreen: React.FC<BeforeAfterScreenProps> = ({
           <button
             onClick={() => setViewMode("slider")}
             className={`p-1.5 rounded-md transition cursor-pointer ${
-              viewMode === "slider" ? "bg-neutral-800 text-cyan-400" : "text-neutral-500"
+              viewMode === "slider" ? "bg-neutral-800 text-brand-on-dark" : "text-neutral-500"
             }`}
             title="Интерактивный слайдер"
           >
@@ -56,7 +56,7 @@ export const BeforeAfterScreen: React.FC<BeforeAfterScreenProps> = ({
           <button
             onClick={() => setViewMode("side_by_side")}
             className={`p-1.5 rounded-md transition cursor-pointer ${
-              viewMode === "side_by_side" ? "bg-neutral-800 text-cyan-400" : "text-neutral-500"
+              viewMode === "side_by_side" ? "bg-neutral-800 text-brand-on-dark" : "text-neutral-500"
             }`}
             title="Бок о бок"
           >
@@ -177,15 +177,15 @@ export const BeforeAfterScreen: React.FC<BeforeAfterScreenProps> = ({
 
           <div className="space-y-1.5 pt-2 border-t border-neutral-800/80 text-xs text-neutral-300">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-light" />
               <span>Лифт подвески +30 мм и усиленные пружины</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-light" />
               <span>Светодиодная оптика дальнего света на крыше</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-light" />
               <span>Антихром элементов решетки и защитное покрытие</span>
             </div>
           </div>

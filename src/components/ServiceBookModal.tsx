@@ -67,7 +67,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `GarageHub_${vehicle.make}_${vehicle.model}_ServiceBook.json`;
+    a.download = `Garage AI_${vehicle.make}_${vehicle.model}_ServiceBook.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -105,7 +105,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
                 <FileText className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-[11px] font-bold text-red-600 uppercase tracking-wider">
+                <div className="text-[11px] font-bold text-brand-strong uppercase tracking-wider">
                   Официальный документ для продажи авто
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-neutral-900 leading-tight">
@@ -117,7 +117,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => exportServiceBookToPdf(vehicle, serviceRecords)}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-red-600/25 active:scale-95"
+                className="px-3.5 py-1.5 bg-brand-strong hover:bg-brand text-white rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-md shadow-brand-strong/25 active:scale-95"
                 title="Экспорт сервисной книжки в PDF для печати или сохранения документа"
               >
                 <FileDown className="w-4 h-4" />
@@ -173,7 +173,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
               {/* Passport Car Cover */}
             <div className="p-4 sm:p-5 bg-neutral-900 text-white rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 text-red-500 text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2 text-brand-strong text-xs font-bold uppercase tracking-wider">
                   <ShieldCheck className="w-4 h-4" />
                   <span>Верифицированная сервисная история</span>
                 </div>
@@ -204,7 +204,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
                   <div className="font-bold text-emerald-400 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Проверено
                   </div>
-                  <div className="text-neutral-400">GarageHub Cloud</div>
+                  <div className="text-neutral-400">Garage AI Cloud</div>
                   <div className="text-neutral-400 font-mono text-[10px]">
                     {vehicleRecords.length} записей
                   </div>
@@ -286,9 +286,9 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
           /* Backup tab */
           <div className="mt-4 space-y-4 text-xs">
             {/* PDF Export Section */}
-            <div className="p-4 bg-gradient-to-br from-red-50/60 to-rose-50/30 rounded-2xl border border-red-200/80 space-y-2">
+            <div className="p-4 bg-gradient-to-br from-brand/60 to-brand/30 rounded-2xl border border-brand-border/80 space-y-2">
               <h4 className="font-bold text-neutral-900 flex items-center gap-1.5">
-                <FileDown className="w-4 h-4 text-red-600" />
+                <FileDown className="w-4 h-4 text-brand-strong" />
                 <span>Официальный экспорт сервисной книжки (PDF / Печать)</span>
               </h4>
               <p className="text-neutral-600 text-[11px] leading-relaxed">
@@ -298,7 +298,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
                 <button
                   type="button"
                   onClick={() => exportServiceBookToPdf(vehicle, serviceRecords)}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-red-600/20 active:scale-95"
+                  className="px-4 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-brand-strong/20 active:scale-95"
                 >
                   <FileDown className="w-4 h-4" />
                   <span>Экспорт в PDF (Сохранить / Печать)</span>
@@ -334,7 +334,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
 
             <form onSubmit={handleImportSubmit} className="p-4 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-2">
               <h4 className="font-bold text-neutral-900 flex items-center gap-1.5">
-                <Upload className="w-4 h-4 text-red-600" />
+                <Upload className="w-4 h-4 text-brand-strong" />
                 <span>Восстановить данные из бэкапа</span>
               </h4>
               <textarea
@@ -350,7 +350,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
                   className={`p-2.5 rounded-xl text-xs font-semibold ${
                     importStatus.type === "success"
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : "bg-red-50 text-red-700 border border-red-200"
+                      : "bg-brand-soft text-brand-hover border border-brand-border"
                   }`}
                 >
                   {importStatus.message}
@@ -358,7 +358,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
               )}
               <button
                 type="submit"
-                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition cursor-pointer"
+                className="px-4 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl transition cursor-pointer"
               >
                 Импортировать
               </button>
@@ -373,7 +373,7 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
           <button
             type="button"
             onClick={() => exportServiceBookToPdf(vehicle, serviceRecords)}
-            className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-red-600/20 active:scale-95"
+            className="px-4 py-2 text-xs font-bold text-white bg-brand-strong hover:bg-brand rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-md shadow-brand-strong/20 active:scale-95"
             title="Выгрузить сервисную книжку в PDF"
           >
             <FileDown className="w-4 h-4" />

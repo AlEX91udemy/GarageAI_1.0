@@ -5,7 +5,7 @@ import { pilotEvidence } from "./pilotEvidence";
 const retrievedAt = "2026-09-14";
 export const catalogSources: CatalogSource[] = [{
   id: "source-legacy-catalog",
-  source: "GarageHub legacy catalog (existing application data)",
+  source: "Garage AI legacy catalog (existing application data)",
   sourceUrl: null,
   sourceType: "legacy_catalog",
   documentName: null,

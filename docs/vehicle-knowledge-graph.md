@@ -1,6 +1,6 @@
-# GarageHub Vehicle Knowledge Graph
+# Garage AI Vehicle Knowledge Graph
 
-Существующий GarageHub использует React/Vite frontend, Express backend и атомарное JSON-хранилище `data/garage_store.json`. Пользовательский автомобиль остаётся совместимым с плоским типом `Vehicle`; нормализованный каталог размещён в `src/catalog` и строится из существующего `src/carCatalog.ts` без дубликатов визуальных ассетов.
+Существующий Garage AI использует React/Vite frontend, Express backend и атомарное JSON-хранилище `data/garage_store.json`. Пользовательский автомобиль остаётся совместимым с плоским типом `Vehicle`; нормализованный каталог размещён в `src/catalog` и строится из существующего `src/carCatalog.ts` без дубликатов визуальных ассетов.
 
 ## Каталог и происхождение
 

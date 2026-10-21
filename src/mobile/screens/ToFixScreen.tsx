@@ -62,7 +62,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
           </button>
           <button
             onClick={onAddTask}
-            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-red-600/30 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1 shadow-md shadow-brand-strong/30 transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Проблема</span>
@@ -83,7 +83,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
             onClick={() => setFilterPriority(f.id as any)}
             className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition cursor-pointer ${
               filterPriority === f.id
-                ? "bg-red-600 text-white shadow-sm"
+                ? "bg-brand-strong text-white shadow-sm"
                 : "bg-neutral-900 text-neutral-400 border border-neutral-800 hover:text-white"
             }`}
           >
@@ -117,7 +117,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
                   isCompleted
                     ? "bg-neutral-900/50 border-neutral-850 opacity-60"
                     : isHigh
-                    ? "bg-rose-500/10 border-rose-500/30"
+                    ? "bg-brand/10 border-brand/30"
                     : "bg-neutral-900 border-neutral-800 hover:border-neutral-700"
                 }`}
               >
@@ -126,7 +126,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
                     <span
                       className={`text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                         isHigh
-                          ? "bg-rose-500/25 text-rose-300 border border-rose-500/40"
+                          ? "bg-brand/25 text-brand-light border border-brand/40"
                           : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
                       }`}
                     >
@@ -166,7 +166,7 @@ export const ToFixScreen: React.FC<ToFixScreenProps> = ({
 
                 <div className="mt-3 flex items-center justify-between pt-2 border-t border-neutral-800/80 text-[11px] text-neutral-400">
                   <span>Срок: {task.dueDate || "По плану"}</span>
-                  <div className="flex items-center gap-1 text-red-400 font-semibold">
+                  <div className="flex items-center gap-1 text-brand-on-dark font-semibold">
                     <span>Подробнее</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </div>
