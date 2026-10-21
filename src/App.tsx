@@ -57,6 +57,7 @@ import {
   createReminder as apiCreateReminder,
   updateReminder as apiUpdateReminder,
   deleteReminder as apiDeleteReminder,
+  logout as apiLogout,
 } from "./api";
 import { CarHeader } from "./components/CarHeader";
 import { Dashboard } from "./components/Dashboard";
@@ -148,6 +149,7 @@ export default function App() {
 
   // Server state
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [garageLoaded, setGarageLoaded] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
 
   // Active Modals
@@ -178,6 +180,7 @@ export default function App() {
   >(undefined);
 
   const handleAuthSuccess = async () => {
+    // Авторизация из мобильного профиля не должна менять выбранный интерфейс.
     try {
       const data = await fetchGarageData();
       setVehicles(data.vehicles || []);
@@ -188,8 +191,9 @@ export default function App() {
       setGarageParts(data.garageParts || []);
       setToFixTasks(data.toFixTasks || []);
       setTuningStages(data.tuningStages || []);
-      setActiveVehicleId(data.vehicles?.[0]?.id || "");
+      setActiveVehicleId(data.vehicles?.[0]?.id || "empty-garage");
       setIsOnline(true);
+      setGarageLoaded(true);
     } catch (error) {
       console.warn("Не удалось загрузить персональный гараж:", error);
     }
@@ -202,13 +206,13 @@ export default function App() {
       .then((data) => {
         if (!active) return;
         setIsOnline(true);
-        if (data.vehicles && data.vehicles.length > 0) {
-          setVehicles(data.vehicles);
-          setActiveVehicleId((prev) => {
-            const exists = data.vehicles.some((v) => v.id === prev);
-            return exists ? prev : data.vehicles[0].id;
-          });
-        }
+        const loadedVehicles = data.vehicles || [];
+        setVehicles(loadedVehicles);
+        setActiveVehicleId((prev) =>
+          loadedVehicles.some((vehicle) => vehicle.id === prev)
+            ? prev
+            : loadedVehicles[0]?.id || "empty-garage"
+        );
         if (data.reminders) setReminders(data.reminders);
         if (data.serviceRecords) setServiceRecords(data.serviceRecords);
         if (data.fuelRecords) setFuelRecords(data.fuelRecords);
@@ -216,6 +220,7 @@ export default function App() {
         if (data.garageParts) setGarageParts(data.garageParts);
         if (data.toFixTasks) setToFixTasks(data.toFixTasks);
         if (data.tuningStages) setTuningStages(data.tuningStages);
+        setGarageLoaded(true);
       })
       .catch((err) => {
         console.warn("Backend server not responding, running with local cache:", err);
@@ -240,6 +245,7 @@ export default function App() {
         setGarageParts(readCache<GaragePart>("garagehub_garage_parts"));
         setToFixTasks(readCache<ToFixTask>("garagehub_to_fix_tasks"));
         setTuningStages(readCache<TuningStage>("garagehub_tuning_stages"));
+        setGarageLoaded(true);
       });
 
     return () => {
@@ -249,42 +255,50 @@ export default function App() {
 
   // Save to localStorage as offline fallback
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_vehicles", JSON.stringify(vehicles));
-  }, [vehicles]);
+  }, [vehicles, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_reminders", JSON.stringify(reminders));
-  }, [reminders]);
+  }, [reminders, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem(
       "garagehub_service_records",
       JSON.stringify(serviceRecords)
     );
-  }, [serviceRecords]);
+  }, [serviceRecords, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_fuel_records", JSON.stringify(fuelRecords));
-  }, [fuelRecords]);
+  }, [fuelRecords, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem(
       "garagehub_oem_schedules",
       JSON.stringify(oemSchedules)
     );
-  }, [oemSchedules]);
+  }, [oemSchedules, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_garage_parts", JSON.stringify(garageParts));
-  }, [garageParts]);
+  }, [garageParts, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_to_fix_tasks", JSON.stringify(toFixTasks));
-  }, [toFixTasks]);
+  }, [toFixTasks, garageLoaded]);
 
   useEffect(() => {
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_tuning_stages", JSON.stringify(tuningStages));
-  }, [tuningStages]);
+  }, [tuningStages, garageLoaded]);
 
   // Current selected vehicle
   const currentVehicle =
@@ -850,6 +864,18 @@ export default function App() {
           }}
           onOpenBackup={() => setShowBackupModal(true)}
           onSwitchToMobile={() => handleSetPlatform("mobile")}
+          onLogout={() => {
+            void apiLogout().catch(console.error);
+            setVehicles([]);
+            setReminders([]);
+            setActiveVehicleId("empty-garage");
+            setServiceRecords([]);
+            setFuelRecords([]);
+            setOemSchedules([]);
+            setGarageParts([]);
+            setToFixTasks([]);
+            setTuningStages([]);
+          }}
         />
         {renderAppModals()}
       </Suspense>
@@ -905,6 +931,7 @@ export default function App() {
             apiDeleteFuelRecord(id).catch(console.error);
           }}
           onLogout={() => {
+            void apiLogout().catch(console.error);
             setVehicles([]);
             setReminders([]);
             setActiveVehicleId("empty-garage");
@@ -924,10 +951,10 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col selection:bg-red-500 selection:text-white transition-colors duration-200 ${
+      className={`min-h-screen flex flex-col selection:bg-brand selection:text-white transition-colors duration-200 ${
         theme === "light"
-          ? "bg-slate-100 text-slate-900"
-          : "bg-[#06090e] text-slate-100"
+          ? "bg-[#F4F5F8] text-slate-900"
+          : "bg-[#0D131D] text-slate-100"
       }`}
     >
       <a href="#main-content" className="skip-link">Перейти к содержимому</a>
@@ -936,7 +963,7 @@ export default function App() {
         className={`app-navigation sticky top-0 z-40 backdrop-blur-md px-3 sm:px-6 py-2 shadow-md transition-colors duration-200 ${
           theme === "light"
             ? "bg-white/95 border-b border-slate-200 text-slate-900"
-            : "bg-[#0b1018]/95 border-b border-[#243044] text-white"
+            : "bg-[#0D131D]/95 border-b border-[#243044] text-white"
         }`}
       >
         <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2">
@@ -962,7 +989,7 @@ export default function App() {
                   activeView === "dashboard"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -977,7 +1004,7 @@ export default function App() {
                   activeView === "service_log"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -985,7 +1012,7 @@ export default function App() {
               >
                 <BookOpen aria-hidden="true" />
                 <span>Журнал</span>
-                <span className="text-[10px] bg-red-500/20 text-red-500 px-1.5 py-0.2 rounded-full font-mono font-bold">
+                <span className="text-[10px] bg-brand/20 text-brand-strong px-1.5 py-0.2 rounded-full font-mono font-bold">
                   {currentRecords.length}
                 </span>
               </button>
@@ -995,7 +1022,7 @@ export default function App() {
                   activeView === "oem_schedule"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -1010,7 +1037,7 @@ export default function App() {
                   activeView === "expenses"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -1025,7 +1052,7 @@ export default function App() {
                   activeView === "garage_inventory"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -1040,7 +1067,7 @@ export default function App() {
                   activeView === "tuning"
                     ? theme === "light"
                       ? "bg-slate-100 text-slate-900 font-bold border border-slate-200 shadow-xs"
-                      : "bg-[#1e293b] text-white font-bold border border-[#334155]"
+                      : "bg-[#1e293b] text-white font-bold border border-[#243044]"
                     : theme === "light"
                     ? "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                     : "text-slate-400 hover:text-white hover:bg-[#17202e]"
@@ -1060,7 +1087,7 @@ export default function App() {
               className={`app-nav-utility p-1 sm:px-2.5 sm:py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer shadow-xs border ${
                 theme === "light"
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
-                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+                  : "bg-[#17202E] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
               title="Статус сервера базы данных и резервное копирование"
             >
@@ -1096,7 +1123,7 @@ export default function App() {
               className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
                 theme === "light"
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
-                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+                  : "bg-[#17202E] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
               title="Сканировать чек или заказ-наряд"
             >
@@ -1110,7 +1137,7 @@ export default function App() {
               className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
                 theme === "light"
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
-                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+                  : "bg-[#17202E] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
               title="Электронная сервисная книжка"
             >
@@ -1124,7 +1151,7 @@ export default function App() {
               className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
                 theme === "light"
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
-                  : "bg-[#131b26] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
+                  : "bg-[#17202E] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
               title="Переключить в режим мобильного приложения (iOS / Android)"
             >
@@ -1143,12 +1170,12 @@ export default function App() {
               }}
               className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border shadow-xs ${
                 theme === "light"
-                  ? "bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
-                  : "bg-red-600/15 hover:bg-red-600/25 text-red-300 border-red-500/30"
+                  ? "bg-brand-soft hover:bg-brand-soft-strong text-brand-hover border-brand-border"
+                  : "bg-brand-strong/15 hover:bg-brand-strong/25 text-brand-light border-brand/30"
               }`}
               title="Установить Garage AI на компьютер (ПК) / Скачать как отдельное приложение"
             >
-              <Download aria-hidden="true" className="w-3.5 h-3.5 text-red-500" />
+              <Download aria-hidden="true" className="w-3.5 h-3.5 text-brand-strong" />
               <span className="hidden sm:inline">Установить на ПК</span>
               <span className="sm:hidden">ПК</span>
             </button>
@@ -1158,7 +1185,7 @@ export default function App() {
               className={`flex items-center p-0.5 rounded-xl border text-xs shadow-xs transition-colors ${
                 theme === "light"
                   ? "bg-slate-100 border-slate-300"
-                  : "bg-[#131b26] border-[#243044]"
+                  : "bg-[#17202E] border-[#243044]"
               }`}
             >
               <button
@@ -1179,7 +1206,7 @@ export default function App() {
                 onClick={() => setTheme("dark")}
                 className={`app-theme-option px-2.5 py-1 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
                   theme === "dark"
-                    ? "bg-red-600 text-white shadow-sm"
+                    ? "bg-brand-strong text-white shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
                 title="Переключить на тёмную тему"
@@ -1339,7 +1366,7 @@ export default function App() {
         className={`md:hidden fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md px-2 py-1.5 flex items-center justify-around text-[10px] font-medium transition-colors shadow-2xl ${
           theme === "light"
             ? "bg-white/95 border-t border-slate-200 text-slate-500"
-            : "bg-[#0b1018]/95 border-t border-[#243044] text-slate-400"
+            : "bg-[#0D131D]/95 border-t border-[#243044] text-slate-400"
         }`}
       >
         <button
@@ -1362,7 +1389,7 @@ export default function App() {
           aria-current={activeView === "service_log" ? "page" : undefined} onClick={() => setActiveView("service_log")}
           className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition ${
             activeView === "service_log"
-              ? "text-red-500 font-bold"
+              ? "text-brand-strong font-bold"
               : theme === "light"
               ? "hover:text-slate-900"
               : "hover:text-neutral-200"
@@ -1379,7 +1406,7 @@ export default function App() {
           }}
           className="flex flex-col items-center justify-center -mt-5"
         >
-          <div className="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/40 active:scale-95 transition-transform">
+          <div className="w-12 h-12 rounded-full bg-brand-strong text-white flex items-center justify-center shadow-lg shadow-brand-strong/40 active:scale-95 transition-transform">
             <Plus className="w-6 h-6" />
           </div>
           <span
