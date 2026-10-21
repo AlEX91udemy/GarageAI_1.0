@@ -1,0 +1,10 @@
+{
+  "name": "garageai-1-0",
+  "main": "cloudflare-entry.ts",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  }
+}
