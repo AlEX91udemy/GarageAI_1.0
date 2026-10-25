@@ -74,7 +74,7 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT || 8080);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
 const OPENROUTER_RECEIPT_MODEL = process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL;
 const OPENROUTER_DOCUMENT_MODEL = process.env.OPENROUTER_DOCUMENT_MODEL || OPENROUTER_MODEL;
 const OPENROUTER_DOCUMENT_REFINEMENT_ENABLED = process.env.OPENROUTER_DOCUMENT_REFINEMENT_ENABLED === "true";
@@ -102,10 +102,25 @@ async function processWithDocumentAi(content: Buffer, mimeType: string, processo
   return result.document;
 }
 
+app.set("trust proxy", 1);
+
 // Middleware for parsing JSON with a 10mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
 
-// Базовая защита от клиентских подделок Origin на state-changing запросах.
+const ALLOWED_ORIGIN_HOSTS = new Set(
+  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://www.garageai.site,http://localhost:3000,http://localhost:8080")
+    .split(",")
+    .map((item) => {
+      try {
+        return new URL(item.trim()).host;
+      } catch {
+        return item.trim();
+      }
+    })
+    .filter(Boolean)
+);
+
+// Защита от клиентских подделок Origin на state-changing запросах с поддержкой reverse-proxy.
 app.use((req, res, next) => {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
   const origin = req.headers.origin;
@@ -116,7 +131,15 @@ app.use((req, res, next) => {
     } catch {
       return res.status(403).json({ error: "Некорректный Origin" });
     }
-    if (originHost !== req.headers.host) {
+    const forwardedHost =
+      typeof req.headers["x-forwarded-host"] === "string"
+        ? req.headers["x-forwarded-host"].split(",")[0].trim()
+        : undefined;
+    const hostMatches =
+      originHost === req.headers.host ||
+      (forwardedHost !== undefined && originHost === forwardedHost) ||
+      ALLOWED_ORIGIN_HOSTS.has(originHost);
+    if (!hostMatches) {
       return res.status(403).json({ error: "Запрос отклонён: несовпадение origin" });
     }
   }
@@ -178,35 +201,16 @@ function getInitialDatabase(): GarageDatabase {
   };
 }
 
-function ensureDatabaseExists(): GarageDatabase {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    if (!fs.existsSync(DB_FILE)) {
-      const initial = getInitialDatabase();
-      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf-8");
-      return initial;
-    }
-
-    const raw = fs.readFileSync(DB_FILE, "utf-8");
-    const parsed = JSON.parse(raw);
-    return {
-      vehicles: Array.isArray(parsed.vehicles) ? parsed.vehicles : INITIAL_VEHICLES,
-      reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
-      serviceRecords: Array.isArray(parsed.serviceRecords) ? parsed.serviceRecords : INITIAL_SERVICE_RECORDS,
-      fuelRecords: Array.isArray(parsed.fuelRecords) ? parsed.fuelRecords : INITIAL_FUEL_RECORDS,
-      oemSchedules: Array.isArray(parsed.oemSchedules) ? parsed.oemSchedules : INITIAL_OEM_SCHEDULES,
-      garageParts: Array.isArray(parsed.garageParts) ? parsed.garageParts : INITIAL_GARAGE_PARTS,
-      toFixTasks: Array.isArray(parsed.toFixTasks) ? parsed.toFixTasks : INITIAL_TO_FIX_TASKS,
-      tuningStages: Array.isArray(parsed.tuningStages) ? parsed.tuningStages : INITIAL_TUNING_STAGES,
-      lastUpdated: parsed.lastUpdated || new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error("Database initialization failed, fallback to defaults:", error);
-    return getInitialDatabase();
-  }
+function isSafeAssetUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 5_000_000) return false;
+  return (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("/") ||
+    /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(trimmed)
+  );
 }
 
 // In-memory cache synced to disk
@@ -246,10 +250,10 @@ const dbMemory = new Proxy({} as GarageDatabase, {
   },
 });
 
-function saveDatabase(): void {
+function saveDatabase(): Promise<void> {
   const context = requestContext.getStore();
-  if (!context) return;
-  store.schedulePersist(context.userId);
+  if (!context) return Promise.resolve();
+  return store.schedulePersist(context.userId, context.garage);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,17 +293,33 @@ function getOpenRouterConfig(purpose: OpenRouterPurpose = "receipt") {
   return { key, model };
 }
 
+async function requestOpenRouter(payload: Record<string, unknown>, title: string, key: string): Promise<any> {
+  if (!key) throw new Error("OpenRouter API key is not configured");
+  const send = async (body: Record<string, unknown>) => {
+    const response = await fetch(OPENROUTER_URL, {
+      signal: AbortSignal.timeout(25_000),
+      method: "POST",
+      headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": title },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json().catch(() => ({}));
+    return { response, result };
+  };
+  let attempt = await send(payload);
+  if (!attempt.response.ok && attempt.response.status === 400 && payload.response_format) {
+    const retryPayload = { ...payload };
+    delete retryPayload.response_format;
+    attempt = await send(retryPayload);
+  }
+  if (!attempt.response.ok) throw new Error(attempt.result?.error?.message || "OpenRouter request failed (" + attempt.response.status + ")");
+  return attempt.result;
+}
+
 async function requestOpenRouterVision(imageBase64: string, mimeType: string, prompt: string, purpose: OpenRouterPurpose = "receipt"): Promise<string> {
   const { key, model } = getOpenRouterConfig(purpose);
   if (!key) throw new Error("OpenRouter API key is not configured");
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
-  const response = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI" },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || "OpenRouter request failed (" + response.status + ")");
+  const payload = await requestOpenRouter({ model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }, "Garage AI", key);
   const content = payload?.choices?.[0]?.message?.content;
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("OpenRouter returned an empty response");
@@ -310,10 +330,7 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
   const { key, model } = getOpenRouterConfig("document");
   if (!key) throw new Error("Document OpenRouter API key is not configured");
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
-  const response = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI OCR" },
-    body: JSON.stringify({
+  const payload = await requestOpenRouter({
       model,
       messages: [{ role: "user", content: [
         { type: "text", text: "You are a document OCR engine. Transcribe every visible character and word in natural reading order. Preserve spelling, numbers, punctuation and line breaks. Do not summarize, translate, correct or omit anything. Return only the transcription as plain text." },
@@ -321,10 +338,7 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
       ] }],
       temperature: 0,
       max_tokens: 4000,
-    }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || "Document OCR request failed (" + response.status + ")");
+    }, "Garage AI OCR", key);
   const content = payload?.choices?.[0]?.message?.content;
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("Document OCR returned an empty response");
@@ -335,6 +349,7 @@ async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<s
   const { key, model } = getOpenRouterConfig("receipt");
   if (!key) throw new Error("Receipt OpenRouter API key is not configured");
   const response = await fetch(OPENROUTER_URL, {
+    signal: AbortSignal.timeout(25_000),
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Receipt Parser" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${ocrText}` }], temperature: 0, response_format: { type: "json_object" } }),
@@ -351,6 +366,7 @@ async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<str
   const { key, model } = getOpenRouterConfig("document");
   if (!key) throw new Error("Document OpenRouter API key is not configured");
   const response = await fetch(OPENROUTER_URL, {
+    signal: AbortSignal.timeout(25_000),
     method: "POST",
     headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Document OCR" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: `Исправь только очевидные OCR-ошибки в распознанном тексте документа. Не добавляй догадки, не меняй имена, даты, номера и суммы без явного основания. Сохрани порядок и строки. Верни только исправленный текст.\n\n${ocrText}` }], temperature: 0, max_tokens: 4000 }),
@@ -364,11 +380,7 @@ async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<str
 }
 
 function mergeOcrText(...texts: string[]) {
-  const lines = new Set<string>();
-  for (const text of texts) {
-    for (const line of text.split(/\r?\n/).map(value => value.trim()).filter(Boolean)) lines.add(line);
-  }
-  return [...lines].join("\n");
+  return texts.map((text) => text.trim()).find(Boolean) || "";
 }
 
 function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T): T {
@@ -599,23 +611,31 @@ app.post("/api/vehicles", (req, res) => {
     typeof body.colorHex === "string" && /^#[0-9a-f]{6}$/i.test(body.colorHex)
       ? body.colorHex
       : "#2563eb";
+  if (body.photoUrl !== undefined && body.photoUrl !== "" && !isSafeAssetUrl(body.photoUrl)) {
+    return res.status(400).json({ error: "Некорректный URL фотографии автомобиля" });
+  }
+  if (body.model3dUrl !== undefined && body.model3dUrl !== "" && !isSafeAssetUrl(body.model3dUrl)) {
+    return res.status(400).json({ error: "Некорректный URL 3D-модели" });
+  }
+
   const newVehicle: Vehicle = {
     id: uniqueId(body.id, "car", dbMemory.vehicles),
-    make: body.make.trim(),
-    model: body.model.trim(),
-    generation: body.generation?.trim() || "",
+    make: asTrimmedString(body.make, 100),
+    model: asTrimmedString(body.model, 100),
+    generation: asTrimmedString(body.generation, 100),
     year: Number(body.year) || new Date().getFullYear(),
-    licensePlate: body.licensePlate?.trim() || "",
-    vin: body.vin?.trim() || "",
-    engine: body.engine?.trim() || "Стандарт",
-    fuelType: body.fuelType || "Бензин (АИ-95)",
-    transmission: body.transmission || "Автомат",
-    driveType: body.driveType || "Передний",
+    licensePlate: asTrimmedString(body.licensePlate, 32),
+    vin: asTrimmedString(body.vin, 32),
+    engine: asTrimmedString(body.engine, 100) || "Стандарт",
+    fuelType: asTrimmedString(body.fuelType, 60) || "Бензин (АИ-95)",
+    transmission: asTrimmedString(body.transmission, 60) || "Автомат",
+    driveType: asTrimmedString(body.driveType, 60) || "Передний",
     currentMileage: Number(body.currentMileage) || 0,
     lastMileageUpdate: new Date().toLocaleDateString("ru-RU"),
     colorHex,
     bodyType: body.bodyType || "sedan",
-    photoUrl: body.photoUrl,
+    photoUrl: isSafeAssetUrl(body.photoUrl) ? body.photoUrl.trim() : undefined,
+    model3dUrl: isSafeAssetUrl(body.model3dUrl) ? body.model3dUrl.trim() : undefined,
   };
 
   dbMemory.vehicles.push(newVehicle);
@@ -629,7 +649,7 @@ app.put("/api/vehicles/:id", (req, res) => {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
 
-  const updates = { ...req.body } as Partial<Vehicle>;
+  const updates = (req.body || {}) as Partial<Vehicle>;
   if (updates.make !== undefined && (typeof updates.make !== "string" || !updates.make.trim())) {
     return res.status(400).json({ error: "Марка не может быть пустой" });
   }
@@ -639,10 +659,10 @@ app.put("/api/vehicles/:id", (req, res) => {
   if (updates.bodyType !== undefined && !VALID_BODY_TYPES.has(updates.bodyType)) {
     return res.status(400).json({ error: "Некорректный тип кузова" });
   }
-  if (updates.year !== undefined && (!Number.isInteger(Number(updates.year)) || Number(updates.year) < 1886 || Number(updates.year) > new Date().getFullYear() + 1)) {
+  if (updates.year !== undefined && !isValidYear(updates.year)) {
     return res.status(400).json({ error: "Некорректный год выпуска" });
   }
-  if (updates.currentMileage !== undefined && (!Number.isFinite(Number(updates.currentMileage)) || Number(updates.currentMileage) < 0)) {
+  if (updates.currentMileage !== undefined && asNonNegativeNumber(updates.currentMileage) === null) {
     return res.status(400).json({ error: "Некорректный пробег" });
   }
   if (
@@ -651,10 +671,41 @@ app.put("/api/vehicles/:id", (req, res) => {
   ) {
     return res.status(400).json({ error: "Некорректный цвет кузова" });
   }
+  if (updates.photoUrl !== undefined && updates.photoUrl !== "" && !isSafeAssetUrl(updates.photoUrl)) {
+    return res.status(400).json({ error: "Некорректный URL фотографии автомобиля" });
+  }
+  if (updates.model3dUrl !== undefined && updates.model3dUrl !== "" && !isSafeAssetUrl(updates.model3dUrl)) {
+    return res.status(400).json({ error: "Некорректный URL 3D-модели" });
+  }
 
+  const current = dbMemory.vehicles[index];
   dbMemory.vehicles[index] = {
-    ...dbMemory.vehicles[index],
-    ...updates,
+    ...current,
+    make: updates.make !== undefined ? asTrimmedString(updates.make, 100) : current.make,
+    model: updates.model !== undefined ? asTrimmedString(updates.model, 100) : current.model,
+    generation: updates.generation !== undefined ? asTrimmedString(updates.generation, 100) : current.generation,
+    year: updates.year !== undefined ? Number(updates.year) : current.year,
+    licensePlate: updates.licensePlate !== undefined ? asTrimmedString(updates.licensePlate, 32) : current.licensePlate,
+    vin: updates.vin !== undefined ? asTrimmedString(updates.vin, 32) : current.vin,
+    engine: updates.engine !== undefined ? asTrimmedString(updates.engine, 100) : current.engine,
+    fuelType: updates.fuelType !== undefined ? asTrimmedString(updates.fuelType, 60) : current.fuelType,
+    transmission: updates.transmission !== undefined ? asTrimmedString(updates.transmission, 60) : current.transmission,
+    driveType: updates.driveType !== undefined ? asTrimmedString(updates.driveType, 60) : current.driveType,
+    currentMileage: updates.currentMileage !== undefined ? Number(updates.currentMileage) : current.currentMileage,
+    colorHex: updates.colorHex !== undefined ? updates.colorHex : current.colorHex,
+    bodyType: updates.bodyType !== undefined ? updates.bodyType : current.bodyType,
+    photoUrl:
+      updates.photoUrl === ""
+        ? undefined
+        : updates.photoUrl !== undefined
+        ? updates.photoUrl.trim()
+        : current.photoUrl,
+    model3dUrl:
+      updates.model3dUrl === ""
+        ? undefined
+        : updates.model3dUrl !== undefined
+        ? updates.model3dUrl.trim()
+        : current.model3dUrl,
     id: req.params.id,
   };
 
@@ -690,6 +741,7 @@ app.delete("/api/vehicles/:id", (req, res) => {
   }
 
   // Also clean up linked records
+  dbMemory.reminders = dbMemory.reminders.filter((r) => r.vehicleId !== id);
   dbMemory.serviceRecords = dbMemory.serviceRecords.filter((r) => r.vehicleId !== id);
   dbMemory.fuelRecords = dbMemory.fuelRecords.filter((r) => r.vehicleId !== id);
   dbMemory.oemSchedules = dbMemory.oemSchedules.filter((s) => s.vehicleId !== id);
@@ -707,7 +759,7 @@ app.delete("/api/vehicles/:id", (req, res) => {
 
 app.get("/api/services", (req, res) => {
   const { vehicleId, category, search } = req.query;
-  let list = dbMemory.serviceRecords;
+  let list = [...dbMemory.serviceRecords];
 
   if (vehicleId && typeof vehicleId === "string") {
     list = list.filter((r) => r.vehicleId === vehicleId);
@@ -751,28 +803,39 @@ app.post("/api/services", (req, res) => {
     return res.status(400).json({ error: "Некорректная дата или пробег" });
   }
 
-  const parts = Array.isArray(body.parts) ? body.parts : [];
-  const partsCost = parts.reduce((sum, p) => sum + (p.quantity || 1) * (p.unitPrice || 0), 0);
-  const laborCost = Number(body.laborCost) || 0;
+  const parts = Array.isArray(body.parts)
+    ? body.parts.map((p, idx) => ({
+        id: typeof p?.id === "string" && p.id.trim() ? p.id.trim() : `part-${Date.now()}-${idx}`,
+        name: asTrimmedString(p?.name, 200),
+        brand: asTrimmedString(p?.brand, 100),
+        partNumber: asTrimmedString(p?.partNumber, 100),
+        quantity: Math.max(1, Number(p?.quantity) || 1),
+        unitPrice: Math.max(0, Number(p?.unitPrice) || 0),
+      }))
+    : [];
+  const partsCost = parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0);
+  const laborCost = body.laborCost !== undefined ? Number(body.laborCost) : 0;
   const totalCost = body.totalCost !== undefined ? Number(body.totalCost) : laborCost + partsCost;
   if (![laborCost, totalCost, partsCost].every((value) => Number.isFinite(value) && value >= 0)) {
     return res.status(400).json({ error: "Стоимость должна быть неотрицательным числом" });
   }
 
   const newRecord: ServiceRecord = {
-    id: body.id || `rec-${Date.now()}`,
-    vehicleId: body.vehicleId,
-    date: body.date,
+    id: uniqueId(body.id, "rec", dbMemory.serviceRecords),
+    vehicleId: body.vehicleId.trim(),
+    date: body.date.trim(),
     mileage: Number(body.mileage) || 0,
     category: body.category || "ТО и замена жидкостей",
     title: body.title.trim(),
-    description: body.description?.trim() || "",
+    description: asTrimmedString(body.description, 2000),
     laborCost,
     parts,
     totalCost,
-    serviceCenter: body.serviceCenter?.trim() || "",
-    receiptImages: body.receiptImages || [],
-    notes: body.notes?.trim() || "",
+    serviceCenter: asTrimmedString(body.serviceCenter, 300),
+    receiptImages: Array.isArray(body.receiptImages)
+      ? body.receiptImages.filter((img): img is string => typeof img === "string")
+      : [],
+    notes: asTrimmedString(body.notes, 2000),
   };
 
   dbMemory.serviceRecords.unshift(newRecord);
@@ -790,19 +853,29 @@ app.post("/api/services", (req, res) => {
     if (task) task.status = "completed";
   }
 
-  // Mark garage parts installed if part numbers match.
-  // Учитываем привязку детали к автомобилю и остаток: если на складе несколько
-  // экземпляров — списываем одну штуку, вместо мгновенной установки всей позиции.
-  if (parts.length > 0) {
-    const partNumbers = parts.map((p) => p.partNumber.toLowerCase());
+  // Mark garage parts installed if part numbers or installedPartIds match.
+  const installedIds = new Set(
+    Array.isArray(body.installedPartIds)
+      ? body.installedPartIds.filter((id): id is string => typeof id === "string")
+      : []
+  );
+  if (parts.length > 0 || installedIds.size > 0) {
     dbMemory.garageParts.forEach((gp) => {
-      if (
-        (gp.vehicleId === newRecord.vehicleId || gp.vehicleId === "all") &&
-        partNumbers.includes(gp.partNumber.toLowerCase())
-      ) {
-        if (gp.quantity > 1) {
-          gp.quantity -= 1;
+      if (gp.status !== "in_stock") return;
+      if (gp.vehicleId !== newRecord.vehicleId && gp.vehicleId !== "all") return;
+      const gpNumber = (gp.partNumber || "").trim().toLowerCase();
+      const matchedPart = parts.find(
+        (p) =>
+          (gpNumber !== "" && p.partNumber.toLowerCase() === gpNumber) ||
+          installedIds.has(gp.id) ||
+          p.id === `gp-${gp.id}`
+      );
+      if (matchedPart || installedIds.has(gp.id)) {
+        const usedQty = matchedPart ? matchedPart.quantity : 1;
+        if (gp.quantity > usedQty) {
+          gp.quantity -= usedQty;
         } else {
+          gp.quantity = 1;
           gp.status = "installed";
         }
       }
@@ -883,7 +956,7 @@ app.delete("/api/services/:id", (req, res) => {
 
 app.get("/api/fuel", (req, res) => {
   const { vehicleId } = req.query;
-  let list = dbMemory.fuelRecords;
+  let list = [...dbMemory.fuelRecords];
   if (vehicleId && typeof vehicleId === "string") {
     list = list.filter((f) => f.vehicleId === vehicleId);
   }
@@ -893,8 +966,13 @@ app.get("/api/fuel", (req, res) => {
 
 app.post("/api/fuel", (req, res) => {
   const body = req.body as Partial<FuelRecord>;
-  if (typeof body.vehicleId !== "string" || !body.vehicleId.trim() || typeof body.date !== "string" || !body.date.trim()) {
-    return res.status(400).json({ error: "vehicleId, date и liters обязательны" });
+  if (
+    typeof body.vehicleId !== "string" ||
+    !body.vehicleId.trim() ||
+    typeof body.date !== "string" ||
+    !isValidDate(body.date)
+  ) {
+    return res.status(400).json({ error: "vehicleId, корректная date (YYYY-MM-DD) и liters обязательны" });
   }
 
   const liters = Number(body.liters) || 0;
@@ -924,9 +1002,9 @@ app.post("/api/fuel", (req, res) => {
   }
 
   const newFuel: FuelRecord = {
-    id: body.id || `fuel-${Date.now()}`,
+    id: uniqueId(body.id, "fuel", dbMemory.fuelRecords),
     vehicleId: body.vehicleId,
-    date: body.date,
+    date: body.date.trim(),
     mileage,
     liters,
     pricePerLiter,
@@ -993,7 +1071,7 @@ app.post("/api/inventory", (req, res) => {
       : `SKU-${Date.now().toString().slice(-6)}`;
 
   const newPart: GaragePart = {
-    id: body.id || `gp-${Date.now()}`,
+    id: uniqueId(body.id, "gp", dbMemory.garageParts),
     vehicleId: body.vehicleId || "all",
     name: body.name.trim(),
     brand: body.brand?.trim() || "OEM",

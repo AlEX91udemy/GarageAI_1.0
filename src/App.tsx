@@ -379,16 +379,14 @@ export default function App() {
     // The modal recovers the real part ids (with the "gp-" prefix) and passes
     // them as usedPartIds — call the install endpoint for each of them so the
     // server inventory matches the local state.
-    if (usedPartIds && usedPartIds.length > 0) {
-      usedPartIds.forEach((partId) => {
-        apiInstallGaragePart(partId).catch(console.error);
-      });
-    }
-
     // Keep edit and create operations separate so editing never duplicates a record.
     const saveRequest = currentRecords.some((record) => record.id === newRecord.id)
       ? apiUpdateServiceRecord(newRecord.id, newRecord)
-      : apiCreateServiceRecord({ ...newRecord, completedTaskId });
+      : apiCreateServiceRecord({
+          ...newRecord,
+          completedTaskId,
+          ...(usedPartIds && usedPartIds.length > 0 ? { installedPartIds: usedPartIds } : {}),
+        } as any);
     saveRequest.catch(console.error);
 
     setShowAddServiceModal(false);
@@ -498,10 +496,15 @@ export default function App() {
   // Delete vehicle
   const handleDeleteVehicle = (vehicleId: string) => {
     const remaining = vehicles.filter((v) => v.id !== vehicleId);
-    if (remaining.length > 0) {
-      setVehicles(remaining);
-      setActiveVehicleId(remaining[0].id);
-    }
+    setVehicles(remaining);
+    setActiveVehicleId(remaining[0]?.id || "empty-garage");
+    setReminders((prev) => prev.filter((r) => r.vehicleId !== vehicleId));
+    setServiceRecords((prev) => prev.filter((r) => r.vehicleId !== vehicleId));
+    setFuelRecords((prev) => prev.filter((r) => r.vehicleId !== vehicleId));
+    setOemSchedules((prev) => prev.filter((s) => s.vehicleId !== vehicleId));
+    setGarageParts((prev) => prev.filter((p) => p.vehicleId !== vehicleId));
+    setToFixTasks((prev) => prev.filter((t) => t.vehicleId !== vehicleId));
+    setTuningStages((prev) => prev.filter((t) => t.vehicleId !== vehicleId));
     apiDeleteVehicle(vehicleId).catch(console.error);
   };
 
@@ -562,15 +565,15 @@ export default function App() {
   };
 
   const handleDataReloaded = (data: FullGarageData) => {
-    setVehicles(data.vehicles);
-    if (data.vehicles.length > 0) {
-      setActiveVehicleId(data.vehicles[0].id);
-    }
-    setServiceRecords(data.serviceRecords);
-    setFuelRecords(data.fuelRecords);
-    setOemSchedules(data.oemSchedules);
-    setGarageParts(data.garageParts);
-    setToFixTasks(data.toFixTasks);
+    setVehicles(data.vehicles || []);
+    setActiveVehicleId(data.vehicles?.[0]?.id || "empty-garage");
+    setReminders(data.reminders || []);
+    setServiceRecords(data.serviceRecords || []);
+    setFuelRecords(data.fuelRecords || []);
+    setOemSchedules(data.oemSchedules || []);
+    setGarageParts(data.garageParts || []);
+    setToFixTasks(data.toFixTasks || []);
+    setTuningStages(data.tuningStages || []);
   };
 
   const handleAddServiceRecord = (record: ServiceRecord) => {

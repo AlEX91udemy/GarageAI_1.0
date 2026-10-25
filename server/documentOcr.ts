@@ -22,7 +22,7 @@ export async function prepareDocumentImage(input: Buffer): Promise<PreparedOcrIm
       .normalize();
   const [clean, binary] = await Promise.all([
     base().gamma(1.08).sharpen({ sigma: 1.1 }).png().toBuffer(),
-    base().gamma(1.08).sharpen({ sigma: 1.1 }).threshold(175).png().toBuffer(),
+    base().gamma(1.08).sharpen({ sigma: 1.1 }).linear(1.25, -25).png().toBuffer(),
   ]);
   return [
     { name: "clean", image: clean },
