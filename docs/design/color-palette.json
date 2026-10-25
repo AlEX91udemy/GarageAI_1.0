@@ -1,0 +1,150 @@
+{
+  "name": "Garage AI",
+  "version": "1.0.0",
+  "updated": "2026-10-21",
+  "description": "Canonical color tokens for Garage AI. Brand mark red and action red are the only brand accents; lime, orange, purple, cyan and pink are not part of the core identity.",
+  "brand": {
+    "red": {
+      "50": "#FEF2F2",
+      "100": "#FEE2E2",
+      "200": "#FECACA",
+      "300": "#FCA5A5",
+      "400": "#F87171",
+      "500": "#EF4444",
+      "600": "#DC2626",
+      "700": "#B91C1C",
+      "800": "#991B1B",
+      "900": "#7F1D1D"
+    },
+    "mark": "#EF3038",
+    "navy": "#061527",
+    "roles": {
+      "mark": "#EF3038",
+      "primary": "#B91C1C",
+      "accent": "#EF3038",
+      "hover": "#991B1B",
+      "pressed": "#7F1D1D",
+      "onDark": "#F87171",
+      "soft": "#FEF2F2",
+      "border": "#FECACA"
+    }
+  },
+  "light": {
+    "canvas": "#F4F5F8",
+    "surface": "#FFFFFF",
+    "surfaceSubtle": "#F8FAFC",
+    "border": "#E2E8F0",
+    "borderSubtle": "#F1F5F9",
+    "text": "#0F172A",
+    "textSecondary": "#64748B",
+    "textMuted": "#94A3B8",
+    "textStrongMuted": "#536171"
+  },
+  "dark": {
+    "canvas": "#0D131D",
+    "canvasDeep": "#090D14",
+    "surface": "#17202E",
+    "surfaceElevated": "#1E293B",
+    "border": "#243044",
+    "borderSubtle": "#1C2637",
+    "text": "#FFFFFF",
+    "textSecondary": "#CBD5E1",
+    "textMuted": "#94A3B8",
+    "textSubtle": "#64748B"
+  },
+  "status": {
+    "success": {
+      "base": "#10B981",
+      "strong": "#047857",
+      "onDark": "#34D399",
+      "soft": "rgba(16, 185, 129, 0.12)"
+    },
+    "warning": {
+      "base": "#F59E0B",
+      "strong": "#B45309",
+      "onDark": "#FBBF24",
+      "soft": "rgba(245, 158, 11, 0.12)"
+    },
+    "danger": {
+      "base": "#EF3038",
+      "strong": "#B91C1C",
+      "onDark": "#F87171",
+      "soft": "rgba(239, 48, 56, 0.12)"
+    },
+    "info": {
+      "base": "#3B82F6",
+      "strong": "#1D4ED8",
+      "onDark": "#60A5FA",
+      "soft": "rgba(59, 130, 246, 0.12)"
+    },
+    "neutral": {
+      "base": "#64748B",
+      "strong": "#334155",
+      "soft": "rgba(100, 116, 139, 0.12)"
+    }
+  },
+  "chart": {
+    "1": "#EF3038",
+    "2": "#3B82F6",
+    "3": "#10B981",
+    "4": "#F59E0B",
+    "5": "#8B5CF6",
+    "6": "#06B6D4",
+    "7": "#EC4899",
+    "8": "#64748B"
+  },
+  "effects": {
+    "focusLight": "#B91C1C",
+    "focusDark": "#FF9B9B",
+    "selectionBackground": "#EF3038",
+    "selectionText": "#FFFFFF",
+    "overlay": "rgba(2, 6, 23, 0.60)",
+    "brandShadow": "rgba(185, 28, 28, 0.28)",
+    "markShadow": "rgba(239, 48, 56, 0.25)"
+  },
+  "legacy": {
+    "doNotUseForNewUi": {
+      "lime": ["#B7F34A", "#D1FF83", "#8CBF32"],
+      "orange": ["#F97316", "#EA580C"],
+      "oldBrandReds": ["#E5232E", "#F5222D", "#FC0E0E", "#CC2323", "#D32F2F", "#B71C1C"],
+      "legacyTailwindReds": ["#EF4444", "#DC2626"],
+      "extraDarkSurfaces": [
+        "#06090E",
+        "#0B0E14",
+        "#101724",
+        "#111827",
+        "#111722",
+        "#131B26",
+        "#131C2B",
+        "#141D2B",
+        "#15191F",
+        "#16202E",
+        "#171B1A",
+        "#1A2333",
+        "#1B2535",
+        "#1C2738",
+        "#1F2C3F",
+        "#20262E",
+        "#202C3E",
+        "#222E42",
+        "#222F42",
+        "#28374D",
+        "#2B3A50",
+        "#2D3D57",
+        "#2F3D54",
+        "#3C4654"
+      ],
+      "extraLightSurfaces": [
+        "#F3F4F6",
+        "#F4F5F7",
+        "#FAFAFC",
+        "#FAFAFA",
+        "#F5F5F5",
+        "#E8ECF2",
+        "#EEF2F6",
+        "#FBFCFE",
+        "#F2F6FC"
+      ]
+    }
+  }
+}
