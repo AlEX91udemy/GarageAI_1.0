@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Garage AI color palette</title>
+  <desc id="desc">Signal red, deep navy, cool neutrals, status colors and chart colors.</desc>
+  <rect width="1200" height="900" fill="#0D131D"/>
+
+  <text x="60" y="72" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Garage AI</text>
+  <text x="60" y="103" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="15">Color palette · v1.0 · 21.10.2026</text>
+  <text x="1140" y="72" fill="#EF3038" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="end">SIGNAL RED + DEEP NAVY</text>
+
+  <text x="60" y="158" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700">BRAND</text>
+
+  <g>
+    <rect x="60" y="176" width="170" height="104" rx="12" fill="#B91C1C"/>
+    <text x="76" y="218" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Red 700</text>
+    <text x="76" y="240" fill="#FEE2E2" font-family="Consolas, monospace" font-size="12">#B91C1C</text>
+    <text x="76" y="260" fill="#FEE2E2" font-family="Segoe UI, Arial, sans-serif" font-size="11">Primary</text>
+
+    <rect x="244" y="176" width="170" height="104" rx="12" fill="#EF3038"/>
+    <text x="260" y="218" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Mark</text>
+    <text x="260" y="240" fill="#FEE2E2" font-family="Consolas, monospace" font-size="12">#EF3038</text>
+    <text x="260" y="260" fill="#FEE2E2" font-family="Segoe UI, Arial, sans-serif" font-size="11">Accent</text>
+
+    <rect x="428" y="176" width="170" height="104" rx="12" fill="#991B1B"/>
+    <text x="444" y="218" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Red 800</text>
+    <text x="444" y="240" fill="#FEE2E2" font-family="Consolas, monospace" font-size="12">#991B1B</text>
+    <text x="444" y="260" fill="#FEE2E2" font-family="Segoe UI, Arial, sans-serif" font-size="11">Pressed</text>
+
+    <rect x="612" y="176" width="170" height="104" rx="12" fill="#F87171"/>
+    <text x="628" y="218" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Red 400</text>
+    <text x="628" y="240" fill="#0F172A" font-family="Consolas, monospace" font-size="12">#F87171</text>
+    <text x="628" y="260" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="11">On dark</text>
+
+    <rect x="796" y="176" width="170" height="104" rx="12" fill="#061527" stroke="#243044"/>
+    <text x="812" y="218" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Navy</text>
+    <text x="812" y="240" fill="#94A3B8" font-family="Consolas, monospace" font-size="12">#061527</text>
+    <text x="812" y="260" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="11">Logo</text>
+
+    <rect x="980" y="176" width="170" height="104" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <text x="996" y="218" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">White</text>
+    <text x="996" y="240" fill="#64748B" font-family="Consolas, monospace" font-size="12">#FFFFFF</text>
+    <text x="996" y="260" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="11">Surface</text>
+  </g>
+
+  <text x="60" y="330" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700">DARK UI</text>
+
+  <g>
+    <rect x="60" y="348" width="210" height="104" rx="12" fill="#0D131D" stroke="#243044"/>
+    <text x="76" y="390" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Canvas</text>
+    <text x="76" y="412" fill="#94A3B8" font-family="Consolas, monospace" font-size="12">#0D131D</text>
+    <text x="76" y="432" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="11">App background</text>
+
+    <rect x="284" y="348" width="210" height="104" rx="12" fill="#17202E" stroke="#243044"/>
+    <text x="300" y="390" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Surface</text>
+    <text x="300" y="412" fill="#94A3B8" font-family="Consolas, monospace" font-size="12">#17202E</text>
+    <text x="300" y="432" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="11">Cards</text>
+
+    <rect x="508" y="348" width="210" height="104" rx="12" fill="#1E293B" stroke="#243044"/>
+    <text x="524" y="390" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Elevated</text>
+    <text x="524" y="412" fill="#94A3B8" font-family="Consolas, monospace" font-size="12">#1E293B</text>
+    <text x="524" y="432" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="11">Dropdown / hover</text>
+
+    <rect x="732" y="348" width="210" height="104" rx="12" fill="#243044" stroke="#334155"/>
+    <text x="748" y="390" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Border</text>
+    <text x="748" y="412" fill="#CBD5E1" font-family="Consolas, monospace" font-size="12">#243044</text>
+    <text x="748" y="432" fill="#CBD5E1" font-family="Segoe UI, Arial, sans-serif" font-size="11">Dividers</text>
+
+    <rect x="956" y="348" width="194" height="104" rx="12" fill="#FFFFFF"/>
+    <text x="972" y="390" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Text</text>
+    <text x="972" y="412" fill="#64748B" font-family="Consolas, monospace" font-size="12">#FFFFFF</text>
+    <text x="972" y="432" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="11">Primary text</text>
+  </g>
+
+  <text x="60" y="490" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700">LIGHT UI</text>
+
+  <g>
+    <rect x="60" y="508" width="210" height="104" rx="12" fill="#F4F5F8" stroke="#E2E8F0"/>
+    <text x="76" y="550" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Canvas</text>
+    <text x="76" y="572" fill="#536171" font-family="Consolas, monospace" font-size="12">#F4F5F8</text>
+    <text x="76" y="592" fill="#536171" font-family="Segoe UI, Arial, sans-serif" font-size="11">App background</text>
+
+    <rect x="284" y="508" width="210" height="104" rx="12" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <text x="300" y="550" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Surface</text>
+    <text x="300" y="572" fill="#536171" font-family="Consolas, monospace" font-size="12">#FFFFFF</text>
+    <text x="300" y="592" fill="#536171" font-family="Segoe UI, Arial, sans-serif" font-size="11">Cards</text>
+
+    <rect x="508" y="508" width="210" height="104" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="524" y="550" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Subtle</text>
+    <text x="524" y="572" fill="#536171" font-family="Consolas, monospace" font-size="12">#F8FAFC</text>
+    <text x="524" y="592" fill="#536171" font-family="Segoe UI, Arial, sans-serif" font-size="11">Nested blocks</text>
+
+    <rect x="732" y="508" width="210" height="104" rx="12" fill="#E2E8F0"/>
+    <text x="748" y="550" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Border</text>
+    <text x="748" y="572" fill="#536171" font-family="Consolas, monospace" font-size="12">#E2E8F0</text>
+    <text x="748" y="592" fill="#536171" font-family="Segoe UI, Arial, sans-serif" font-size="11">Dividers</text>
+
+    <rect x="956" y="508" width="194" height="104" rx="12" fill="#0F172A"/>
+    <text x="972" y="550" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Text</text>
+    <text x="972" y="572" fill="#CBD5E1" font-family="Consolas, monospace" font-size="12">#0F172A</text>
+    <text x="972" y="592" fill="#CBD5E1" font-family="Segoe UI, Arial, sans-serif" font-size="11">Primary text</text>
+  </g>
+
+  <text x="60" y="650" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700">STATUS</text>
+
+  <g>
+    <rect x="60" y="668" width="260" height="84" rx="12" fill="#10B981"/>
+    <text x="76" y="702" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Success</text>
+    <text x="76" y="724" fill="#0F172A" font-family="Consolas, monospace" font-size="12">#10B981</text>
+
+    <rect x="334" y="668" width="260" height="84" rx="12" fill="#F59E0B"/>
+    <text x="350" y="702" fill="#0F172A" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Warning</text>
+    <text x="350" y="724" fill="#0F172A" font-family="Consolas, monospace" font-size="12">#F59E0B</text>
+
+    <rect x="608" y="668" width="260" height="84" rx="12" fill="#EF3038"/>
+    <text x="624" y="702" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Danger</text>
+    <text x="624" y="724" fill="#FEE2E2" font-family="Consolas, monospace" font-size="12">#EF3038</text>
+
+    <rect x="882" y="668" width="260" height="84" rx="12" fill="#3B82F6"/>
+    <text x="898" y="702" fill="#FFFFFF" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700">Info</text>
+    <text x="898" y="724" fill="#FFFFFF" font-family="Consolas, monospace" font-size="12">#3B82F6</text>
+  </g>
+
+  <text x="60" y="790" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="12" font-weight="700">CHARTS ONLY</text>
+
+  <g font-family="Consolas, monospace" font-size="10" fill="#CBD5E1">
+    <rect x="60" y="808" width="150" height="44" rx="8" fill="#EF3038"/>
+    <text x="68" y="835" fill="#FFFFFF">#EF3038</text>
+    <rect x="220" y="808" width="150" height="44" rx="8" fill="#3B82F6"/>
+    <text x="228" y="835" fill="#FFFFFF">#3B82F6</text>
+    <rect x="380" y="808" width="150" height="44" rx="8" fill="#10B981"/>
+    <text x="388" y="835" fill="#0F172A">#10B981</text>
+    <rect x="540" y="808" width="150" height="44" rx="8" fill="#F59E0B"/>
+    <text x="548" y="835" fill="#0F172A">#F59E0B</text>
+    <rect x="700" y="808" width="150" height="44" rx="8" fill="#8B5CF6"/>
+    <text x="708" y="835" fill="#FFFFFF">#8B5CF6</text>
+    <rect x="860" y="808" width="150" height="44" rx="8" fill="#06B6D4"/>
+    <text x="868" y="835" fill="#0F172A">#06B6D4</text>
+    <rect x="1020" y="808" width="120" height="44" rx="8" fill="#EC4899"/>
+    <text x="1028" y="835" fill="#FFFFFF">#EC4899</text>
+  </g>
+
+  <text x="60" y="882" fill="#64748B" font-family="Segoe UI, Arial, sans-serif" font-size="11">Do not use for core UI: lime #B7F34A · orange #F97316 · legacy reds #E5232E / #F5222D / #EF4444</text>
+</svg>

@@ -35,7 +35,6 @@
           if (!event) return;
           var msg = (event.message || event.error && event.error.message || '').toString();
           if (
-            msg.indexOf('is not a function') !== -1 ||
             msg.indexOf('ResizeObserver') !== -1 ||
             msg.indexOf('Script error') !== -1
           ) {
@@ -49,7 +48,6 @@
         window.onerror = function(message, source, lineno, colno, error) {
           var msg = (message || error && error.message || '').toString();
           if (
-            msg.indexOf('is not a function') !== -1 ||
             msg.indexOf('ResizeObserver') !== -1 ||
             msg.indexOf('Script error') !== -1
           ) {
@@ -65,7 +63,6 @@
           if (!event) return;
           var reason = (event.reason && event.reason.message || event.reason || '').toString();
           if (
-            reason.indexOf('is not a function') !== -1 ||
             reason.indexOf('ResizeObserver') !== -1
           ) {
             try { event.stopImmediatePropagation(); } catch(e) {}
