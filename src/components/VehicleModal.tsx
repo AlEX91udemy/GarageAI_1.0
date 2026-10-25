@@ -553,7 +553,8 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         </div>
 
         {/* Main Vehicle Form */}
-        <form onSubmit={handleSubmit} className="space-y-3 mt-3 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-3 mt-3 text-xs flex flex-col [&>*]:order-3">
+          <div className="order-2">
           {/* Linked Hierarchical Selector: Make -> Model -> Generation -> Body Type */}
           <CarCascadeSelector
             make={make}
@@ -575,9 +576,10 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             onChangeTransmission={(tr) => setTransmission(tr)}
             onChangeDriveType={(dt) => setDriveType(dt)}
           />
+          </div>
 
           {/* Row 2: License Plate & VIN Number */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 order-1">
             {/* License Plate (Configured only once when adding vehicle) */}
             <div>
               <div className="flex items-center justify-between mb-1">
