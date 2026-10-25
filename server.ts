@@ -72,7 +72,7 @@ import {
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 8080);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
 const OPENROUTER_RECEIPT_MODEL = process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL;
@@ -102,7 +102,7 @@ async function processWithDocumentAi(content: Buffer, mimeType: string, processo
   return result.document;
 }
 
-// Middleware for parsing JSON with 25mb limit for receipt photos
+// Middleware for parsing JSON with a 10mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
 
 // Базовая защита от клиентских подделок Origin на state-changing запросах.
@@ -260,14 +260,21 @@ let aiClient: GoogleGenAI | null = null;
 function getAi(): GoogleGenAI {
   if (!aiClient) {
     const key = process.env.GEMINI_API_KEY || "";
-    aiClient = new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          "User-Agent": "garagehub-applet",
-        },
-      },
-    });
+    const useVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI === "true";
+    aiClient = useVertex
+      ? new GoogleGenAI({
+          vertexai: true,
+          project: process.env.GOOGLE_CLOUD_PROJECT,
+          location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+        })
+      : new GoogleGenAI({
+          apiKey: key,
+          httpOptions: {
+            headers: {
+              "User-Agent": "garagehub-applet",
+            },
+          },
+        });
   }
   return aiClient;
 }
@@ -288,7 +295,7 @@ async function requestOpenRouterVision(imageBase64: string, mimeType: string, pr
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI" },
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -305,7 +312,7 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
   const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI OCR" },
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI OCR" },
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: [
@@ -329,7 +336,7 @@ async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<s
   if (!key) throw new Error("Receipt OpenRouter API key is not configured");
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI Receipt Parser" },
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Receipt Parser" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${ocrText}` }], temperature: 0, response_format: { type: "json_object" } }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -345,7 +352,7 @@ async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<str
   if (!key) throw new Error("Document OpenRouter API key is not configured");
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": "http://localhost:3000", "X-Title": "Garage AI Document OCR" },
+    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Document OCR" },
     body: JSON.stringify({ model, messages: [{ role: "user", content: `Исправь только очевидные OCR-ошибки в распознанном тексте документа. Не добавляй догадки, не меняй имена, даты, номера и суммы без явного основания. Сохрани порядок и строки. Верни только исправленный текст.\n\n${ocrText}` }], temperature: 0, max_tokens: 4000 }),
   });
   const payload = await response.json().catch(() => ({}));
@@ -1619,7 +1626,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
       return res.status(403).json({ error: "CSRF-токен недействителен" });
     }
   }
-  const garage = store.garageForUser(session.userId, true);
+  const garage = store.snapshotForUser(session.userId, true);
   requestContext.run({ userId: session.userId, garage, session }, () => next());
 }
 

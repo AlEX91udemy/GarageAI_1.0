@@ -1,0 +1,5 @@
+google-adk==2.13.0
+fastapi>=0.133,<1
+uvicorn[standard]>=0.34,<1
+python-dotenv>=1,<2
+

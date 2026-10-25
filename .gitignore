@@ -14,3 +14,20 @@ data/*.tmp
 # AI Studio debug artifacts (temporary media storage, brain artifacts)
 artifacts/
 .aistudio/
+
+# Local audit exports, Python caches and generated visual/diagnostic artifacts
+*.zip
+*.tar.gz
+__pycache__/
+eng.traineddata
+public/*-preview.png
+public/*-options.png
+public/garageai-*.html
+scripts/_*.mjs
+scripts/*-benchmark.mjs
+scripts/*-audit.mjs
+scripts/capture-*.mjs
+scripts/render-*.mjs
+replace-script.ps1
+simple-replace.ps1
+apply-all-fixes.mjs
