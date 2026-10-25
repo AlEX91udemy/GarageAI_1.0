@@ -74,9 +74,14 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT || 8080);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
-const OPENROUTER_RECEIPT_MODEL = process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL;
-const OPENROUTER_DOCUMENT_MODEL = process.env.OPENROUTER_DOCUMENT_MODEL || OPENROUTER_MODEL;
+const PAID_VISION_MODEL = "google/gemini-2.5-flash";
+function resolveVisionModel(value: string | undefined): string {
+  const model = value?.trim();
+  return !model || model === "openrouter/free" || model.endsWith(":free") ? PAID_VISION_MODEL : model;
+}
+const OPENROUTER_MODEL = resolveVisionModel(process.env.OPENROUTER_MODEL);
+const OPENROUTER_RECEIPT_MODEL = resolveVisionModel(process.env.OPENROUTER_RECEIPT_MODEL || OPENROUTER_MODEL);
+const OPENROUTER_DOCUMENT_MODEL = resolveVisionModel(process.env.OPENROUTER_DOCUMENT_MODEL || OPENROUTER_MODEL);
 const OPENROUTER_DOCUMENT_REFINEMENT_ENABLED = process.env.OPENROUTER_DOCUMENT_REFINEMENT_ENABLED === "true";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 let documentAiClient: documentai.DocumentProcessorServiceClient | null = null;
