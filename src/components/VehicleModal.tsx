@@ -653,7 +653,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
           {/* Row 4: Year, Transmission, Drive Type */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" style={{ order: 3 }}>
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
                 Год выпуска <span className="text-brand-strong">*</span>
@@ -695,7 +695,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
           {/* Row 5: Engine, Fuel, Mileage */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" style={{ order: 4 }}>
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
                 Двигатель <span className="text-brand-strong">*</span>
@@ -737,7 +737,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-end gap-2 pt-4 border-t border-neutral-100">
+          <div className="flex justify-end gap-2 pt-4 border-t border-neutral-100" style={{ order: 5 }}>
             <button
               type="button"
               onClick={onClose}
