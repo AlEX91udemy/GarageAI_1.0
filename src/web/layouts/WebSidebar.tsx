@@ -54,10 +54,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
       <div className="h-16 flex items-center justify-between px-4 border-b border-inherit shrink-0">
         {!isCollapsed && (
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <img src="/garage-ai-mark.png" alt="" className="h-8 w-8 rounded-lg" />
-              <span className="text-base font-bold tracking-normal"><span>Garage</span><span className="text-[#EF3038]">AI</span></span>
-            </div>
+            <img src="/garageai-wordmark.png" alt="GarageAI" className="h-auto w-[116px] object-contain object-left" />
           </div>
         )}
         {isCollapsed && (
