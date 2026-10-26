@@ -38,7 +38,7 @@ describe("LandingPage UI & UX Audit Suite", () => {
     const navLinks = header?.querySelectorAll("nav a");
     expect(navLinks?.length).toBe(4);
 
-    const appButton = header?.querySelector('a[href="/app"]');
+    const appButton = header?.querySelector('a[href="/app?view=mobile"]');
     expect(appButton?.textContent).toContain("Открыть веб-приложение");
   });
 
