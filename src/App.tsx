@@ -1315,6 +1315,10 @@ export default function App() {
           {activeView === "dashboard" && (
             <Dashboard
               vehicle={currentVehicle}
+              onOpenAddVehicle={() => {
+                setVehicleModalMode("add");
+                setShowVehicleModal(true);
+              }}
               serviceRecords={serviceRecords}
               fuelRecords={fuelRecords}
               toFixTasks={toFixTasks}

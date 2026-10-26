@@ -410,6 +410,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
         return (
           <Dashboard
             vehicle={currentVehicle}
+            onOpenAddVehicle={onOpenAddVehicle}
             serviceRecords={currentRecords}
             fuelRecords={currentFuel}
             oemSchedules={currentSchedules}
@@ -466,6 +467,11 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
       {/* Sidebar */}
       <WebSidebar
         activeView={activeView}
+        currentVehicle={currentVehicle}
+        allVehicles={vehicles}
+        onSelectVehicle={(v) => setActiveVehicleId(v.id)}
+        onOpenAddVehicle={onOpenAddVehicle}
+        onOpenEditVehicle={onOpenEditVehicle}
         onNavigate={(view) => setActiveView(view as ActiveView)}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -481,13 +487,8 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
       >
         {/* Top Bar */}
         <WebTopBar
-          currentVehicle={currentVehicle}
-          allVehicles={vehicles}
-          onSelectVehicle={(v) => setActiveVehicleId(v.id)}
           onOpenNotifications={onOpenReminders}
           onToggleTheme={onToggleTheme}
-          onOpenAddVehicle={onOpenAddVehicle}
-          onOpenEditVehicle={onOpenEditVehicle}
           onOpenScan={onOpenScanReceipt}
           onSwitchToMobile={onSwitchToMobile}
           theme={theme}

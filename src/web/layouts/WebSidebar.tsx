@@ -8,7 +8,10 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Plus,
 } from "lucide-react";
+import { Vehicle } from "../../types";
 
 interface WebSidebarProps {
   activeView: string;
@@ -17,6 +20,11 @@ interface WebSidebarProps {
   onToggleCollapse?: () => void;
   onLogout?: () => void;
   theme?: "light" | "dark";
+  currentVehicle: Vehicle;
+  allVehicles: Vehicle[];
+  onSelectVehicle: (v: Vehicle) => void;
+  onOpenAddVehicle?: () => void;
+  onOpenEditVehicle?: () => void;
 }
 
 export const WebSidebar: React.FC<WebSidebarProps> = ({
@@ -26,8 +34,14 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
   onToggleCollapse,
   onLogout,
   theme = "dark",
+  currentVehicle,
+  allVehicles,
+  onSelectVehicle,
+  onOpenAddVehicle,
+  onOpenEditVehicle,
 }) => {
   const isDark = theme === "dark";
+  const [showVehicleList, setShowVehicleList] = React.useState(false);
 
   const navItems = [
     { id: "dashboard", label: "Главная", icon: Home },
@@ -61,6 +75,35 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
           <img src="/garage-ai-mark.png" alt="Garage AI" className="w-8 h-8 rounded-lg mx-auto" />
         )}
       </div>
+
+      {!isCollapsed && (
+        <div className="px-3 pt-3">
+          <button type="button" onClick={() => setShowVehicleList((v) => !v)} className={`w-full flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left transition ${isDark ? "bg-[#1E293B] border-[#243044] hover:border-[#EF3038]/40" : "bg-slate-50 border-slate-200 hover:border-slate-300"}`}>
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-200">
+              {currentVehicle.id === "empty-garage" ? <Plus className="w-4 h-4" /> : <span className="text-[10px] font-bold">{currentVehicle.make[0]}{currentVehicle.model[0]}</span>}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-bold">{currentVehicle.id === "empty-garage" ? "Добавить автомобиль" : `${currentVehicle.make} ${currentVehicle.model}`}</span>
+              <span className="block truncate text-[10px] text-slate-500">{currentVehicle.id === "empty-garage" ? "Профиль автомобиля" : `${currentVehicle.currentMileage.toLocaleString("ru-RU")} км`}</span>
+            </span>
+            <ChevronDown className={`w-4 h-4 shrink-0 transition ${showVehicleList ? "rotate-180" : ""}`} />
+          </button>
+          {showVehicleList && (
+            <div className={`mt-2 rounded-xl border p-1 shadow-lg ${isDark ? "bg-[#1E293B] border-[#243044]" : "bg-white border-slate-200"}`}>
+              {allVehicles.map((vehicle) => (
+                <button key={vehicle.id} type="button" onClick={() => { onSelectVehicle(vehicle); setShowVehicleList(false); }} className={`w-full rounded-lg px-2.5 py-2 text-left text-xs ${vehicle.id === currentVehicle.id ? "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300" : "hover:bg-slate-50 dark:hover:bg-slate-700"}`}>
+                  <span className="block font-semibold truncate">{vehicle.make} {vehicle.model}</span>
+                  <span className="text-[10px] text-slate-500">{vehicle.currentMileage.toLocaleString("ru-RU")} км</span>
+                </button>
+              ))}
+              {(onOpenAddVehicle || onOpenEditVehicle) && <div className="mt-1 border-t border-slate-200/70 pt-1 dark:border-slate-700">
+                {onOpenAddVehicle && <button type="button" onClick={() => { onOpenAddVehicle(); setShowVehicleList(false); }} className="w-full rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-700 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"><Plus className="mr-1 inline h-3.5 w-3.5" />Добавить автомобиль</button>}
+                {onOpenEditVehicle && currentVehicle.id !== "empty-garage" && <button type="button" onClick={() => { onOpenEditVehicle(); setShowVehicleList(false); }} className="w-full rounded-lg px-2.5 py-2 text-left text-xs hover:bg-slate-50 dark:hover:bg-slate-700">Параметры автомобиля</button>}
+              </div>}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">

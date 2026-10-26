@@ -30,6 +30,7 @@ interface DashboardProps {
   toFixTasks: ToFixTask[];
   oemSchedules: OemScheduleItem[];
   onOpenAddService: () => void;
+  onOpenAddVehicle?: () => void;
   onOpenHistory: () => void;
   onOpenAiDiagnostic: () => void;
   onOpenExpenses: () => void;
@@ -48,6 +49,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   toFixTasks,
   oemSchedules,
   onOpenAddService,
+  onOpenAddVehicle,
   onOpenHistory,
   onOpenAiDiagnostic,
   onOpenExpenses,
@@ -154,6 +156,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </p>
         </div>
       </div>
+
+      {vehicle.id === "empty-garage" && onOpenAddVehicle && (
+        <section className="rounded-2xl border border-red-100 bg-white p-4 shadow-sm dark:border-red-900/40 dark:bg-[#17202e] sm:p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700 dark:bg-red-900/25 dark:text-red-300">
+                <Plus className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black tracking-tight text-neutral-900 dark:text-white">
+                  Добавьте первый автомобиль
+                </h3>
+                <p className="mt-1 max-w-xl text-sm leading-snug text-neutral-500 dark:text-neutral-400">
+                  Создайте профиль, чтобы вести историю обслуживания, расходы и напоминания в одном месте.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenAddVehicle}
+              className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-[#B91C1C] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-[#991B1B] sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить автомобиль
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Primary 4-Card Action Grid: Human-friendly automotive cards */}
       <div className="dashboard-actions grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -280,15 +310,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* AI Quick Receipt Scanner Banner (OCR) */}
-      <div className="bg-neutral-900 text-white p-4 sm:p-5 rounded-xl border border-neutral-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
+      <div className="bg-neutral-900 text-white p-4 sm:p-5 rounded-xl border border-neutral-800 shadow-sm flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-2xl bg-brand-strong/20 text-brand-on-dark border border-brand/30 flex items-center justify-center shrink-0">
             <Camera className="w-6 h-6" />
           </div>
-          <div>
-            <div className="text-sm sm:text-base font-bold flex items-center gap-2">
-              <span>Умный сканер чеков и заказ-нарядов</span>
-              <span className="text-[10px] bg-brand-strong text-white font-bold px-2 py-0.5 rounded-full">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm sm:text-base font-bold flex flex-wrap items-center gap-x-2 gap-y-1 leading-snug">
+              <span className="min-w-0">Умный сканер чеков и заказ-нарядов</span>
+              <span className="text-[10px] bg-brand-strong text-white font-bold px-2 py-0.5 rounded-full shrink-0">
                 OCR + AI
               </span>
             </div>
@@ -300,7 +330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
         <button
           onClick={onOpenScanReceipt}
-          className="w-full sm:w-auto px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-brand-strong/30 whitespace-nowrap active:scale-95"
+          className="w-full lg:w-auto shrink-0 px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer shadow-lg shadow-brand-strong/30 whitespace-nowrap active:scale-95"
         >
           Сканировать чек
         </button>
