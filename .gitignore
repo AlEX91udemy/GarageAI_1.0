@@ -20,6 +20,7 @@ artifacts/
 *.tar.gz
 __pycache__/
 eng.traineddata
+*.traineddata
 public/*-preview.png
 public/*-options.png
 public/garageai-*.html
