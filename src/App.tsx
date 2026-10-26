@@ -1039,8 +1039,7 @@ export default function App() {
               aria-current={activeView === "dashboard" ? "page" : undefined} onClick={() => setActiveView("dashboard")}
               className="flex items-center gap-2 cursor-pointer group"
             >
-              <img src="/garage-ai-mark.png" alt="" className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg group-hover:scale-105 transition-transform" />
-              <img src="/garageai-wordmark.png" alt="GarageAI" className="w-24 h-5 object-contain object-left" />
+              <img src="/garage-ai-wordmark-dark.svg" alt="GarageAI" className="h-8 w-[114px] object-contain object-left group-hover:scale-[1.02] transition-transform" />
             </button>
 
             {/* Desktop Navigation Links */}
