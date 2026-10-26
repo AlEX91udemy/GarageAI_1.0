@@ -77,7 +77,31 @@ $env:BENCH_DOCUMENT_LIMIT="10"
 node scripts\ocr-benchmark.mjs
 ```
 
-Отчёт сохраняется в `artifacts/ocr-benchmark-report.json`. Последний прогон после подключения OCR-процессора показал 95% по полям чеков (`38/40`) и 58,69% совпадения слов FUNSD (`831/1416`). Это оценка ответа Gemini; отдельное измерение необработанного `document.text` Google Document AI в текущем бенчмарке пока не выполняется.
+Отчёт сохраняется в `artifacts/ocr-benchmark-report.json`. Последний проверенный прогон на 10 чеках и 10 документах дал 95% по полям чеков (`38/40`) и следующие метрики FUNSD:
+
+| Режим | Совпадение слов | WER | CER |
+| --- | ---: | ---: | ---: |
+| `geminiOnly` | 59,75% | 0,62 | 0,42 |
+| `hybrid` (Document AI `document.text` + Gemini) | 59,62% | 0,62 | 0,43 |
+| `rawDocumentAi` | 59,42% | 0,64 | 0,45 |
+| `tesseractFallback` | 34,95% | 0,79 | 0,61 |
+
+В этом прогоне все 10 запросов к OpenRouter получили HTTP 200 и были разобраны как JSON. Ошибочные запуски Google Document AI исключаются из агрегата `rawDocumentAi`, а их `status` и `error` сохраняются в телеметрии каждого документа. Tesseract Worker завершается через `try/finally`.
+
+#### Эксперимент со структурированным контекстом
+
+В отдельной ветке `experiment/structured-hybrid` проверен режим `hybridStructured`: строки Document AI группируются по страницам и колонкам, сортируются по координатам и передаются Gemini как JSON-layout. На той же выборке он дал 59,55%, то есть не превысил `geminiOnly`. Эксперимент сохранён коммитом `e03230a` и не включён в production или основную ветку.
+
+#### Form Parser R&D
+
+Для извлечения бизнес-полей (VIN, госномер, даты и суммы) планируется отдельный процессор Form Parser. Он подключается только после задания `DOCUMENT_AI_FORM_PROCESSOR_ID` в регионе `eu`:
+
+```text
+DOCUMENT_AI_LOCATION=eu
+DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
+```
+
+Будущий benchmark будет сравнивать пары «ключ-значение», confidence и fallback на текущий OCR + Gemini. Эти показатели не смешиваются с FUNSD word-accuracy и не считаются подтверждёнными до отдельного прогона.
 
 
 ## Каталог автомобилей
