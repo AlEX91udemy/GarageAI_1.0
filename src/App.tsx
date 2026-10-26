@@ -183,17 +183,54 @@ export default function App() {
     // Авторизация из мобильного профиля не должна менять выбранный интерфейс.
     try {
       const data = await fetchGarageData();
-      setVehicles(data.vehicles || []);
+      const readCache = <T,>(key: string): T[] => {
+        try {
+          const value = JSON.parse(localStorage.getItem(key) || "[]");
+          return Array.isArray(value) ? value : [];
+        } catch {
+          return [];
+        }
+      };
+      const serverVehicles = data.vehicles || [];
+      const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
+      const shouldMigrateGuestGarage = serverVehicles.length === 0 && cachedVehicles.length > 0;
+      const loadedVehicles = shouldMigrateGuestGarage ? cachedVehicles : serverVehicles;
+      const cachedServices = readCache<ServiceRecord>("garagehub_service_records");
+      const cachedFuel = readCache<FuelRecord>("garagehub_fuel_records");
+      const cachedOem = readCache<OemScheduleItem>("garagehub_oem_schedules");
+      const cachedParts = readCache<GaragePart>("garagehub_garage_parts");
+      const cachedTasks = readCache<ToFixTask>("garagehub_to_fix_tasks");
+      const cachedTuning = readCache<TuningStage>("garagehub_tuning_stages");
+      setVehicles(loadedVehicles);
       setReminders(data.reminders || []);
-      setServiceRecords(data.serviceRecords || []);
-      setFuelRecords(data.fuelRecords || []);
-      setOemSchedules(data.oemSchedules || []);
-      setGarageParts(data.garageParts || []);
-      setToFixTasks(data.toFixTasks || []);
-      setTuningStages(data.tuningStages || []);
-      setActiveVehicleId(data.vehicles?.[0]?.id || "empty-garage");
+      setServiceRecords(shouldMigrateGuestGarage ? cachedServices : data.serviceRecords || []);
+      setFuelRecords(shouldMigrateGuestGarage ? cachedFuel : data.fuelRecords || []);
+      setOemSchedules(shouldMigrateGuestGarage ? cachedOem : data.oemSchedules || []);
+      setGarageParts(shouldMigrateGuestGarage ? cachedParts : data.garageParts || []);
+      setToFixTasks(shouldMigrateGuestGarage ? cachedTasks : data.toFixTasks || []);
+      setTuningStages(shouldMigrateGuestGarage ? cachedTuning : data.tuningStages || []);
+      setActiveVehicleId(loadedVehicles[0]?.id || "empty-garage");
       setIsOnline(true);
       setGarageLoaded(true);
+      if (shouldMigrateGuestGarage) {
+        await Promise.allSettled([
+          ...cachedVehicles.map((vehicle) => apiCreateVehicle(vehicle)),
+          ...cachedServices.map((record) => apiCreateServiceRecord(record)),
+          ...cachedFuel.map((record) => apiCreateFuelRecord(record)),
+          ...cachedParts.map((part) => apiCreateGaragePart(part)),
+          ...cachedTasks.map((task) => apiCreateToFixTask(task)),
+          ...cachedTuning.map((stage) => apiCreateTuningStage(stage)),
+        ]);
+        if (cachedOem.length > 0) {
+          const byVehicle = new Map<string, OemScheduleItem[]>();
+          cachedOem.forEach((item) => {
+            const list = byVehicle.get(item.vehicleId) || [];
+            list.push(item);
+            byVehicle.set(item.vehicleId, list);
+          });
+          await Promise.allSettled([...byVehicle].map(([vehicleId, items]) => apiSaveOemScheduleItems(vehicleId, items)));
+        }
+      }
     } catch (error) {
       console.warn("Не удалось загрузить персональный гараж:", error);
     }
@@ -557,6 +594,32 @@ export default function App() {
               apiCreateServiceRecord(record).catch(console.error);
             }
           });
+        }
+      }
+      const targetVehicleId = data.vehicle?.id;
+      if (targetVehicleId) {
+        const mergeByVehicle = <T extends { vehicleId: string }>(items: T[], setter: React.Dispatch<React.SetStateAction<T[]>>) => {
+          setter((prev) => [...prev.filter((item) => item.vehicleId !== targetVehicleId), ...items]);
+        };
+        if (Array.isArray(data.fuelRecords)) {
+          mergeByVehicle(data.fuelRecords, setFuelRecords);
+          data.fuelRecords.forEach((record: FuelRecord) => apiCreateFuelRecord(record).catch(console.error));
+        }
+        if (Array.isArray(data.garageParts)) {
+          mergeByVehicle(data.garageParts, setGarageParts);
+          data.garageParts.forEach((part: GaragePart) => apiCreateGaragePart(part).catch(console.error));
+        }
+        if (Array.isArray(data.toFixTasks)) {
+          mergeByVehicle(data.toFixTasks, setToFixTasks);
+          data.toFixTasks.forEach((task: ToFixTask) => apiCreateToFixTask(task).catch(console.error));
+        }
+        if (Array.isArray(data.tuningStages)) {
+          mergeByVehicle(data.tuningStages, setTuningStages);
+          data.tuningStages.forEach((stage: TuningStage) => apiCreateTuningStage(stage).catch(console.error));
+        }
+        if (Array.isArray(data.oemSchedules)) {
+          setOemSchedules((prev) => [...prev.filter((item) => item.vehicleId !== targetVehicleId), ...data.oemSchedules]);
+          apiSaveOemScheduleItems(targetVehicleId, data.oemSchedules).catch(console.error);
         }
       }
     } catch (e) {
