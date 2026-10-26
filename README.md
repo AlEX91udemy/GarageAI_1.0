@@ -103,6 +103,19 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 Будущий benchmark будет сравнивать пары «ключ-значение», confidence и fallback на текущий OCR + Gemini. Эти показатели не смешиваются с FUNSD word-accuracy и не считаются подтверждёнными до отдельного прогона.
 
+### Публикация frontend через Cloudflare
+
+Проект подготовлен к схеме «Cloudflare Worker + Assets для frontend и Cloud Run для Node/Express API». Worker проксирует запросы `/api/*` на Cloud Run через переменную `API_ORIGIN`, поэтому HttpOnly-сессии и CSRF остаются same-origin для браузера.
+
+```powershell
+npm run build
+npx wrangler login
+npx wrangler secret put API_ORIGIN
+npm run cloudflare:deploy
+```
+
+В `API_ORIGIN` укажите полный HTTPS-адрес развёрнутого Node/Express API Cloud Run. Ключи Gemini, OpenRouter, Document AI и service account не добавляйте в Cloudflare Assets или клиентский код: они должны оставаться переменными окружения API-сервиса.
+
 Изолированный сценарий `scripts/form-parser-benchmark.mjs` уже подготовлен. Он использует 10 чеков SROIE по умолчанию, сохраняет пары `fieldName -> fieldValue`, confidence и совпадение с эталонными полями в `artifacts/form-parser-benchmark-report.json`. До создания процессора сценарий завершается без сетевого вызова со статусом `not_configured`:
 
 ```powershell
