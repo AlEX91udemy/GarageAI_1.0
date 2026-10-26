@@ -103,6 +103,20 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 Будущий benchmark будет сравнивать пары «ключ-значение», confidence и fallback на текущий OCR + Gemini. Эти показатели не смешиваются с FUNSD word-accuracy и не считаются подтверждёнными до отдельного прогона.
 
+Изолированный сценарий `scripts/form-parser-benchmark.mjs` уже подготовлен. Он использует 10 чеков SROIE по умолчанию, сохраняет пары `fieldName -> fieldValue`, confidence и совпадение с эталонными полями в `artifacts/form-parser-benchmark-report.json`. До создания процессора сценарий завершается без сетевого вызова со статусом `not_configured`:
+
+```powershell
+$env:FORM_BENCH_LIMIT="10"
+node scripts\form-parser-benchmark.mjs
+```
+
+После создания Form Parser в GCP добавьте ID только в локальное окружение и повторите запуск:
+
+```text
+DOCUMENT_AI_LOCATION=eu
+DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
+```
+
 
 ## Каталог автомобилей
 
