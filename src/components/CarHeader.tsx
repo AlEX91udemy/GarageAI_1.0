@@ -313,10 +313,10 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
 
   return (
     <header
-      className={`vehicle-hero w-full relative pt-3.5 pb-4 px-4 sm:px-5 rounded-3xl shadow-xl border transition-colors ${
+      className={`vehicle-hero w-full relative pt-3.5 pb-4 px-4 sm:px-5 rounded-xl shadow-sm border transition-colors ${
         isLight
-          ? "light-car-header bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900 border-slate-200"
-          : "bg-gradient-to-b from-neutral-950 via-neutral-900 to-neutral-950 text-white border-neutral-800/80"
+          ? "light-car-header bg-white text-slate-900 border-slate-200"
+          : "bg-neutral-950 text-white border-neutral-800/80"
       }`}
     >
       {/* Top Bar: Multi-Car Switcher & Action Buttons */}
@@ -637,7 +637,7 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
           className={`w-full flex items-center justify-between p-2.5 sm:px-3.5 sm:py-2 text-left rounded-2xl border transition-all duration-200 cursor-pointer group shadow-xs ${
             isLight
               ? "bg-amber-50/70 hover:bg-amber-50 border-amber-200/80 text-slate-900"
-              : "bg-gradient-to-r from-amber-500/10 via-neutral-900 to-neutral-900/90 hover:from-amber-500/15 hover:to-neutral-850 border-amber-500/30 text-white"
+              : "bg-neutral-900 hover:bg-neutral-800 border-amber-500/30 text-white"
           }`}
           title="Открыть график планового обслуживания и регламент"
         >

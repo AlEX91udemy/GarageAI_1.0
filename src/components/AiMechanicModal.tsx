@@ -41,11 +41,10 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
 
   // Quick preset queries
   const presets = [
-    "Гул спереди справа на скорости от 60 км/ч, усиливается в левом повороте",
-    "Рывки и пинки вариатора при плавном разгоне с места",
-    "Свист приводного ремня на холодную при запуске утром",
-    "Ошибка Check Engine: код P0420 (эффективность катализатора)",
-    "Стук в передней подвеске при проезде мелких неровностей",
+    "Что проверить перед поездкой?",
+    "Разобрать ошибку двигателя",
+    "Составить план обслуживания",
+    "Оценить стоимость ремонта",
   ];
 
   const handleDiagnose = async (queryText?: string) => {
@@ -144,7 +143,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl border border-neutral-200 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl border border-neutral-200 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Fixed Header */}
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
