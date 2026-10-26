@@ -20,135 +20,151 @@
   --color-chart-7-strong: #be185d;
 }
 
-/* Theme variables */
+/* =========================================
+   UNIFIED THEME & ANIMATION TOKENS
+   ========================================= */
 :root {
   --app-bg: #f4f5f8;
   --app-card: #ffffff;
   --app-subcard: #f8fafc;
   --app-border: #e2e8f0;
   --app-text: #0f172a;
+  --app-text-secondary: #334155;
   --app-text-muted: #536171;
   --app-accent: #b91c1c;
   --app-brand-mark: #ef3038;
+
+  /* Unified interaction & animation tokens */
+  --anim-duration: 180ms;
+  --anim-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --anim-hover-y: -2px;
+  --anim-btn-hover-y: -1px;
+  --anim-active-scale: 0.98;
+  --card-hover-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.08);
 }
 
-html.dark, :root.dark, .dark {
+html.dark,
+:root.dark,
+.dark {
   --app-bg: #0d131d;
   --app-card: #17202e;
-  --app-subcard: #0d131d;
+  --app-subcard: #1e293b;
   --app-border: #243044;
   --app-text: #f8fafc;
-  --app-text-muted: #94A3B8;
+  --app-text-secondary: #cbd5e1;
+  --app-text-muted: #94a3b8;
   --app-accent: #ef3038;
+  --card-hover-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.4);
 }
 
 body {
   background-color: var(--app-bg);
   color: var(--app-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color var(--anim-duration) var(--anim-ease),
+    color var(--anim-duration) var(--anim-ease);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-/* =========================================
-   DARK THEME OVERRIDES (Obsidian Palette)
-   ========================================= */
-.dark .theme-card,
-.dark .bg-white {
-  background-color: var(--app-card) !important;
-  color: #f8fafc;
+/* Unified interactive card hover & transition class */
+.garage-card-anim {
+  transition:
+    transform var(--anim-duration) var(--anim-ease),
+    border-color var(--anim-duration) var(--anim-ease),
+    background-color var(--anim-duration) var(--anim-ease),
+    box-shadow var(--anim-duration) var(--anim-ease);
 }
 
-.dark .theme-subcard,
-.dark .bg-neutral-50,
-.dark .bg-slate-50,
-.dark .bg-gray-50 {
+.garage-card-anim:hover {
+  transform: translateY(var(--anim-hover-y));
+  border-color: color-mix(in srgb, var(--app-brand-mark) 45%, var(--app-border));
+  box-shadow: var(--card-hover-shadow);
+}
+
+/* Unified interactive button hover & press transition class */
+.garage-btn-anim {
+  transition:
+    transform var(--anim-duration) var(--anim-ease),
+    background-color var(--anim-duration) var(--anim-ease),
+    border-color var(--anim-duration) var(--anim-ease),
+    color var(--anim-duration) var(--anim-ease),
+    box-shadow var(--anim-duration) var(--anim-ease),
+    opacity var(--anim-duration) var(--anim-ease);
+}
+
+.garage-btn-anim:hover:not(:disabled) {
+  transform: translateY(var(--anim-btn-hover-y));
+}
+
+.garage-btn-anim:active:not(:disabled) {
+  transform: translateY(0) scale(var(--anim-active-scale));
+}
+
+/* =========================================
+   CONSOLIDATED DARK THEME OVERRIDES
+   ========================================= */
+.dark :is(.theme-card, .bg-white, .bg-neutral-100, .bg-slate-100, .bg-gray-100) {
+  background-color: var(--app-card) !important;
+  color: var(--app-text);
+}
+
+.dark :is(.theme-subcard, .bg-neutral-50, .bg-slate-50, .bg-gray-50) {
   background-color: var(--app-subcard) !important;
 }
 
-.dark .bg-neutral-100,
-.dark .bg-slate-100,
-.dark .bg-gray-100 {
-  background-color: var(--app-card) !important;
-}
-
-.dark .bg-neutral-900,
-.dark .bg-slate-900 {
+.dark :is(.bg-neutral-900, .bg-slate-900) {
   background-color: var(--app-bg) !important;
 }
 
-.dark .bg-neutral-950,
-.dark .bg-slate-950 {
+.dark :is(.bg-neutral-950, .bg-slate-950) {
   background-color: #090d14 !important;
 }
 
-/* Borders in Dark Theme */
-.dark .border-neutral-200,
-.dark .border-neutral-200\/80,
-.dark .border-neutral-200\/60,
-.dark .border-neutral-300,
-.dark .border-slate-200,
-.dark .border-gray-200 {
-  border-color: #243044 !important;
+/* Consolidated Borders in Dark Theme */
+.dark :is(
+  .border-neutral-200,
+  .border-neutral-200\/80,
+  .border-neutral-200\/60,
+  .border-neutral-300,
+  .border-slate-200,
+  .border-gray-200,
+  .border-neutral-800,
+  .border-neutral-700,
+  .border-neutral-700\/70
+) {
+  border-color: var(--app-border) !important;
 }
 
-.dark .border-neutral-800,
-.dark .border-neutral-700,
-.dark .border-neutral-700\/70 {
-  border-color: #243044 !important;
+/* Consolidated Typography in Dark Theme */
+.dark :is(.text-neutral-900, .text-slate-900, .text-gray-900, .text-neutral-800, .text-slate-800, .text-gray-800) {
+  color: var(--app-text) !important;
 }
 
-/* Typography in Dark Theme */
-.dark .text-neutral-900,
-.dark .text-slate-900,
-.dark .text-gray-900 {
-  color: #f8fafc !important;
+.dark :is(.text-neutral-700, .text-slate-700, .text-gray-700) {
+  color: var(--app-text-secondary) !important;
 }
 
-.dark .text-neutral-800,
-.dark .text-slate-800,
-.dark .text-gray-800 {
-  color: #f1f5f9 !important;
-}
-
-.dark .text-neutral-700,
-.dark .text-slate-700,
-.dark .text-gray-700 {
-  color: #cbd5e1 !important;
-}
-
-.dark .text-neutral-600,
-.dark .text-neutral-500,
-.dark .text-slate-600,
-.dark .text-slate-500 {
-  color: #94a3b8 !important;
-}
-
-.dark .text-neutral-400,
-.dark .text-slate-400 {
-  color: #94A3B8 !important;
+.dark :is(.text-neutral-600, .text-neutral-500, .text-slate-600, .text-slate-500, .text-neutral-400, .text-slate-400) {
+  color: var(--app-text-muted) !important;
 }
 
 /* Inputs in Dark Theme */
-.dark input,
-.dark textarea,
-.dark select {
+.dark :is(input, textarea, select) {
   background-color: var(--app-subcard) !important;
-  color: #f8fafc !important;
-  border-color: #243044 !important;
+  color: var(--app-text) !important;
+  border-color: var(--app-border) !important;
 }
 
-.dark input::placeholder,
-.dark textarea::placeholder {
-  color: #94A3B8 !important;
+.dark :is(input, textarea)::placeholder {
+  color: var(--app-text-muted) !important;
 }
 
-/* Accent Badges in Dark Theme */
+/* Accent & Status Badges in Dark Theme */
 .text-brand-strong {
-  color: #b91c1c;
+  color: var(--app-accent);
 }
 
 .dark .text-brand-strong {
-  color: #f87171;
+  color: var(--color-brand-on-dark);
 }
 
 .dark .bg-brand-soft {
@@ -165,8 +181,7 @@ body {
 .dark .border-emerald-200 {
   border-color: rgba(16, 185, 129, 0.25) !important;
 }
-.dark .text-emerald-700,
-.dark .text-emerald-600 {
+.dark :is(.text-emerald-700, .text-emerald-600) {
   color: #34d399 !important;
 }
 
@@ -176,8 +191,7 @@ body {
 .dark .border-amber-200 {
   border-color: rgba(245, 158, 11, 0.25) !important;
 }
-.dark .text-amber-700,
-.dark .text-amber-600 {
+.dark :is(.text-amber-700, .text-amber-600) {
   color: #fbbf24 !important;
 }
 
@@ -187,8 +201,7 @@ body {
 .dark .border-blue-200 {
   border-color: rgba(59, 130, 246, 0.25) !important;
 }
-.dark .text-blue-700,
-.dark .text-blue-600 {
+.dark :is(.text-blue-700, .text-blue-600) {
   color: #60a5fa !important;
 }
 
@@ -241,7 +254,11 @@ html { color-scheme: light; scroll-padding-top: 130px; }
 html.dark { color-scheme: dark; }
 body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; line-height: 1.5; }
 .connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: rgba(245, 158, 11, 0.12); color: #B45309; font-size: 14px; text-align: center; }
-button { transition-property: color, background-color, border-color, opacity, transform; }
+button {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--anim-duration);
+  transition-timing-function: var(--anim-ease);
+}
 td, .font-mono { font-variant-numeric: tabular-nums; }
 .license-plate, .dark .license-plate { background: #fff !important; color: #0F172A !important; border-color: #0F172A !important; }
 .license-plate span, .dark .license-plate span { color: #0F172A !important; }
