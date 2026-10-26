@@ -216,14 +216,14 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             setStatusFilter((prev) => (prev === "overdue" ? "all" : "overdue"));
             setIsScheduleListCollapsed(false);
           }}
-          className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 select-none ${
+          className={`relative rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center gap-3 select-none ${
             statusFilter === "overdue"
               ? "bg-brand-soft/80 border-brand-light ring-2 ring-brand-border shadow-md scale-[1.01]"
               : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-brand-border"
           }`}
           title={statusFilter === "overdue" ? "Нажмите, чтобы сбросить фильтр" : "Показать только требующие внимания"}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-start gap-3 pr-14">
             <div className="w-10 h-10 rounded-2xl bg-brand-soft-strong text-brand-strong flex items-center justify-center shrink-0">
               <AlertTriangle className="w-5 h-5" />
             </div>
@@ -235,7 +235,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             </div>
           </div>
           <span
-            className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
+            className={`absolute right-4 top-4 text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
               statusFilter === "overdue"
                 ? "bg-brand-strong text-white"
                 : "bg-neutral-100 text-neutral-500 hover:bg-brand-soft-strong hover:text-brand-hover"
@@ -251,14 +251,14 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             setStatusFilter((prev) => (prev === "soon" ? "all" : "soon"));
             setIsScheduleListCollapsed(false);
           }}
-          className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 select-none ${
+          className={`relative rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center gap-3 select-none ${
             statusFilter === "soon"
               ? "bg-amber-50/80 border-amber-400 ring-2 ring-amber-500 shadow-md scale-[1.01]"
               : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-amber-200"
           }`}
           title={statusFilter === "soon" ? "Нажмите, чтобы сбросить фильтр" : "Показать позиции, где скоро замена"}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-start gap-3 pr-14">
             <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
               <Clock className="w-5 h-5" />
             </div>
@@ -270,7 +270,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             </div>
           </div>
           <span
-            className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
+            className={`absolute right-4 top-4 text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
               statusFilter === "soon"
                 ? "bg-amber-600 text-white"
                 : "bg-neutral-100 text-neutral-500 hover:bg-amber-100 hover:text-amber-700"
@@ -286,14 +286,14 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             setStatusFilter((prev) => (prev === "ok" ? "all" : "ok"));
             setIsScheduleListCollapsed(false);
           }}
-          className={`rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 select-none ${
+          className={`relative rounded-3xl p-4 border text-left transition-all duration-200 cursor-pointer flex items-center gap-3 select-none ${
             statusFilter === "ok"
               ? "bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-500 shadow-md scale-[1.01]"
               : "bg-white hover:bg-neutral-50 border-neutral-200/80 shadow-sm hover:border-emerald-200"
           }`}
           title={statusFilter === "ok" ? "Нажмите, чтобы сбросить фильтр" : "Показать позиции в пределах нормы"}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-start gap-3 pr-14">
             <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
@@ -305,7 +305,7 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
             </div>
           </div>
           <span
-            className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
+            className={`absolute right-4 top-4 text-[10px] font-bold px-2 py-1 rounded-full uppercase transition ${
               statusFilter === "ok"
                 ? "bg-emerald-600 text-white"
                 : "bg-neutral-100 text-neutral-500 hover:bg-emerald-100 hover:text-emerald-700"

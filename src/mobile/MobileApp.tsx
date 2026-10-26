@@ -289,11 +289,31 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       case "home":
         if (vehicles.length === 0 && currentVehicle.id === "empty-garage") {
           return (
-            <div className="h-full w-full bg-neutral-950 text-white flex flex-col items-center justify-center px-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-brand-strong/15 text-brand-on-dark flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
+            <div
+              className={`h-full w-full flex-1 flex flex-col items-center justify-center px-6 text-center transition-colors ${
+                themeMode === "dark"
+                  ? "bg-[#0D131D] text-[#F8FAFC]"
+                  : "bg-[#F4F5F8] text-[#0F172A]"
+              }`}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-[#EF3038]/15 text-[#EF3038] flex items-center justify-center mb-4">
+                <Car className="w-8 h-8" />
+              </div>
               <h2 className="text-xl font-black">Гараж пока пуст</h2>
-              <p className="text-sm text-neutral-400 mt-2 max-w-xs">Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.</p>
-              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-brand-strong px-5 py-3 text-sm font-bold">Добавить автомобиль</button>
+              <p
+                className={`text-sm mt-2 max-w-xs ${
+                  themeMode === "dark" ? "text-[#94A3B8]" : "text-[#536171]"
+                }`}
+              >
+                Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.
+              </p>
+              <button
+                type="button"
+                onClick={onOpenAddVehicleModal}
+                className="mt-5 rounded-xl bg-[#B91C1C] hover:bg-[#991B1B] text-white px-5 py-3 text-sm font-bold transition-colors cursor-pointer"
+              >
+                Добавить автомобиль
+              </button>
             </div>
           );
         }
@@ -873,17 +893,31 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
   return (
     <div
-      className={`h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
-        isWeb ? "bg-[#0D131D]" : "bg-neutral-950 sm:py-6"
-      }`}
+      className={`h-[100dvh] w-full flex flex-col items-center justify-start p-0 overflow-hidden transition-colors ${
+        themeMode === "dark"
+          ? "bg-[#0D131D] text-[#F8FAFC]"
+          : "bg-[#F4F5F8] text-[#0F172A]"
+      } ${isWeb ? "" : "sm:py-6"}`}
     >
       {/* Top Floating Control Bar (Desktop/Preview mode toggle) */}
       {!isWeb && (
-      <header className="mobile-preview-controls w-full max-w-[430px] shrink-0 px-3 sm:px-4 py-2 flex items-center justify-between z-40 bg-neutral-900/90 backdrop-blur-md rounded-2xl mb-2 sm:mb-3 border border-neutral-800 text-xs shadow-xl">
+      <header
+        className={`mobile-preview-controls w-full max-w-[430px] shrink-0 px-3 sm:px-4 py-2 flex items-center justify-between z-40 backdrop-blur-md rounded-2xl mb-2 sm:mb-3 border text-xs shadow-sm transition-colors ${
+          themeMode === "dark"
+            ? "bg-[#17202E]/95 border-[#243044] text-[#F8FAFC]"
+            : "bg-[#FFFFFF]/95 border-[#E2E8F0] text-[#0F172A]"
+        }`}
+      >
         <div className="flex items-center gap-2">
           <img src="/garage-ai-mark.png" alt="GarageAI" className="w-6 h-6 rounded-lg object-contain" />
-          <span className="font-bold text-white tracking-tight text-xs">GarageAI</span>
-          <span className="text-[10px] font-mono text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded hidden xs:inline">
+          <span className="font-bold tracking-tight text-xs">GarageAI</span>
+          <span
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded hidden xs:inline ${
+              themeMode === "dark"
+                ? "text-[#94A3B8] bg-[#1E293B]"
+                : "text-[#536171] bg-[#F8FAFC] border border-[#E2E8F0]"
+            }`}
+          >
             iOS / Android
           </span>
         </div>
@@ -893,10 +927,14 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           {onSwitchToWebView && (
             <button
               onClick={onSwitchToWebView}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px]"
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition cursor-pointer font-semibold text-[11px] ${
+                themeMode === "dark"
+                  ? "bg-[#1E293B] border-[#243044] text-[#94A3B8] hover:text-[#F8FAFC]"
+                  : "bg-[#F8FAFC] border-[#E2E8F0] text-[#536171] hover:text-[#0F172A]"
+              }`}
               title="Переключиться на Web-версию"
             >
-              <Monitor className="w-3.5 h-3.5 text-neutral-400" />
+              <Monitor className="w-3.5 h-3.5" />
               <span>Web</span>
             </button>
           )}
@@ -906,10 +944,14 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onClick={() =>
               setDeviceFrameMode(deviceFrameMode === "frame" ? "full" : "frame")
             }
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer font-semibold text-[11px]"
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border transition cursor-pointer font-semibold text-[11px] ${
+              themeMode === "dark"
+                ? "bg-[#1E293B] border-[#243044] text-[#94A3B8] hover:text-[#F8FAFC]"
+                : "bg-[#F8FAFC] border-[#E2E8F0] text-[#536171] hover:text-[#0F172A]"
+            }`}
             title="Переключить рамку смартфона"
           >
-            <Smartphone className="w-3.5 h-3.5 text-neutral-400" />
+            <Smartphone className="w-3.5 h-3.5" />
             <span>{deviceFrameMode === "frame" ? "Без рамки" : "В рамке"}</span>
           </button>
         </div>
@@ -927,7 +969,9 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             : "bg-[#F4F5F8] text-[#0F172A]"
         } ${
           !isWeb && deviceFrameMode === "frame"
-            ? "sm:flex-none sm:rounded-[44px] sm:border-[8px] sm:border-neutral-800 sm:h-[840px] sm:max-h-[calc(100vh-60px)] sm:min-h-[640px] sm:ring-1 sm:ring-neutral-700"
+            ? themeMode === "dark"
+              ? "sm:flex-none sm:rounded-[44px] sm:border-[8px] sm:border-neutral-800 sm:h-[840px] sm:max-h-[calc(100vh-60px)] sm:min-h-[640px] sm:ring-1 sm:ring-neutral-700"
+              : "sm:flex-none sm:rounded-[44px] sm:border-[8px] sm:border-[#1E293B] sm:h-[840px] sm:max-h-[calc(100vh-60px)] sm:min-h-[640px] sm:ring-1 sm:ring-[#E2E8F0]"
             : ""
         }`}
       >

@@ -20,7 +20,6 @@ import {
   ArrowRight,
   Check,
   Edit2,
-  ScanBarcode,
 } from "lucide-react";
 import { formatGarageCurrency } from "../currency";
 import { formatDistance } from "../units";
@@ -181,31 +180,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Barcode / VIN Camera Scanner Button */}
-          <button
-            id="home-btn-barcode-scan"
-            onClick={() => {
-              if (typeof onOpenScanBarcode === "function") {
-                onOpenScanBarcode();
-              } else if (typeof onNavigate === "function") {
-                onNavigate("scan_barcode");
-              }
-            }}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative active:scale-95 ${
-              isDark
-                ? "bg-[#17202e] border-[#243044] text-brand-on-dark hover:text-brand-light hover:border-brand/40"
-                : "bg-white border-neutral-200 text-brand-strong hover:bg-neutral-50 shadow-xs"
-            }`}
-            title="Сканер штрихкодов запчастей и VIN"
-          >
-            <ScanBarcode className="w-4 h-4" />
-          </button>
-
           {/* Notifications Button */}
           <button
             id="home-btn-notifications"
             onClick={onOpenNotifications}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative active:scale-95 ${
+            className={`garage-btn-anim w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer relative ${
               isDark
                 ? "bg-[#17202e] border-[#243044] text-slate-300 hover:text-white"
                 : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-xs"
@@ -224,7 +203,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             id="home-btn-theme-toggle"
             onClick={onToggleTheme}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+            className={`garage-btn-anim w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer ${
               isDark
                 ? "bg-[#17202e] border-[#243044] text-amber-400 hover:text-amber-300"
                 : "bg-white border-neutral-200 text-slate-700 hover:bg-neutral-50 shadow-xs"
@@ -238,7 +217,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             id="home-btn-settings"
             onClick={() => onNavigate("settings")}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+            className={`garage-btn-anim w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer ${
               isDark
                 ? "bg-[#17202e] border-[#243044] text-slate-300 hover:text-white"
                 : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-xs"
@@ -347,10 +326,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               setNewMileageInput(String(currentVehicle.currentMileage));
               setShowQuickMileageModal(true);
             }}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`garage-card-anim p-3 rounded-2xl border cursor-pointer ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
-                : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
+                ? "bg-[#17202e] border-[#243044]"
+                : "bg-white border-[#E2E8F0] shadow-xs"
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
@@ -374,10 +353,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             aria-label="Открыть дневник заправок"
             onClick={() => onNavigate("fuel")}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`garage-card-anim p-3 rounded-2xl border cursor-pointer ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
-                : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
+                ? "bg-[#17202e] border-[#243044]"
+                : "bg-white border-[#E2E8F0] shadow-xs"
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
@@ -401,10 +380,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             aria-label="Открыть список работ по автомобилю"
             onClick={() => onNavigate("repair")}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`garage-card-anim p-3 rounded-2xl border cursor-pointer ${
               isDark
-                ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
-                : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
+                ? "bg-[#17202e] border-[#243044]"
+                : "bg-white border-[#E2E8F0] shadow-xs"
             }`}
           >
             <div className="flex items-center gap-1.5 mb-1">
