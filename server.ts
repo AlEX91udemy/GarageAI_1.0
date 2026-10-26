@@ -2278,7 +2278,8 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
     const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное base64-изображение." });
     const prepared = await prepareDocumentImage(Buffer.from(cleanBase64, "base64"));
-    const documentOcrId = process.env.DOCUMENT_AI_OCR_PROCESSOR_ID;
+    const documentOcrId =
+      process.env.DOCUMENT_AI_OCR_PROCESSOR_ID || process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID;
     if (documentOcrId && process.env.GOOGLE_CLOUD_PROJECT) {
       try {
         const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), detectedMime, documentOcrId);
@@ -2289,7 +2290,8 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
             try { refinedText = await requestOpenRouterDocumentRefinement(doc.text); }
             catch (error: any) { refinementWarning = error?.message || "OpenRouter refinement failed"; }
           }
-          return res.json({ text: refinedText || doc.text, sources: { vision: doc.text, local: "", google: doc.text, refined: refinedText }, preprocessing: { variants: ["google-document-ai", ...(refinedText ? ["openrouter-text-refinement"] : [])], mimeType: detectedMime }, warning: refinementWarning });
+          const text = mergeOcrText(doc.text, refinedText || "");
+          return res.json({ text, sources: { vision: doc.text, local: "", google: doc.text, refined: refinedText }, preprocessing: { variants: ["google-document-ai", ...(refinedText ? ["openrouter-text-refinement"] : [])], mimeType: detectedMime }, warning: refinementWarning });
         }
       } catch (error) { console.warn("Document AI OCR failed, using fallback:", error); }
     }
