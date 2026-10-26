@@ -27,7 +27,7 @@ async function __extractWithDocumentAi(dataUrl) {
     __lastDocAiResult = { status: 500, error: "Application Default Credentials unavailable" }; return null;
   }
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
-  const processorId = process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID || process.env.DOCUMENT_AI_OCR_PROCESSOR_ID;
+  const processorId = process.env.DOCUMENT_AI_OCR_PROCESSOR_ID || process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID;
   if (!projectId || !processorId) { __lastDocAiResult = { status: 500, error: "Document AI configuration is missing" }; return null; }
   try {
     const match = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/s);
