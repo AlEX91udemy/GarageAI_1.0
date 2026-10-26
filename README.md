@@ -37,6 +37,48 @@ Garage AI — веб-приложение для ведения цифровог
 
 Дополнительно сравнили три модели на одинаковых 20 документах: `google/gemini-2.5-flash` — 60,60% совпадения слов, `qwen/qwen3-vl-235b-a22b-instruct` — 60,30%, `google/gemini-2.5-pro` — 42,35%. Pro стоила около $0,34 за 20 страниц, поэтому для OCR невыгодна. Бесплатная `dots-studio/dots-3-note-preview:free` не завершила пробный запуск. Ни одна проверенная модель не подтвердила цель 90%; для дальнейшего роста нужны улучшение/разбиение изображения и отдельный OCR-движок либо тест на документном датасете с полноценной OCR-разметкой. Сравнение: `artifacts/document-model-comparison.json`; сценарий: `scripts/compare-document-models.mjs`.
 
+### Гибридный OCR Google Document AI + Gemini
+
+Для документов `scripts/ocr-benchmark.mjs` поддерживает гибридный режим: Google Cloud Document AI сначала извлекает полный оптический текст страницы (`document.text`), после чего Gemini через OpenRouter получает изображение и этот текст для структурированного JSON-ответа. Если Google credentials, процессор или права недоступны, сценарий автоматически использует JPEG-тайлы и OpenRouter без остановки бенчмарка. Чеки продолжают обрабатываться через текущий маршрут OpenRouter.
+
+Для включения Google Document AI задайте в `.env`:
+
+```text
+GOOGLE_CLOUD_PROJECT=garageai-512320
+DOCUMENT_AI_LOCATION=eu
+DOCUMENT_AI_OCR_PROCESSOR_ID=<id OCR-процессора>
+DOCUMENT_AI_RECEIPT_PROCESSOR_ID=<id процессора чеков, опционально>
+```
+
+Авторизуйте Application Default Credentials под аккаунтом Google Cloud, которому выдана роль `Document AI API User` (`roles/documentai.apiUser`):
+
+```powershell
+gcloud auth application-default login
+```
+
+Если `gcloud` не добавлен в `PATH`, используйте полный путь к `gcloud.cmd`, например:
+
+```powershell
+& "D:\Users\user\AppData\Local\Google\Cloud SDK\google-cloud-sdk\bin\gcloud.cmd" auth application-default login
+```
+
+API включается для проекта командой:
+
+```powershell
+gcloud services enable documentai.googleapis.com --project=garageai-512320
+```
+
+Короткий прогон на 10 чеках и 10 документах:
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED="0"
+$env:BENCH_RECEIPT_LIMIT="10"
+$env:BENCH_DOCUMENT_LIMIT="10"
+node scripts\ocr-benchmark.mjs
+```
+
+Отчёт сохраняется в `artifacts/ocr-benchmark-report.json`. Последний прогон после подключения OCR-процессора показал 95% по полям чеков (`38/40`) и 58,69% совпадения слов FUNSD (`831/1416`). Это оценка ответа Gemini; отдельное измерение необработанного `document.text` Google Document AI в текущем бенчмарке пока не выполняется.
+
 
 ## Каталог автомобилей
 
