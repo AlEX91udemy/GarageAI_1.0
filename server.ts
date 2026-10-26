@@ -46,7 +46,13 @@ import {
 } from "./src/catalog/database";
 import { searchKnowledge } from "./src/catalog/knowledge";
 import { verifyModification } from "./src/catalog/verification";
-import { prepareDocumentImage, recognizeDocumentImage } from "./server/documentOcr";
+import {
+  prepareDocumentImage,
+  prepareVisionDocumentTiles,
+  recognizeDocumentImage,
+  normalizeExtractedVin,
+  normalizeRussianPlate,
+} from "./server/documentOcr";
 import { GarageStore, emptyGarage, type GarageData } from "./server/store";
 import { validateGarageBackup } from "./server/backup";
 import {
@@ -72,7 +78,7 @@ import {
 dotenv.config();
 
 const app = express();
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 3000);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
@@ -334,16 +340,46 @@ async function requestOpenRouterVision(imageBase64: string, mimeType: string, pr
 async function requestOpenRouterDocumentText(imageBase64: string, mimeType: string): Promise<string> {
   const { key, model } = getOpenRouterConfig("document");
   if (!key) throw new Error("Document OpenRouter API key is not configured");
-  const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`;
-  const payload = await requestOpenRouter({
+
+  const rawBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "");
+  const inputBuffer = Buffer.from(rawBase64, "base64");
+  const tiles = await prepareVisionDocumentTiles(inputBuffer);
+
+  const imageParts =
+    tiles.length > 0
+      ? tiles.map((tile) => ({
+          type: "image_url",
+          image_url: { url: `data:${tile.mimeType};base64,${tile.base64}` },
+        }))
+      : [
+          {
+            type: "image_url",
+            image_url: {
+              url: imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`,
+            },
+          },
+        ];
+
+  const promptText =
+    tiles.length > 1
+      ? "You are a high-precision document OCR engine. You are given the full document page followed by zoomed-in top and bottom crops of the same page to help read small or faint print. Transcribe EVERY visible word, printed form field label (even if the field is blank), table column header, cell value, checkbox label, header, footer, margin number, stamp, and handwritten annotation in natural top-to-bottom reading order. Preserve exact spelling, casing, numbers, and punctuation. Do not repeat lines from the overlapping region, and do not summarize, translate, or omit anything. Return only the raw plain text transcription."
+      : "You are a high-precision document OCR engine. Transcribe EVERY visible word, printed form field label, table header, cell value, header, footer, margin code, stamp, and handwritten annotation in natural reading order. Preserve exact spelling, numbers, punctuation and line breaks. Do not summarize, translate, or omit anything. Return only the plain text transcription.";
+
+  const payload = await requestOpenRouter(
+    {
       model,
-      messages: [{ role: "user", content: [
-        { type: "text", text: "You are a document OCR engine. Transcribe every visible character and word in natural reading order. Preserve spelling, numbers, punctuation and line breaks. Do not summarize, translate, correct or omit anything. Return only the transcription as plain text." },
-        { type: "image_url", image_url: { url: imageUrl } },
-      ] }],
+      messages: [
+        {
+          role: "user",
+          content: [{ type: "text", text: promptText }, ...imageParts],
+        },
+      ],
       temperature: 0,
-      max_tokens: 4000,
-    }, "Garage AI OCR", key);
+      max_tokens: 8192,
+    },
+    "Garage AI OCR",
+    key
+  );
   const content = payload?.choices?.[0]?.message?.content;
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("Document OCR returned an empty response");
@@ -385,7 +421,42 @@ async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<str
 }
 
 function mergeOcrText(...texts: string[]) {
-  return texts.map((text) => text.trim()).find(Boolean) || "";
+  const valid = texts.map((t) => (typeof t === "string" ? t.trim() : "")).filter(Boolean);
+  if (valid.length === 0) return "";
+  if (valid.length === 1) return valid[0];
+
+  const primaryLines = valid[0].split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const normalizeLine = (line: string) => line.toLowerCase().replace(/[^0-9a-zа-яё]+/gi, "");
+  const seenNormalized = new Set(primaryLines.map(normalizeLine).filter(Boolean));
+  const seenWords = new Set(
+    valid[0]
+      .toLowerCase()
+      .split(/[^0-9a-zа-яё]+/i)
+      .filter((w) => w.length >= 2)
+  );
+
+  const extraLines: string[] = [];
+  for (const secondary of valid.slice(1)) {
+    for (const rawLine of secondary.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const norm = normalizeLine(line);
+      if (!norm || seenNormalized.has(norm)) continue;
+
+      const words = line
+        .toLowerCase()
+        .split(/[^0-9a-zа-яё]+/i)
+        .filter((w) => w.length >= 2);
+      const newWordsCount = words.filter((w) => !seenWords.has(w)).length;
+      if (newWordsCount > 0) {
+        seenNormalized.add(norm);
+        words.forEach((w) => seenWords.add(w));
+        extraLines.push(line);
+      }
+    }
+  }
+
+  return extraLines.length > 0 ? [...primaryLines, ...extraLines].join("\n") : primaryLines.join("\n");
 }
 
 function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T): T {
