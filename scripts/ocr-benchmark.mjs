@@ -5,10 +5,12 @@ dotenv.config();
 // [GARAGEAI_MULTISCALE_OCR_HOOK]
 import sharp from "sharp";
 import { v1 as documentai } from "@google-cloud/documentai";
+import { createWorker, OEM, PSM } from "tesseract.js";
 
 const __origFetch = globalThis.fetch;
 let __docAiClient = null;
 let __docAiDisabled = false;
+let __lastDocAiResult = { status: 503, error: "Document AI unavailable" };
 function __getDocAiClient() {
   if (!__docAiClient) {
     const location = process.env.DOCUMENT_AI_LOCATION || "us";
@@ -17,15 +19,15 @@ function __getDocAiClient() {
   return __docAiClient;
 }
 async function __extractWithDocumentAi(dataUrl) {
-  if (__docAiDisabled) return null;
+  if (__docAiDisabled) { __lastDocAiResult = { status: 503, error: "Document AI disabled" }; return null; }
   const adcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || `${process.env.APPDATA || ""}/gcloud/application_default_credentials.json`;
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !fsSync.existsSync(adcPath)) {
     __docAiDisabled = true;
-    return null;
+    __lastDocAiResult = { status: 500, error: "Application Default Credentials unavailable" }; return null;
   }
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   const processorId = process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID || process.env.DOCUMENT_AI_OCR_PROCESSOR_ID;
-  if (!projectId || !processorId) return null;
+  if (!projectId || !processorId) { __lastDocAiResult = { status: 500, error: "Document AI configuration is missing" }; return null; }
   try {
     const match = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/s);
     const mimeType = match?.[1] || "image/jpeg";
@@ -33,12 +35,12 @@ async function __extractWithDocumentAi(dataUrl) {
     const location = process.env.DOCUMENT_AI_LOCATION || "us";
     const name = `projects/${projectId}/locations/${location}/processors/${processorId}`;
     const [result] = await __getDocAiClient().processDocument({ name, rawDocument: { content, mimeType } });
-    return result?.document?.text?.trim() || null;
+    __lastDocAiResult = { status: 200, error: null }; return result?.document?.text?.trim() || null;
   } catch (error) {
     __docAiDisabled = true;
     __docAiClient = null;
     console.warn(`[Document AI fallback] ${error?.message || error}`);
-    return null;
+    __lastDocAiResult = { status: error?.code || 500, error: error?.message || String(error) }; return null;
   }
 }
 
@@ -217,15 +219,18 @@ if(!receiptKey || !/^sk-or-v1-[a-f0-9]{64}$/.test(receiptKey)) throw Error("Rece
 if(!documentKey || !/^sk-or-v1-[a-f0-9]{64}$/.test(documentKey)) throw Error("Document OpenRouter key is missing or malformed");
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)); const norm=x=>String(x??"").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const num=x=>{const m=String(x??"").replace(/,/g,".").match(/\d+(?:\.\d+)?/);return m?Number(m[0]):null};
+function expectedFunText(value){const items=Array.isArray(value)?value:[value];return items.map(item=>{const raw=String(item??"").trim();const match=raw.match(/^-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s+-?\d+(?:\.\d+)?\s+(.+)$/);return (match?match[1]:raw).trim()}).filter(Boolean).join(" ")}
 async function rows(ds,split,n){const u=`https://datasets-server.huggingface.co/rows?dataset=${encodeURIComponent(ds)}&config=default&split=${split}&offset=0&length=${n}`;const r=await fetch(u);if(!r.ok)throw Error(`${ds} ${r.status}`);return(await r.json()).rows||[]}
 async function dataUrl(src){const r=await fetch(src);const raw=r.headers.get("content-type")?.split(";")[0];const mime=raw&&raw.startsWith("image/")?raw:"image/jpeg";return `data:${mime};base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`}
 async function ask(image,text,{key,model,maxTokens=800}){for(let attempt=0;attempt<3;attempt++){const r=await fetch("https://openrouter.ai/api/v1/chat/completions",{method:"POST",headers:{Authorization:`Bearer ${key}`,"Content-Type":"application/json"},body:JSON.stringify({model,messages:[{role:"user",content:[{type:"text",text},{type:"image_url",image_url:{url:image}}]}],response_format:{type:"json_object"},temperature:0,max_tokens:maxTokens})});const d=await r.json().catch(()=>({}));if(r.status===429||r.status>=500){await sleep(1500*(attempt+1));continue}return {status:r.status,data:d,error:d?.error?JSON.stringify(d.error):null}}return {status:503,data:{},error:"retry_exhausted"}}
 function json(x){const t=typeof x?.choices?.[0]?.message?.content==="string"?x.choices[0].message.content:"";try{return JSON.parse(t)}catch{const m=t.match(/\{[\s\S]*\}/);try{return m?JSON.parse(m[0]):null}catch{return null}}}
 function receiptScore(e,a){const fields=["company","date","address","total"];const actual=a?.[0]||a||{};const matched=fields.filter(f=>{const l=norm(e[f]);const r=norm(actual[f]??actual.merchantName);if(!l||!r)return false;return f==="total"?num(l)===num(r):l===r||l.includes(r)||r.includes(l)});return {matched:matched.length,total:4}}
-function docScore(expected,actual){const e=new Set(norm(expected).split(" ").filter(x=>x.length>1));const a=new Set(norm(actual?.text??actual??"").split(" ").filter(x=>x.length>1));const m=[...e].filter(x=>a.has(x)).length;return {matched:m,total:e.size}}
+function docScore(expected,actual){const e=new Set(norm(expected).split(" ").filter(Boolean));const a=new Set(norm(actual?.text??actual??"").split(" ").filter(Boolean));const m=[...e].filter(x=>a.has(x)).length;return {matched:m,total:e.size}}
+function levenshtein(a,b){const prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let diag=prev[0];prev[0]=i;for(let j=1;j<=b.length;j++){const up=prev[j];prev[j]=Math.min(prev[j]+1,prev[j-1]+1,diag+(a[i-1]===b[j-1]?0:1));diag=up}}return prev[b.length]}
+function textMetrics(expected,actual){const e=norm(expected),a=norm(actual);const ew=e.split(" ").filter(Boolean),aw=a.split(" ").filter(Boolean),ec=e.replace(/\s/g,""),ac=a.replace(/\s/g,"");const expectedSet=new Set(ew),actualSet=new Set(aw),matchedTokenCount=[...expectedSet].filter(w=>actualSet.has(w)).length;return {expectedTokenCount:expectedSet.size,actualTokenCount:actualSet.size,matchedTokenCount,accuracyPercent:expectedSet.size?100*matchedTokenCount/expectedSet.size:0,WER:ew.length?levenshtein(ew,aw)/ew.length:0,CER:ec.length?levenshtein(ec,ac)/ec.length:0}}
 async function runReceipt(row,i){const e=row.row.entities||{};try{const res=await ask(await dataUrl(row.row.image.src),"Return JSON only with company, date, address, total. Copy visible values exactly. No markdown.",{key:receiptKey,model:receiptModel,maxTokens:800});return {i,status:res.status,parseOk:Boolean(json(res.data)),score:receiptScore(e,json(res.data)),cost:res.data.usage?.cost||0,error:res.error}}catch(error){return {i,status:0,parseOk:false,score:{matched:0,total:4},error:String(error)}}}
-async function runDoc(row,i){const e=row.row.ocr_annotation_texts||"";try{const res=await ask(await dataUrl(row.row.image.src),"Return JSON only with one key text containing all visible text. Copy every visible word, preserving reading order. No markdown.",{key:documentKey,model:documentModel,maxTokens:1600});return {i,status:res.status,parseOk:Boolean(json(res.data)),score:docScore(e,json(res.data)),cost:res.data.usage?.cost||0,error:res.error}}catch(error){return {i,status:0,parseOk:false,score:{matched:0,total:0},error:String(error)}}}
+async function runDoc(row,i,worker){const e=expectedFunText(row.row.ocr_annotation_texts);try{const original=await dataUrl(row.row.image.src);const tiles=await __buildDocumentTiles(original);const raw=(await __extractWithDocumentAi(original))||"";const plain=await ask(tiles[0],"Return JSON only with one key text containing all visible text. Copy every visible word precisely. Do not summarize or translate.",{key:documentKey,model:documentModel,maxTokens:3500});const hybrid=await ask(tiles[0],`Return JSON only with one key text. Preserve every word from this Google OCR reference; do not add or omit words.\nGOOGLE OCR:\n${raw||""}`,{key:documentKey,model:documentModel,maxTokens:3500});const tess=worker?await worker.recognize(Buffer.from(original.split(",")[1],"base64")):null;const p=json(plain.data)?.text||"",h=json(hybrid.data)?.text||"",t=tess?.data?.text?.trim()||"";return {i,status:plain.status,parseOk:Boolean(json(plain.data)),score:docScore(e,p),rawDocumentAi:{text:raw,status:__lastDocAiResult.status,error:__lastDocAiResult.error,score:textMetrics(e,raw)},geminiOnly:{text:p,score:textMetrics(e,p)},hybrid:{text:h,score:textMetrics(e,h)},tesseractFallback:{text:t,score:textMetrics(e,t)},cost:(plain.data?.usage?.cost||0)+(hybrid.data?.usage?.cost||0),error:plain.error||hybrid.error}}catch(error){return {i,status:0,parseOk:false,score:{matched:0,total:0},error:String(error)}}}
 async function run(name,items,fn){const out=[];for(let i=0;i<items.length;i++){out.push(await fn(items[i],i));if((i+1)%10===0)console.log(`${name} ${i+1}/${items.length}`);await sleep(300)}return out}
-const receiptLimit=Number(process.env.BENCH_RECEIPT_LIMIT||env.BENCH_RECEIPT_LIMIT||50); const documentLimit=Number(process.env.BENCH_DOCUMENT_LIMIT||env.BENCH_DOCUMENT_LIMIT||100); const receipts=await run("receipts",await rows("jsdnrs/ICDAR2019-SROIE","test",receiptLimit),runReceipt);const documents=await run("documents",await rows("tejasvaidhya/FUNSD","test",documentLimit),runDoc);
+const receiptLimit=Number(process.env.BENCH_RECEIPT_LIMIT||env.BENCH_RECEIPT_LIMIT||50); const documentLimit=Number(process.env.BENCH_DOCUMENT_LIMIT||env.BENCH_DOCUMENT_LIMIT||100); const receipts=await run("receipts",await rows("jsdnrs/ICDAR2019-SROIE","test",receiptLimit),runReceipt);const worker=await createWorker("rus+eng",OEM.LSTM_ONLY,{logger:()=>undefined});await worker.setParameters({tessedit_pageseg_mode:PSM.SPARSE_TEXT,preserve_interword_spaces:"1",user_defined_dpi:"300"});let documents;try{documents=await run("documents",await rows("tejasvaidhya/FUNSD","test",documentLimit),(row,i)=>runDoc(row,i,worker).then(result=>({...result,expectedText:expectedFunText(row.row.ocr_annotation_texts)})));}finally{await worker.terminate();console.log("[Tesseract Worker] Ресурсы освобождены.");}
 const summary=xs=>({count:xs.length,http200:xs.filter(x=>x.status===200).length,parsed:xs.filter(x=>x.parseOk).length,matched:xs.reduce((s,x)=>s+x.score.matched,0),expected:xs.reduce((s,x)=>s+x.score.total,0),fieldAccuracyPercent:100*xs.reduce((s,x)=>s+x.score.matched,0)/Math.max(1,xs.reduce((s,x)=>s+x.score.total,0)),estimatedCost:xs.reduce((s,x)=>s+(x.cost||0),0)});
-const report={generatedAt:new Date().toISOString(),receiptModel,documentModel,receipts:summary(receipts),documents:summary(documents),receiptResults:receipts,documentResults:documents};await fs.writeFile(new URL("../artifacts/ocr-benchmark-report.json",import.meta.url),JSON.stringify(report,null,2));console.log(JSON.stringify({receiptModel,documentModel,receipts:report.receipts,documents:report.documents,report:"artifacts/ocr-benchmark-report.json"},null,2));
+const modeSummary=k=>{const runs=documents.map(x=>x[k]).filter(Boolean).filter(x=>k!=="rawDocumentAi"||x.status===200);const xs=runs.map(x=>x.score).filter(Boolean);return {count:xs.length,matchedTokenCount:xs.reduce((s,x)=>s+x.matchedTokenCount,0),expectedTokenCount:xs.reduce((s,x)=>s+x.expectedTokenCount,0),actualTokenCount:xs.reduce((s,x)=>s+x.actualTokenCount,0),accuracyPercent:100*xs.reduce((s,x)=>s+x.matchedTokenCount,0)/Math.max(1,xs.reduce((s,x)=>s+x.expectedTokenCount,0)),WER:xs.reduce((s,x)=>s+x.WER,0)/Math.max(1,xs.length),CER:xs.reduce((s,x)=>s+x.CER,0)/Math.max(1,xs.length)}};const documentResults=documents.map((x,index)=>({documentIndex:index+1,expectedText:x.expectedText||"",results:{rawDocumentAi:{text:x.rawDocumentAi?.text||"",status:x.rawDocumentAi?.status||0,error:x.rawDocumentAi?.error||null,...x.rawDocumentAi?.score},geminiOnly:{text:x.geminiOnly?.text||"",...x.geminiOnly?.score},hybrid:{text:x.hybrid?.text||"",...x.hybrid?.score},tesseractFallback:{text:x.tesseractFallback?.text||"",...x.tesseractFallback?.score}}}));const report={generatedAt:new Date().toISOString(),receiptModel,documentModel,receipts:summary(receipts),documents:summary(documents),rawDocumentAi:modeSummary("rawDocumentAi"),geminiOnly:modeSummary("geminiOnly"),hybrid:modeSummary("hybrid"),tesseractFallback:modeSummary("tesseractFallback"),receiptResults:receipts,documentResults};await fs.writeFile(new URL("../artifacts/ocr-benchmark-report.json",import.meta.url),JSON.stringify(report,null,2));console.log(JSON.stringify({receiptModel,documentModel,receipts:report.receipts,documents:report.documents,rawDocumentAi:report.rawDocumentAi,geminiOnly:report.geminiOnly,hybrid:report.hybrid,tesseractFallback:report.tesseractFallback,report:"artifacts/ocr-benchmark-report.json"},null,2));
