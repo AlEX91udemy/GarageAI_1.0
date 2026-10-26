@@ -304,33 +304,112 @@ function getOpenRouterConfig(purpose: OpenRouterPurpose = "receipt") {
   return { key, model };
 }
 
-async function requestOpenRouter(payload: Record<string, unknown>, title: string, key: string): Promise<any> {
-  if (!key) throw new Error("OpenRouter API key is not configured");
-  const send = async (body: Record<string, unknown>) => {
-    const response = await fetch(OPENROUTER_URL, {
-      signal: AbortSignal.timeout(25_000),
-      method: "POST",
-      headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": title },
-      body: JSON.stringify(body),
-    });
-    const result = await response.json().catch(() => ({}));
-    return { response, result };
-  };
-  let attempt = await send(payload);
-  if (!attempt.response.ok && attempt.response.status === 400 && payload.response_format) {
-    const retryPayload = { ...payload };
-    delete retryPayload.response_format;
-    attempt = await send(retryPayload);
+async function requestOpenRouter(body: Record<string, unknown>, title: string, key: string) {
+  const maxAttempts = 3;
+  let currentBody: Record<string, unknown> = { ...body };
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await fetch(OPENROUTER_URL, {
+        signal: AbortSignal.timeout(45_000),
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + key,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.APP_URL || "https://garageai.site",
+          "X-Title": title,
+        },
+        body: JSON.stringify(currentBody),
+      });
+
+      let payload = await response.json().catch(() => ({}));
+
+      // Если модель не поддерживает response_format: json_object — повторяем без него
+      if (!response.ok && response.status === 400 && currentBody.response_format) {
+        const { response_format: _ignored, ...fallbackBody } = currentBody;
+        currentBody = fallbackBody;
+        const retryResponse = await fetch(OPENROUTER_URL, {
+          signal: AbortSignal.timeout(45_000),
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + key,
+            "Content-Type": "application/json",
+            "HTTP-Referer": process.env.APP_URL || "https://garageai.site",
+            "X-Title": title,
+          },
+          body: JSON.stringify(currentBody),
+        });
+        payload = await retryResponse.json().catch(() => ({}));
+        if (retryResponse.ok) return payload;
+      }
+
+      if (response.ok) {
+        return payload;
+      }
+
+      const status = response.status;
+      const errMsg = payload?.error?.message || `OpenRouter request failed (${status})`;
+      lastError = new Error(errMsg);
+
+      // Повторяем при 408, 429 и 5xx ошибках провайдера
+      if ((status === 408 || status === 429 || status >= 500) && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+        continue;
+      }
+      throw lastError;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isNetworkOrTimeout =
+        lastError.message.includes("fetch failed") ||
+        lastError.message.includes("timeout") ||
+        lastError.message.includes("aborted") ||
+        lastError.message.includes("ECONNRESET") ||
+        lastError.message.includes("socket");
+      if (isNetworkOrTimeout && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+        continue;
+      }
+      throw lastError;
+    }
   }
-  if (!attempt.response.ok) throw new Error(attempt.result?.error?.message || "OpenRouter request failed (" + attempt.response.status + ")");
-  return attempt.result;
+  throw lastError || new Error("OpenRouter request failed after retries");
 }
 
-async function requestOpenRouterVision(imageBase64: string, mimeType: string, prompt: string, purpose: OpenRouterPurpose = "receipt"): Promise<string> {
+async function requestOpenRouterVision(
+  imageBase64: string,
+  mimeType: string,
+  prompt: string,
+  purpose: OpenRouterPurpose = "receipt"
+): Promise<string> {
   const { key, model } = getOpenRouterConfig(purpose);
   if (!key) throw new Error("OpenRouter API key is not configured");
-  const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
-  const payload = await requestOpenRouter({ model, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: imageUrl } }] }], temperature: 0, response_format: { type: "json_object" } }, "Garage AI", key);
+
+  let imageContents: Array<Record<string, unknown>>;
+  if (purpose === "document") {
+    const rawBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "");
+    const inputBuffer = Buffer.from(rawBase64, "base64");
+    const tiles = await prepareVisionDocumentTiles(inputBuffer);
+    imageContents = tiles.map((tile) => ({
+      type: "image_url",
+      image_url: { url: `data:${tile.mimeType};base64,${tile.base64}` },
+    }));
+  } else {
+    const imageUrl = imageBase64.startsWith("data:") ? imageBase64 : "data:" + mimeType + ";base64," + imageBase64;
+    imageContents = [{ type: "image_url", image_url: { url: imageUrl } }];
+  }
+
+  const payload = await requestOpenRouter(
+    {
+      model,
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContents] }],
+      temperature: 0,
+      max_tokens: 8192,
+      response_format: { type: "json_object" },
+    },
+    "Garage AI",
+    key
+  );
   const content = payload?.choices?.[0]?.message?.content;
   if (Array.isArray(content)) return content.map((part: any) => part?.text || "").join("");
   if (typeof content !== "string") throw new Error("OpenRouter returned an empty response");
@@ -345,35 +424,20 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
   const inputBuffer = Buffer.from(rawBase64, "base64");
   const tiles = await prepareVisionDocumentTiles(inputBuffer);
 
-  const imageParts =
-    tiles.length > 0
-      ? tiles.map((tile) => ({
-          type: "image_url",
-          image_url: { url: `data:${tile.mimeType};base64,${tile.base64}` },
-        }))
-      : [
-          {
-            type: "image_url",
-            image_url: {
-              url: imageBase64.startsWith("data:") ? imageBase64 : `data:${mimeType};base64,${imageBase64}`,
-            },
-          },
-        ];
+  const imageParts = tiles.map((tile) => ({
+    type: "image_url",
+    image_url: { url: `data:${tile.mimeType};base64,${tile.base64}` },
+  }));
 
   const promptText =
     tiles.length > 1
-      ? "You are a high-precision document OCR engine. You are given the full document page followed by zoomed-in top and bottom crops of the same page to help read small or faint print. Transcribe EVERY visible word, printed form field label (even if the field is blank), table column header, cell value, checkbox label, header, footer, margin number, stamp, and handwritten annotation in natural top-to-bottom reading order. Preserve exact spelling, casing, numbers, and punctuation. Do not repeat lines from the overlapping region, and do not summarize, translate, or omit anything. Return only the raw plain text transcription."
+      ? "You are a high-precision document OCR engine. You are given the full document page followed by zoomed-in top and bottom crops of the same page to read small or faint print. Transcribe EVERY visible word, printed form field label (even if the field is blank), table column header, cell value, checkbox label, header, footer, margin number, stamp, and handwritten annotation in natural top-to-bottom reading order. Preserve exact spelling, casing, numbers, and punctuation. Do not repeat lines from the overlapping region, and do not summarize, translate, or omit anything. Return only the raw plain text transcription."
       : "You are a high-precision document OCR engine. Transcribe EVERY visible word, printed form field label, table header, cell value, header, footer, margin code, stamp, and handwritten annotation in natural reading order. Preserve exact spelling, numbers, punctuation and line breaks. Do not summarize, translate, or omit anything. Return only the plain text transcription.";
 
   const payload = await requestOpenRouter(
     {
       model,
-      messages: [
-        {
-          role: "user",
-          content: [{ type: "text", text: promptText }, ...imageParts],
-        },
-      ],
+      messages: [{ role: "user", content: [{ type: "text", text: promptText }, ...imageParts] }],
       temperature: 0,
       max_tokens: 8192,
     },
@@ -389,14 +453,23 @@ async function requestOpenRouterDocumentText(imageBase64: string, mimeType: stri
 async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<string, any>> {
   const { key, model } = getOpenRouterConfig("receipt");
   if (!key) throw new Error("Receipt OpenRouter API key is not configured");
-  const response = await fetch(OPENROUTER_URL, {
-    signal: AbortSignal.timeout(25_000),
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Receipt Parser" },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${ocrText}` }], temperature: 0, response_format: { type: "json_object" } }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || "Receipt text parsing failed (" + response.status + ")");
+  const safeOcrText = ocrText.slice(0, 12000);
+  const payload = await requestOpenRouter(
+    {
+      model,
+      messages: [
+        {
+          role: "user",
+          content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${safeOcrText}`,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 2048,
+      response_format: { type: "json_object" },
+    },
+    "Garage AI Receipt Parser",
+    key
+  );
   const content = payload?.choices?.[0]?.message?.content;
   const text = Array.isArray(content) ? content.map((part: any) => part?.text || "").join("") : content;
   if (typeof text !== "string") throw new Error("Receipt parser returned an empty response");
@@ -406,14 +479,21 @@ async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<s
 async function requestOpenRouterDocumentRefinement(ocrText: string): Promise<string> {
   const { key, model } = getOpenRouterConfig("document");
   if (!key) throw new Error("Document OpenRouter API key is not configured");
-  const response = await fetch(OPENROUTER_URL, {
-    signal: AbortSignal.timeout(25_000),
-    method: "POST",
-    headers: { Authorization: "Bearer " + key, "Content-Type": "application/json", "HTTP-Referer": process.env.APP_URL || "https://garageai.site", "X-Title": "Garage AI Document OCR" },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: `Исправь только очевидные OCR-ошибки в распознанном тексте документа. Не добавляй догадки, не меняй имена, даты, номера и суммы без явного основания. Сохрани порядок и строки. Верни только исправленный текст.\n\n${ocrText}` }], temperature: 0, max_tokens: 4000 }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.error?.message || "Document text refinement failed (" + response.status + ")");
+  const payload = await requestOpenRouter(
+    {
+      model,
+      messages: [
+        {
+          role: "user",
+          content: `Исправь только очевидные OCR-ошибки в распознанном тексте документа. Не добавляй догадки, не меняй имена, даты, номера и суммы без явного основания. Сохрани порядок и строки. Верни только исправленный текст.\n\n${ocrText.slice(0, 15000)}`,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 8192,
+    },
+    "Garage AI Document OCR",
+    key
+  );
   const content = payload?.choices?.[0]?.message?.content;
   const text = Array.isArray(content) ? content.map((part: any) => part?.text || "").join("") : content;
   if (typeof text !== "string" || !text.trim()) throw new Error("Document refiner returned an empty response");
@@ -461,22 +541,46 @@ function mergeOcrText(...texts: string[]) {
 
 function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T): T {
   if (!text) return fallback;
-  try {
-    const cleaned = text
-      .trim()
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
-    return JSON.parse(cleaned);
-  } catch {
+  const cleaned = text
+    .trim()
+    .replace(/^\`\`\`(?:json)?\s*/i, "")
+    .replace(/\s*\`\`\`$/i, "")
+    .trim();
+
+  const tryParse = (candidate: string): T | undefined => {
     try {
-      const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (match) {
-        return JSON.parse(match[0]);
+      return JSON.parse(candidate) as T;
+    } catch {
+      try {
+        // Чиним висящие запятые и неэкранированные переносы строк внутри JSON
+        const sanitized = candidate
+          .replace(/,\s*([}\]])/g, "$1")
+          .replace(/[\u0000-\u0019]+/g, " ");
+        return JSON.parse(sanitized) as T;
+      } catch {
+        return undefined;
       }
-    } catch {}
-    return fallback;
+    }
+  };
+
+  const direct = tryParse(cleaned);
+  if (direct !== undefined) return direct;
+
+  const match = cleaned.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  if (match) {
+    const extracted = tryParse(match[0]);
+    if (extracted !== undefined) return extracted;
   }
+
+  // Если длинный JSON обрезался по лимиту токенов — пытаемся закрыть открытую строку и объект
+  if (cleaned.startsWith("{") && !cleaned.endsWith("}")) {
+    for (const suffix of ['"}', 'null}', '"]}']) {
+      const repaired = tryParse(cleaned + suffix);
+      if (repaired !== undefined) return repaired;
+    }
+  }
+
+  return fallback;
 }
 
 // ---------------------------------------------------------------------------
