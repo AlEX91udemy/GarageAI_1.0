@@ -1,59 +1,18 @@
-import { ArrowRight, BrainCircuit, CarFront, CheckCircle2, Github, Wrench } from "lucide-react";
+import { ArrowRight, Bell, CarFront, Check, Github, Gauge, Wrench, Fuel, CircleDollarSign } from "lucide-react";
 
-const features = [
-  { icon: CarFront, title: "Цифровой гараж", text: "Все автомобили, пробег и история владения в одном рабочем пространстве." },
-  { icon: Wrench, title: "Сервис и расходы", text: "Журнал ремонтов, регламент ТО, топливо, детали и задачи к выполнению." },
-  { icon: BrainCircuit, title: "AI-диагностика", text: "Помощь в разборе симптомов и автомобильных документов на основе контекста машины." },
-];
+const metrics = [[Gauge, "Пробег", "68 450 км"], [Wrench, "Следующее ТО", "через 1 550 км"], [CircleDollarSign, "Расходы за месяц", "24 800 ₽"], [Fuel, "Средний расход", "8,4 л / 100 км"]] as const;
+const modules = ["Сервисная книжка: работы, пробег и документы в одной истории.", "Расходы и топливо: понятная стоимость содержания автомобиля.", "Сканер чеков: OCR извлекает суммы и запчасти.", "AI-механик: рекомендации с учетом истории машины.", "Склад деталей: расходники не теряются между покупкой и ТО.", "Напоминания: ТО и страховка появляются заранее."];
 
 export function LandingPage() {
-  return (
-    <main className="min-h-screen bg-[#0b1110] text-[#f2f5f1]">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 lg:px-8">
-        <a href="/" className="flex items-center gap-3 font-semibold tracking-tight" aria-label="GarageAI">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#d9f36a] text-[#16200f]"><CarFront className="h-5 w-5" /></span>
-          <span>GarageAI</span>
-        </a>
-        <div className="flex items-center gap-5 text-sm text-[#aab7ae]">
-          <a className="hidden transition hover:text-white sm:inline" href="#product">Продукт</a>
-          <a className="hidden transition hover:text-white sm:inline" href="#team">О проекте</a>
-          <a className="inline-flex items-center gap-2 rounded-md border border-[#34423a] px-4 py-2 text-[#e9eee9] transition hover:border-[#d9f36a]" href="/app">Открыть приложение <ArrowRight className="h-4 w-4" /></a>
-        </div>
-      </nav>
-
-      <section className="mx-auto grid max-w-6xl gap-14 px-6 pb-20 pt-16 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:px-8 lg:pb-28 lg:pt-24">
-        <div>
-          <p className="mb-5 text-sm font-semibold uppercase tracking-[0.22em] text-[#d9f36a]">Интеллектуальный журнал автомобиля</p>
-          <h1 className="max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">История автомобиля, которая помогает принимать решения.</h1>
-          <p className="mt-7 max-w-xl text-lg leading-8 text-[#aab7ae]">GarageAI объединяет обслуживание, расходы, детали и AI-инструменты в одном спокойном рабочем пространстве для владельца автомобиля.</p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <a href="/app" className="inline-flex items-center gap-2 rounded-md bg-[#d9f36a] px-5 py-3 font-semibold text-[#16200f] transition hover:bg-[#e7fb8b]">Запустить GarageAI <ArrowRight className="h-4 w-4" /></a>
-            <a href="https://github.com/AlEX91udemy/GarageAI_1.0" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md border border-[#34423a] px-5 py-3 font-medium text-[#e9eee9] transition hover:border-[#d9f36a]"><Github className="h-4 w-4" /> Исходный код</a>
-          </div>
-          <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm text-[#aab7ae]">
-            {["Работающий MVP", "Мультиавтомобильный учёт", "Web-приложение"].map((item) => <span key={item} className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#d9f36a]" />{item}</span>)}
-          </div>
-        </div>
-        <div id="product" className="border border-[#34423a] bg-[#111a17] p-5 shadow-2xl shadow-black/20">
-          <div className="flex items-center justify-between border-b border-[#293730] pb-4 text-sm"><span className="text-[#aab7ae]">GARAGE / OVERVIEW</span><span className="text-[#d9f36a]">MVP</span></div>
-          <div className="grid grid-cols-2 gap-3 py-5">
-            {[['01', 'Автомобиль', 'VW Golf VII'], ['02', 'Пробег', '184 220 км'], ['03', 'Следующее ТО', 'через 2 400 км'], ['04', 'Расходы', 'зафиксированы']].map(([number, label, value]) => <div key={number} className="border border-[#293730] p-4"><span className="text-xs text-[#76877c]">{number}</span><p className="mt-5 text-xs uppercase tracking-[0.14em] text-[#aab7ae]">{label}</p><p className="mt-2 font-medium">{value}</p></div>)}
-          </div>
-          <div className="border border-[#293730] p-4"><div className="flex items-center justify-between text-sm"><span>AI-механик</span><span className="text-[#d9f36a]">готов к работе</span></div><div className="mt-4 h-2 bg-[#293730]"><div className="h-2 w-4/5 bg-[#d9f36a]" /></div></div>
-        </div>
-      </section>
-
-      <section className="border-y border-[#293730] bg-[#101815]">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-16 sm:grid-cols-3 lg:px-8">
-          {features.map(({ icon: Icon, title, text }) => <article key={title} className="border-l border-[#566750] pl-5"><Icon className="h-5 w-5 text-[#d9f36a]" /><h2 className="mt-5 text-lg font-semibold">{title}</h2><p className="mt-3 text-sm leading-6 text-[#aab7ae]">{text}</p></article>)}
-        </div>
-      </section>
-
-      <section id="team" className="mx-auto max-w-6xl px-6 py-16 lg:px-8 lg:py-24">
-        <div className="max-w-2xl"><p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#d9f36a]">О проекте</p><h2 className="mt-4 text-3xl font-semibold tracking-tight">GarageAI строится как практичный инструмент для долгой жизни автомобиля.</h2><p className="mt-5 leading-7 text-[#aab7ae]">Проект развивается как независимый цифровой продукт с работающим MVP. Следующие шаги — проверить спрос, расширить базу знаний автомобилей, улучшить AI-диагностику и подготовить продукт к привлечению венчурного финансирования.</p></div>
-      </section>
-
-      <footer className="border-t border-[#293730]"><div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 text-sm text-[#76877c] sm:flex-row sm:items-center sm:justify-between lg:px-8"><span>© 2026 GarageAI</span><a className="inline-flex items-center gap-2 hover:text-white" href="https://github.com/AlEX91udemy/GarageAI_1.0" target="_blank" rel="noreferrer"><Github className="h-4 w-4" /> GitHub проекта</a></div></footer>
-    </main>
-  );
+  return <main className="min-h-screen bg-[#0D131D] text-[#F8FAFC]">
+    <header className="border-b border-[#243044]"><div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8"><a href="/" className="flex items-center gap-3 font-semibold"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EF3038]"><CarFront className="h-5 w-5" /></span><span>Garage<span className="text-[#EF3038]">AI</span></span></a><nav className="hidden gap-6 text-sm text-[#94A3B8] md:flex"><a href="#workspace">Рабочее пространство</a><a href="#modules">Возможности</a><a href="#workflow">Как это работает</a></nav><a href="/app" className="inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-4 py-2 text-sm font-semibold hover:bg-[#991B1B]">Открыть приложение <ArrowRight className="h-4 w-4" /></a></div></header>
+    <section className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-24"><div><p className="mb-5 text-xs font-semibold uppercase tracking-[0.16em] text-[#EF3038]">Рабочая система для автомобиля</p><h1 className="max-w-2xl text-4xl font-semibold leading-tight sm:text-6xl">Вся история автомобиля в одном месте</h1><p className="mt-6 max-w-xl text-lg leading-7 text-[#94A3B8]">GarageAI помогает вести обслуживание, расходы, топливо и детали, а AI-механик подсказывает, что проверить дальше.</p><div className="mt-8 flex flex-wrap gap-3"><a href="/app" className="inline-flex items-center gap-2 rounded-lg bg-[#EF3038] px-5 py-3 font-semibold hover:bg-[#B91C1C]">Начать работу <ArrowRight className="h-4 w-4" /></a><a href="#modules" className="rounded-lg border border-[#243044] bg-[#17202E] px-5 py-3 font-semibold">Посмотреть возможности</a></div><div className="mt-8 grid gap-3 text-sm text-[#94A3B8] sm:grid-cols-3">{["Мультиавтомобильный учет", "OCR чеков и документов", "История без таблиц"].map((item) => <span key={item} className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-[#34D399]" />{item}</span>)}</div></div>
+      <div id="workspace" className="rounded-xl border border-[#243044] bg-[#17202E] p-4 shadow-2xl shadow-black/20 sm:p-5"><div className="flex items-center justify-between border-b border-[#243044] pb-4"><div><p className="text-sm font-semibold">Обзор автомобиля</p><p className="text-xs text-[#94A3B8]">Демонстрационный экран</p></div><span className="border border-[#243044] px-2 py-1 text-[10px] text-[#94A3B8]">PREVIEW</span></div><div className="grid gap-3 py-4 sm:grid-cols-2">{metrics.map(([Icon, label, value]) => <div key={label} className="rounded-lg border border-[#243044] bg-[#0D131D] p-4"><div className="flex justify-between text-xs text-[#94A3B8]"><span>{label}</span><Icon className="h-4 w-4 text-[#EF3038]" /></div><p className="mt-4 text-lg font-semibold">{value}</p><p className="mt-1 text-xs text-[#94A3B8]">по данным журнала</p></div>)}</div><div className="grid gap-3 border-t border-[#243044] pt-4 sm:grid-cols-2"><div className="rounded-lg border border-[#243044] bg-[#0D131D] p-4"><h2 className="text-sm font-semibold">Последние записи</h2><div className="mt-4 space-y-3 text-xs">{["Замена тормозных колодок", "Регламентное ТО", "Диагностика подвески"].map((item) => <div key={item} className="flex justify-between border-b border-[#243044] pb-2"><span>{item}</span><span className="text-[#94A3B8]">в журнале</span></div>)}</div></div><div className="rounded-lg border border-[#243044] bg-[#0D131D] p-4"><div className="flex gap-2"><Bell className="h-4 w-4 text-[#FBBF24]" /><h2 className="text-sm font-semibold">Напоминания</h2></div><p className="mt-4 border-l-2 border-[#F59E0B] pl-3 text-xs">Плановое ТО через 1 550 км</p><p className="mt-3 border-l-2 border-[#EF3038] pl-3 text-xs">Проверьте срок страхового полиса</p></div></div></div>
+    </section>
+    <section id="modules" className="border-y border-[#243044] bg-[#111827]"><div className="mx-auto max-w-7xl px-5 py-16 sm:px-8"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#EF3038]">Один рабочий контур</p><h2 className="mt-3 max-w-2xl text-3xl font-semibold sm:text-4xl">Инструменты, которые помогают держать автомобиль под контролем</h2><div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{modules.map((text) => <article key={text} className="rounded-lg border border-[#243044] bg-[#17202E] p-5 hover:border-[#EF3038]"><span className="text-[#EF3038]">●</span><p className="mt-4 text-sm leading-6 text-[#94A3B8]">{text}</p></article>)}</div></div></section>
+    <section id="workflow" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:py-24"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#EF3038]">Понятный порядок</p><h2 className="mt-3 text-3xl font-semibold sm:text-4xl">От записи до решения за несколько шагов</h2><div className="mt-8 grid gap-3 md:grid-cols-3">{[["01", "Добавьте автомобиль"], ["02", "Фиксируйте события"], ["03", "Действуйте по контексту"]].map(([n, title]) => <div key={n} className="rounded-lg border border-[#243044] bg-[#17202E] p-5"><span className="font-mono text-[#EF3038]">{n}</span><h3 className="mt-4 font-semibold">{title}</h3><p className="mt-2 text-sm text-[#94A3B8]">Сохраняйте данные и возвращайтесь к ним в нужный момент.</p></div>)}</div></section>
+    <section className="border-t border-[#243044] bg-[#17202E]"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-12 sm:px-8 md:flex-row md:items-center md:justify-between"><div><h2 className="text-2xl font-semibold">Начните вести историю автомобиля сегодня</h2><p className="mt-2 text-sm text-[#94A3B8]">Откройте приложение и соберите рабочий контур под свой автомобиль.</p></div><a href="/app" className="inline-flex items-center gap-2 rounded-lg bg-[#EF3038] px-5 py-3 font-semibold hover:bg-[#B91C1C]">Открыть GarageAI <ArrowRight className="h-4 w-4" /></a></div></section><footer className="border-t border-[#243044]"><div className="mx-auto flex max-w-7xl justify-between px-5 py-8 text-sm text-[#94A3B8] sm:px-8"><span>© 2026 GarageAI</span><a href="https://github.com/AlEX91udemy/GarageAI_1.0" target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-[#F8FAFC]"><Github className="h-4 w-4" /> Исходный код проекта</a></div></footer>
+  </main>;
 }
+
+export default LandingPage;

@@ -160,13 +160,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Card 1: Red vibrant card "Записать ремонт или ТО" */}
         <button
           onClick={onOpenAddService}
-          className="relative text-left p-4 sm:p-5 rounded-3xl bg-gradient-to-br from-brand-strong via-brand-strong to-brand-hover hover:from-brand hover:to-brand-strong text-white shadow-xl shadow-brand-strong/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group overflow-hidden border border-brand/40"
+          className="relative text-left p-4 sm:p-5 rounded-xl bg-brand-strong hover:bg-brand text-white shadow-sm transition-colors duration-200 cursor-pointer flex flex-col justify-between min-h-[150px] sm:min-h-[165px] group overflow-hidden border border-brand/40"
         >
-          {/* Subtle geometric background glow */}
-          <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none group-hover:scale-125 transition-transform" />
-
           <div className="flex items-start justify-between w-full relative z-10">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+            <div className="w-11 h-11 rounded-lg bg-white/15 flex items-center justify-center group-hover:scale-105 transition-transform">
               <Plus className="w-6 h-6 text-white" />
             </div>
             <span className="text-[10px] font-bold bg-white/20 backdrop-blur-md text-white px-2.5 py-1 rounded-full flex items-center gap-1">
@@ -283,7 +280,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* AI Quick Receipt Scanner Banner (OCR) */}
-      <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 text-white p-4 sm:p-5 rounded-3xl border border-neutral-800 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-neutral-900 text-white p-4 sm:p-5 rounded-xl border border-neutral-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-brand-strong/20 text-brand-on-dark border border-brand/30 flex items-center justify-center shrink-0">
             <Camera className="w-6 h-6" />
