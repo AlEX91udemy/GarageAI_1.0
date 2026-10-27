@@ -1,0 +1,15 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - agents_service/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest
+      - .
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest
+substitutions:
+  _REGION: europe-west1
+options:
+  logging: CLOUD_LOGGING_ONLY
