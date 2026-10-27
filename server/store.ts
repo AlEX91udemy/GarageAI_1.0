@@ -23,6 +23,7 @@ export class UserAlreadyExistsError extends Error {
 export interface UserRecord {
   id: string;
   username: string;
+  email?: string | null;
   passwordHash: string;
   createdAt: string;
 }
@@ -238,6 +239,11 @@ export class GarageStore {
     return this.state.users.find((user) => user.username.toLowerCase() === key);
   }
 
+  getUserByEmail(email: string): UserRecord | undefined {
+    const key = email.trim().toLowerCase();
+    return this.state.users.find((user) => user.email?.trim().toLowerCase() === key);
+  }
+
   getUserById(id: string): UserRecord | undefined {
     return this.state.users.find((user) => user.id === id);
   }
@@ -246,15 +252,20 @@ export class GarageStore {
     return this.state.users.map((u) => ({ ...u }));
   }
 
-  async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
+  async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
     const task = this.writeChain.then(() => {
       const normalizedUsername = username.trim().toLowerCase();
       if (this.state.users.some((user) => user.username.trim().toLowerCase() === normalizedUsername)) {
         throw new UserAlreadyExistsError();
       }
+      const normalizedEmail = email?.trim().toLowerCase() || null;
+      if (normalizedEmail && this.state.users.some((user) => user.email?.trim().toLowerCase() === normalizedEmail)) {
+        throw new UserAlreadyExistsError();
+      }
       const created: UserRecord = {
         id,
         username,
+        email: normalizedEmail,
         passwordHash,
         createdAt: new Date().toISOString(),
       };
