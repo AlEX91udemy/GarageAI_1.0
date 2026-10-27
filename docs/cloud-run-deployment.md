@@ -4,7 +4,7 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 ## Production blockers
 
-1. PostgreSQL persistence is now wired behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. **The JSON import/cutover and real Cloud SQL smoke tests are still outstanding.** Do not serve real user data until import ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
+1. PostgreSQL persistence is wired behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. A dry-run/transactional JSON importer and disposable-PostgreSQL CI tests are in the branch, but **real-data import/cutover and Cloud SQL smoke tests have not been performed**. Do not serve real user data until ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
 2. **Resolved in the current branch:** the agent service no longer depends on `google-adk==2.13.0`; it uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. The latest completed Python audit installed 1.45.1 and reported no known vulnerabilities. Re-run CI after the explicit minimum pin, and keep the agent service private regardless.
 3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
@@ -12,7 +12,7 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 The Node server refuses to start in production unless `DATABASE_URL` is configured and `GARAGE_POSTGRES_READY=true` explicitly records that migration/import and restore checks have passed. PostgreSQL schema migrations are verified on startup but are not executed by the runtime service by default. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
 
-Before production deployment, complete the JSON importer, verify ownership and row counts, restore a database backup, and pass Cloud SQL canary tests for auth/session lifecycle, concurrent writes, tenant isolation and restart/scale. The current runbook is not a deploy-now checklist while this gate is active.
+Before production deployment, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data, restore a backup, and pass Cloud SQL canary tests for auth/session lifecycle, concurrent writes, tenant isolation and restart/scale. Only then set `GARAGE_POSTGRES_READY=true`. The current runbook is not a deploy-now checklist while this gate is active.
 
 ## Suggested initial resources
 
@@ -26,6 +26,19 @@ Before production deployment, complete the JSON importer, verify ownership and r
 ## APIs and billing
 
 Enable only Cloud Run, Artifact Registry, Cloud Build, Secret Manager, and Vertex AI if using Gemini through Vertex AI. Document AI is optional. Check Billing > Reports and budgets after deployment; do not assume all AI Studio usage is covered by Google Cloud credits.
+
+## Database migration and import
+
+From a controlled migration environment with the intended Cloud SQL connection configured (do not commit credentials):
+
+```bash
+npx tsx scripts/migrate-postgres.ts
+npx tsx scripts/import-legacy-json.ts --source-dir=./data
+# Review the counts/conflicts, verify a backup, then explicitly apply:
+npx tsx scripts/import-legacy-json.ts --source-dir=./data --apply
+```
+
+The importer does not auto-assign ownerless legacy garage data. Stop on any conflict and reconcile ownership manually. Keep `GARAGE_POSTGRES_READY` unset until row-count/data checks, restore validation and production-like smoke tests pass. The web runtime should not have schema-owner privileges; use a separate migration identity.
 
 ## Build the web container
 
