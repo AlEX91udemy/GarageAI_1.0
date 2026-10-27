@@ -2,10 +2,11 @@
 
 - Initial review date: 2026-10-27
 - Repository: `AlEX91udemy/GarageAI_1.0`
-- Review branch: `audit/security-hardening-2026-10-27`
+- Initial review branch: `audit/security-hardening-2026-10-27`
+- Current reviewed code: `main` after PostgreSQL persistence, shared rate limits, HTTP integration coverage and agent fan-out cap were merged.
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest completed code run 40467458312)
+## CI results (latest pre-merge verification runs)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **116 passed across 19 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -18,7 +19,7 @@
 - Python dependency audit: **passed after remediation**. The service no longer depends on `google-adk==2.13.0` (whose OpenTelemetry cap prevented upgrading), uses `google-genai` directly, and explicitly requires `opentelemetry-api>=1.45.1,<2`. The verified CI environment installed `opentelemetry-api 1.45.1`; `pip-audit` reported `No known vulnerabilities found`.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
-The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
+The combined main state has been validated in two adjacent PR runs: [40490128356](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490128356) passed the PostgreSQL-backed HTTP integration test, and [40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417) passed the agent fan-out regression and Python security audit. These ran against separate PR heads before both merges; a fresh full run against the combined `main` state is still required. The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
 
 ## Findings and remediation
 
@@ -50,14 +51,13 @@ The unit-test log contains connection-refused messages for an optional localhost
 ### HIGH — Agent review context previously contained only file names
 - Location: `agents_service/app.py`, `_repo_snapshot()`.
 - Finding: the agents received a list of repository paths, not source contents, so code-review tasks could not reliably inspect implementation details.
-- Remediation on this branch: provide a bounded snapshot of source/config/test contents (maximum 40 files and 45,000 characters), prioritize implementation files, skip runtime data/lockfiles/virtual environments, and redact lines that resemble secret assignments. A test checks that source is included and runtime data is excluded.
+- Remediation merged to `main`: provide a bounded snapshot of source/config/test contents (maximum 40 files and 45,000 characters), prioritize implementation files, skip runtime data/lockfiles/virtual environments, and redact lines that resemble secret assignments. A test checks that source is included and runtime data is excluded.
 - Remaining risk: heuristic redaction is not a substitute for secret scanning; the snapshot is intentionally bounded and may omit files outside the limit.
 
 ### HIGH — Omitted agent selection bypassed the model fan-out cap
 - Location: `agents_service/app.py`, `run_agents()`.
 - Finding: explicit selections above three agents were rejected, but omitting `agents` selected all five configured agents, bypassing the intended paid-model fan-out limit and potentially multiplying request cost.
-- Remediation on this branch: omitted selections now default to `architect`, `qa`, and `ops`; a regression test verifies the default invokes no more than three agents.
-- Verification: CI must pass before merge. The fix is not yet merged or deployed.
+- Remediation merged to `main`: omitted selections now default to `architect`, `qa`, and `ops`; a regression test verifies the default invokes no more than three agents. PR CI passed in [run 40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417). It has not been deployed.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
@@ -65,13 +65,16 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed full code run [40475616003](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40475616003) passed after adding shared PostgreSQL rate limits and fixing the revision migration upgrade path. All three jobs passed: Python dependency audit, Node typecheck/unit tests/build, both Docker builds, schema contract, PostgreSQL migration/repository/importer/smoke tests, npm audits and Gitleaks.
-- Remediation: remove the ADK dependency instead of bypassing its version constraints. The current agent runner calls the Google GenAI SDK directly and pins a patched OpenTelemetry minimum. The latest code CI run verified the Python audit passed with `opentelemetry-api 1.45.1`; the overall workflow also passed.
+- Latest database/shared-rate-limit CI [40475616003](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40475616003) passed all three jobs, including PostgreSQL migration/repository/importer/smoke tests, npm audits and Gitleaks.
+- The production HTTP integration [40490128356](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490128356) passed: production-mode server, PostgreSQL auth/session lifecycle, CSRF rejection, user isolation, persistence across process restart and logout revocation.
+- Agent fan-out cap regression [40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417) passed. The fix is merged to `main`; the omitted-agent default is bounded to three paid model calls.
+- Remediation: remove the ADK dependency instead of bypassing its version constraints. The current agent runner calls the Google GenAI SDK directly and pins `opentelemetry-api>=1.45.1,<2`; CI's Python dependency audit passed.
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests before production.
 - The web app has a PostgreSQL adapter and a fail-closed production startup gate. Real-data migration and deployment remain outstanding: run the dry-run importer against a verified copy, review conflicts/orphans, apply transactionally, validate row counts/ownership, demonstrate backup restore, and smoke-test a private Cloud Run canary before setting `GARAGE_POSTGRES_READY=true`. `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
 - The in-process write queue is only a local optimization; PostgreSQL revision checks and database transactions are the cross-instance concurrency controls.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
-- Runtime garage data was removed from the current tree, but historical Git copies remain. Determine whether the records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
+- Runtime garage data is absent from the current tree, but historical Git copies may remain. Determine whether those records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
+- This documentation PR triggers a fresh full CI run against the combined latest `main` state; record its result before release.
 
 ## Release decision
 
