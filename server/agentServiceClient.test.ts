@@ -40,8 +40,10 @@ describe("private agent service client", () => {
       calls.push({ url, init });
       if (url.startsWith("http://metadata.google.internal/")) {
         expect((init?.headers as Record<string, string>)["metadata-flavor"]).toBe("Google");
+        expect(init?.redirect).toBe("error");
         return new Response("cloud-run-id-token", { status: 200 });
       }
+      expect(init?.redirect).toBe("error");
       return new Response(JSON.stringify({ task: "Run qa", results: { qa: "passed" } }), { status: 200 });
     };
 
