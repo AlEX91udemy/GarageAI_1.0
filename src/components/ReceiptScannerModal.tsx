@@ -171,6 +171,12 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setScanError(null);
       void handleScan(image);
     };
+    reader.onerror = () => {
+      setScanError("Не удалось прочитать файл. Попробуйте другое фото.");
+    };
+    reader.onabort = () => {
+      setScanError("Чтение фотографии было прервано. Попробуйте ещё раз.");
+    };
     reader.readAsDataURL(file);
   };
 
