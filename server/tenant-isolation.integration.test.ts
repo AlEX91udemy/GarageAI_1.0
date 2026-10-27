@@ -79,6 +79,8 @@ describe("HTTP tenant isolation", () => {
         env: {
           ...process.env,
           NODE_ENV: "production",
+          // The HTTP integration server uses disposable test files, never real production data.
+          GARAGE_ALLOW_EPHEMERAL_STORAGE: "true",
           PORT: String(port),
           GARAGE_DB_FILE: path.join(tempDir, "garage_store.json"),
           GARAGE_SESSIONS_FILE: path.join(tempDir, "sessions.json"),
