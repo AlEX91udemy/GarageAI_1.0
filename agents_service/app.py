@@ -1,4 +1,4 @@
-"""Four GarageAI maintenance agents exposed through a small ADK API."""
+"""GarageAI multi-agent API backed by the Google GenAI SDK."""
 from __future__ import annotations
 
 import asyncio
@@ -11,9 +11,8 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
+from google import genai
 from google.genai import types
-from google.adk.agents import LlmAgent
-from google.adk.runners import InMemoryRunner
 
 load_dotenv()
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -130,30 +129,41 @@ def _repo_snapshot() -> str:
         + "".join(sections)
     )
 
-def _build_agents() -> dict[str, LlmAgent]:
+def _build_agents() -> dict[str, dict[str, str]]:
+    """Return lightweight agent configurations without the ADK runtime dependency."""
     return {
-        name: LlmAgent(
-            name=f"garageai_{name}",
-            model=ARGON_MODEL if name == "argon_reviewer" else MODEL,
-            mode="task",
-            instruction=brief,
-        )
+        name: {
+            "model": ARGON_MODEL if name == "argon_reviewer" else MODEL,
+            "instruction": brief,
+        }
         for name, brief in AGENT_BRIEFS.items()
     }
 
-async def _run_agent(agent: LlmAgent, name: str, prompt: str) -> str:
-    runner = InMemoryRunner(agent=agent, app_name=f"garageai_{name}")
+
+async def _run_agent(agent: dict[str, str], name: str, prompt: str) -> str:
+    """Call Google GenAI directly and always release the async client."""
+    use_vertex_ai = _env_flag("GOOGLE_GENAI_USE_VERTEXAI")
+    client_options: dict[str, Any] = {
+        "vertexai": use_vertex_ai,
+        "location": os.getenv("GOOGLE_CLOUD_LOCATION", "europe-west1"),
+    }
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    if project:
+        client_options["project"] = project
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key and not use_vertex_ai:
+        client_options["api_key"] = api_key
+
+    client = genai.Client(**client_options)
     try:
-        session = await runner.session_service.create_session(app_name=f"garageai_{name}", user_id="local-user")
-        content = types.Content(role="user", parts=[types.Part(text=prompt)])
-        chunks = []
-        async for event in runner.run_async(user_id="local-user", session_id=session.id, new_message=content):
-            if event.content and event.content.parts:
-                chunks.extend(part.text for part in event.content.parts if part.text)
-        return "\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
+        response = await client.aio.models.generate_content(
+            model=agent["model"],
+            contents=prompt,
+            config=types.GenerateContentConfig(system_instruction=agent["instruction"]),
+        )
+        return (getattr(response, "text", None) or "").strip() or "Агент не вернул текстовый ответ."
     finally:
-        # Clean up the runner if session creation or model execution fails too.
-        await runner.close()
+        await client.aio.aclose()
 
 app = FastAPI(title="GarageAI Agents", version="1.0.0")
 
