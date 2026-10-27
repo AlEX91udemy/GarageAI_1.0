@@ -23,12 +23,12 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
   let category: ReceiptCategory = valid.has(current as ReceiptCategory) ? current as ReceiptCategory : "other";
 
   const strongFuelSignal =
-    /\b(азс|заправк[аиу]|топлив[оа]|бензин|дизельное топливо|дизтопливо|дт)\b/i.test(normalized) ||
-    /\b(аи[- ]?\d{2}|аи[- ]?\d{2}\s?к\d)\b/i.test(normalized) ||
-    (/\b(литр(?:а|ов|ы)?|л\.?\s*(?:×|x|по|\d))\b/i.test(normalized) &&
-      /(?:₽\s*\/\s*л|руб(?:\.|лей)?\s*(?:за|\/)?\s*литр|цена\s*за\s*литр|колонка)/i.test(normalized));
-  const repairSignal = /\b(заказ[- ]?наряд|сто|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту)\b/i.test(normalized);
-  const partsSignal = /\b(магазин автозапчастей|автозапчасти|артикул|каталожный номер)\b/i.test(normalized);
+    /(азс|заправк[а-я]*|топлив[а-я]*|бензин|дизельное топливо|дизтопливо|дт)/i.test(normalized) ||
+    /(аи[- ]?\\d{2}(?:\\s?к\\d)?)/i.test(normalized) ||
+    (/(литр(?:а|ов|ы)?|л\\.?\\s*(?:×|x|по|\\d))/i.test(normalized) &&
+      /(?:₽\\s*\\/\\s*л|руб(?:\\.|лей)?\\s*(?:за|\\/)?\\s*литр|цена\\s*за\\s*литр|колонка)/i.test(normalized));
+  const repairSignal = /(заказ[- ]?наряд|сто|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту)/i.test(normalized);
+  const partsSignal = /(магазин автозапчастей|автозапчасти|артикул|каталожный номер)/i.test(normalized);
 
   if (strongFuelSignal && !repairSignal) category = "fuel";
   else if (category === "other" && repairSignal) category = "repair";
