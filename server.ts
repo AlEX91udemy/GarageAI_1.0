@@ -60,6 +60,7 @@ import { AgentServiceClientError, runAgentService } from "./server/agentServiceC
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
+import { EMAIL_LOGIN_CODE_MAX_ATTEMPTS, EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS, EMAIL_LOGIN_CODE_TTL_MS, generateEmailLoginCode, hashEmailLoginCode, isValidEmail, normalizeEmail, sendEmailLoginCode } from "./server/emailAuth";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -1819,6 +1820,7 @@ const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
 const loginAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
+const localEmailLoginCodes = new Map<string, { userId: string; codeHash: string; expiresAtMs: number; attempts: number; sentAtMs: number }>();
 const SESSION_COOKIE = "garagehub_session";
 
 function loadSessions(): void {
@@ -1876,6 +1878,9 @@ const rateLimitCleanupTimer = setInterval(() => {
     if (now - attempt.startedAt >= LOGIN_WINDOW_MS) {
       loginAttempts.delete(key);
     }
+  }
+  for (const [email, challenge] of localEmailLoginCodes) {
+    if (challenge.expiresAtMs <= now) localEmailLoginCodes.delete(email);
   }
   if (store instanceof PostgresPersistence) {
     void Promise.all([
@@ -2110,7 +2115,7 @@ async function clearLoginAttempts(clientId: string): Promise<void> {
   loginAttempts.delete(clientId);
 }
 
-async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string, email?: string | null) {
   const { record, token } = createSession(userId);
   if (store instanceof PostgresPersistence) {
     await store.putSession(record);
@@ -2119,13 +2124,26 @@ async function establishSession(req: express.Request, res: express.Response, use
     await persistSessions();
   }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-  return { username, csrfToken: record.csrfSecret };
+  return { username, ...(email ? { email } : {}), csrfToken: record.csrfSecret };
 }
 
 app.post("/api/auth/register", async (req, res) => {
   if (await rateLimitedLogin(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
+  const body = (req.body || {}) as Record<string, unknown>;
+  const email = normalizeEmail(body.email);
+  if (body.email !== undefined && !isValidEmail(email)) return res.status(400).json({ error: "Укажите корректный адрес электронной почты." });
+  if (email && ((process.env.EMAIL_CODE_PEPPER || "").length < 32 || !process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim())) {
+    return res.status(503).json({ error: "Регистрация по email временно недоступна: настройте Resend и EMAIL_CODE_PEPPER." });
+  }
+  if (email) {
+    try {
+      if (await store.getUserByEmail(email)) return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
+    } catch {
+      return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
+    }
+  }
   try {
     if (await store.getUserByName(credentials.username!)) {
       return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
@@ -2136,8 +2154,30 @@ app.post("/api/auth/register", async (req, res) => {
   }
   void (async () => {
     const userId = newId("user");
-    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
+    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email || undefined);
     await clearLoginAttempts(req.ip || "unknown");
+    if (email) {
+      const now = Date.now();
+      const code = generateEmailLoginCode();
+      const codeHash = hashEmailLoginCode(email, code, process.env.EMAIL_CODE_PEPPER || "");
+      const expiresAtMs = now + EMAIL_LOGIN_CODE_TTL_MS;
+      try {
+        if (store instanceof PostgresPersistence) {
+          const stored = await store.putEmailLoginCode(email, userId, codeHash, expiresAtMs, now, EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS);
+          if (!stored) throw new Error("Email verification cooldown active");
+        } else {
+          localEmailLoginCodes.set(email, { userId, codeHash, expiresAtMs, attempts: 0, sentAtMs: now });
+        }
+        await sendEmailLoginCode(email, code);
+        res.status(201).json({ success: true, emailVerificationRequired: true, message: "Аккаунт создан. Введите код из письма для завершения входа." });
+      } catch (emailError) {
+        if (store instanceof PostgresPersistence) await store.deleteEmailLoginCode(email).catch(() => undefined);
+        else localEmailLoginCodes.delete(email);
+        console.error("Registration email delivery failed:", emailError instanceof Error ? emailError.message : "unknown error");
+        res.status(503).json({ error: "Аккаунт создан, но письмо с кодом не отправлено. Попробуйте войти позже." });
+      }
+      return;
+    }
     res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
@@ -2168,10 +2208,114 @@ app.post("/api/auth/login", async (req, res) => {
   }
   await clearLoginAttempts(req.ip || "unknown");
   try {
-    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch (error) {
     console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
+});
+
+app.post("/api/auth/email-code/request", async (req, res) => {
+  if (await rateLimitedLogin(req, res)) return;
+  const body = (req.body || {}) as Record<string, unknown>;
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!isValidEmail(email) || !password) {
+    return res.status(400).json({ error: "Введите корректный Gmail и пароль." });
+  }
+
+  let user;
+  try {
+    user = await store.getUserByEmail(email);
+  } catch {
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
+  }
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    return res.status(401).json({ error: "Неверная почта или пароль." });
+  }
+
+  const pepper = process.env.EMAIL_CODE_PEPPER || "";
+  if (pepper.length < 32) {
+    return res.status(503).json({ error: "Email-вход не настроен: требуется EMAIL_CODE_PEPPER." });
+  }
+  if (!process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+    return res.status(503).json({ error: "Не настроена отправка писем: задайте RESEND_API_KEY и EMAIL_FROM." });
+  }
+
+  const now = Date.now();
+  try {
+    const existing = store instanceof PostgresPersistence
+      ? await store.getEmailLoginCode(email)
+      : localEmailLoginCodes.get(email);
+    if (existing && existing.expiresAtMs > now && now - existing.sentAtMs < EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS) {
+      res.setHeader("Retry-After", Math.ceil((EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS - (now - existing.sentAtMs)) / 1000));
+      return res.status(429).json({ error: "Код уже отправлен. Подождите минуту перед повторной отправкой." });
+    }
+
+    const code = generateEmailLoginCode();
+    const codeHash = hashEmailLoginCode(email, code, pepper);
+    const expiresAtMs = now + EMAIL_LOGIN_CODE_TTL_MS;
+    if (store instanceof PostgresPersistence) {
+      const stored = await store.putEmailLoginCode(email, user.id, codeHash, expiresAtMs, now, EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS);
+      if (!stored) {
+        res.setHeader("Retry-After", Math.ceil(EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS / 1000));
+        return res.status(429).json({ error: "Код уже отправлен. Подождите минуту перед повторной отправкой." });
+      }
+    } else {
+      localEmailLoginCodes.set(email, { userId: user.id, codeHash, expiresAtMs, attempts: 0, sentAtMs: now });
+    }
+    await sendEmailLoginCode(email, code);
+    return res.status(202).json({ success: true, message: "Код входа отправлен на почту." });
+  } catch (error) {
+    if (store instanceof PostgresPersistence) {
+      await store.deleteEmailLoginCode(email).catch(() => undefined);
+    } else {
+      localEmailLoginCodes.delete(email);
+    }
+    console.error("Email login code delivery failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось отправить код. Проверьте настройки почтового сервиса." });
+  }
+});
+
+app.post("/api/auth/email-code/verify", async (req, res) => {
+  if (await rateLimitedLogin(req, res)) return;
+  const body = (req.body || {}) as Record<string, unknown>;
+  const email = normalizeEmail(body.email);
+  const code = typeof body.code === "string" ? body.code.trim() : "";
+  if (!isValidEmail(email) || !/^\\d{8}$/.test(code)) {
+    return res.status(400).json({ error: "Введите почту и восьмизначный код из письма." });
+  }
+  const pepper = process.env.EMAIL_CODE_PEPPER || "";
+  if (pepper.length < 32) return res.status(503).json({ error: "Email-вход не настроен." });
+
+  try {
+    const codeHash = hashEmailLoginCode(email, code, pepper);
+    let userId: string | null = null;
+    if (store instanceof PostgresPersistence) {
+      userId = await store.consumeEmailLoginCode(email, codeHash, Date.now(), EMAIL_LOGIN_CODE_MAX_ATTEMPTS);
+    } else {
+      const record = localEmailLoginCodes.get(email);
+      const now = Date.now();
+      if (record && record.expiresAtMs > now && record.attempts < EMAIL_LOGIN_CODE_MAX_ATTEMPTS) {
+        if (crypto.timingSafeEqual(Buffer.from(record.codeHash), Buffer.from(codeHash))) {
+          userId = record.userId;
+          localEmailLoginCodes.delete(email);
+        } else {
+          record.attempts += 1;
+          if (record.attempts >= EMAIL_LOGIN_CODE_MAX_ATTEMPTS) localEmailLoginCodes.delete(email);
+        }
+      } else {
+        localEmailLoginCodes.delete(email);
+      }
+    }
+    if (!userId) return res.status(401).json({ error: "Код неверный или срок его действия истёк." });
+    const user = await store.getUserById(userId);
+    if (!user || user.email?.toLowerCase() !== email) return res.status(401).json({ error: "Аккаунт не найден." });
+    await clearLoginAttempts(req.ip || "unknown");
+    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+  } catch (error) {
+    console.error("Email login verification failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось проверить код. Повторите попытку." });
   }
 });
 
@@ -2216,7 +2360,7 @@ app.get("/api/auth/session", async (req, res) => {
       }
       res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
     }
-    return res.json({ username: user.username, csrfToken: session.csrfSecret });
+    return res.json({ username: user.username, ...(user.email ? { email: user.email } : {}), csrfToken: session.csrfSecret });
   } catch (error) {
     console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });

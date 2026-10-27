@@ -11,14 +11,17 @@ export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
 
 # The migration must support a pre-existing garage table from before the revision column.
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+psql -v ON_ERROR_STOP=1 -f db/migrations/002_email_auth.sql
 psql -v ON_ERROR_STOP=1 <<'SQL'
 ALTER TABLE garageai_garages DROP CONSTRAINT IF EXISTS garageai_garages_revision_nonnegative;
 ALTER TABLE garageai_garages DROP COLUMN IF EXISTS revision;
 SQL
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+psql -v ON_ERROR_STOP=1 -f db/migrations/002_email_auth.sql
 
 # A second re-apply must be idempotent and retain the revision guard.
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+psql -v ON_ERROR_STOP=1 -f db/migrations/002_email_auth.sql
 psql -v ON_ERROR_STOP=1 <<'SQL'
 DO $migration$
 BEGIN
@@ -35,8 +38,8 @@ SQL
 
 psql -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
-INSERT INTO garageai_users (id, username, password_hash)
-VALUES ('ci-user-a', 'GarageAI-CI', 'test-only-scrypt-placeholder');
+INSERT INTO garageai_users (id, username, password_hash, email)
+VALUES ('ci-user-a', 'GarageAI-CI', 'test-only-scrypt-placeholder', 'ci-user-a@example.test');
 
 INSERT INTO garageai_garages (user_id, data)
 VALUES ('ci-user-a', '{"vehicles":[{"id":"car-a"}]}'::jsonb);
@@ -59,6 +62,12 @@ BEGIN
   IF (SELECT count(*) FROM garageai_schema_migrations WHERE version = 1) <> 1 THEN
     RAISE EXCEPTION 'migration ledger must contain exactly one row for version 1';
   END IF;
+  IF (SELECT count(*) FROM garageai_schema_migrations WHERE version = 2) <> 1 THEN
+    RAISE EXCEPTION 'migration ledger must contain exactly one row for version 2';
+  END IF;
+  IF (SELECT count(*) FROM garageai_users WHERE email = 'ci-user-a@example.test') <> 1 THEN
+    RAISE EXCEPTION 'email column missing or not persisted';
+  END IF;
   IF (SELECT count(*) FROM garageai_garages WHERE user_id = 'ci-user-a') <> 1 THEN
     RAISE EXCEPTION 'garage row missing';
   END IF;
@@ -70,6 +79,14 @@ BEGIN
     INSERT INTO garageai_users (id, username, password_hash)
     VALUES ('ci-user-duplicate', ' garageai-ci ', 'test-only');
     RAISE EXCEPTION 'normalized duplicate username unexpectedly accepted';
+  EXCEPTION WHEN unique_violation THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO garageai_users (id, username, password_hash, email)
+    VALUES ('ci-user-email-duplicate', 'ci-email-duplicate', 'test-only', 'CI-USER-A@example.test');
+    RAISE EXCEPTION 'normalized duplicate email unexpectedly accepted';
   EXCEPTION WHEN unique_violation THEN
     NULL;
   END;

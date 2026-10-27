@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const schemaPath = path.resolve("db/migrations/001_initial_postgres.sql");
-const sql = fs.readFileSync(schemaPath, "utf8");
+const emailSchemaPath = path.resolve("db/migrations/002_email_auth.sql");
+const sql = `${fs.readFileSync(schemaPath, "utf8")}\n${fs.readFileSync(emailSchemaPath, "utf8")}`;
 const required = [
   /CREATE TABLE IF NOT EXISTS garageai_users/i,
   /username_normalized text GENERATED ALWAYS AS \(lower\(btrim\(username\)\)\) STORED/i,
@@ -23,6 +24,11 @@ const required = [
   /garageai_rate_limits_count_nonnegative CHECK \(hit_count >= 0\)/i,
   /INSERT INTO garageai_schema_migrations/i,
   /ON CONFLICT \(version\) DO NOTHING/i,
+  /ADD COLUMN IF NOT EXISTS email text/i,
+  /garageai_users_email_normalized_uq/i,
+  /CREATE TABLE IF NOT EXISTS garageai_email_login_codes/i,
+  /code_hash char\(64\) NOT NULL/i,
+  /attempts integer NOT NULL DEFAULT 0/i,
 ];
 
 const missing = required.filter((pattern) => !pattern.test(sql));

@@ -12,13 +12,13 @@ Status: PostgreSQL schema, async repository, PostgreSQL-backed sessions, revisio
 - Application connections use a bounded pool, TLS/Cloud SQL connector or Cloud SQL Unix socket, least-privilege runtime identity, and Secret Manager for credentials if a password is used.
 - Every garage read/write is scoped by authenticated `user_id`; session and garage changes commit transactionally. No process-local session map or container file is authoritative.
 
-## Migration 001
+## Migrations 001–002
 
-File: `db/migrations/001_initial_postgres.sql`
+Files: `db/migrations/001_initial_postgres.sql` and `db/migrations/002_email_auth.sql`
 
-The SQL creates the schema-migrations ledger, user/garage/session tables, a normalized unique username index, ownership foreign keys, JSON object validation, expiry indexes, and a garage revision for optimistic concurrency. It is intentionally additive and does not import or delete application data.
+The SQL creates the schema-migrations ledger, user/garage/session tables, a normalized unique username index, ownership foreign keys, JSON object validation, expiry indexes, and a garage revision for optimistic concurrency. Migration 001 is additive and does not import or delete application data. Migration 002 adds an optional normalized email to users, a unique email index, and PostgreSQL-backed short-lived email login-code records with expiry and attempt counters.
 
-Apply with `DATABASE_URL=... npx tsx scripts/migrate-postgres.ts` from a controlled migration environment after a verified backup. The runtime service account should not have schema-owner privileges. Production app startup verifies migration 001 but does not run DDL by default; `DATABASE_AUTO_MIGRATE=true` is an explicit override and should not be used for normal production rollout.
+Apply with `DATABASE_URL=... npx tsx scripts/migrate-postgres.ts` from a controlled migration environment after a verified backup. The runtime service account should not have schema-owner privileges. Production app startup verifies migration 002 (which implies migration 001 was applied by the ordered runner) but does not run DDL by default; `DATABASE_AUTO_MIGRATE=true` is an explicit override and should not be used for normal production rollout.
 
 ## JSON import requirements
 
@@ -41,7 +41,7 @@ The importer in `scripts/import-legacy-json.ts` is dry-run by default and requir
 
 File: `scripts/import-legacy-json.ts`
 
-The importer is dry-run by default and requires `--apply` for writes. It reads `users.json`, `garage_store.json`, and optional `sessions.json` from `data/` (override with `--source-dir=/path/to/data`). It requires migration 001 to already exist.
+The importer is dry-run by default and requires `--apply` for writes. It reads `users.json`, `garage_store.json`, and optional `sessions.json` from `data/` (override with `--source-dir=/path/to/data`). It requires the schema-migrations ledger and migration 001 to already exist; email login additionally requires migration 002.
 
 Example sequence:
 
@@ -65,7 +65,8 @@ Do not run a migration against production data until the tool and its tests exis
 ## Required application changes before production
 
 - Finish the migration/import and cutover verification before enabling `GARAGE_POSTGRES_READY=true` in production.
-- The async PostgreSQL repository is selected by `DATABASE_URL`; PostgreSQL-backed auth/session reads, writes, renewal and revocation are now wired into `server.ts`. The in-memory session map is used only in local JSON mode.
+- The async PostgreSQL repository is selected by `DATABASE_URL`; PostgreSQL-backed auth/session reads, writes, renewal and revocation plus email login-code state use PostgreSQL. Apply migrations 001 and 002 before enabling email login. Email delivery requires `RESEND_API_KEY`, `EMAIL_FROM`, and a strong `EMAIL_CODE_PEPPER` from Secret Manager. The Node service sends code emails through Resend; raw codes are never stored in PostgreSQL. Existing accounts without an email retain legacy username/password login until an email-linking flow is implemented.
+- PostgreSQL-backed auth/session reads, writes, renewal and revocation are now wired into `server.ts`. The in-memory session map is used only in local JSON mode.
 - Garage mutations are committed before success responses. PostgreSQL uses a per-garage revision check; stale writes are rejected with HTTP 409 rather than overwriting newer data.
 - Keep the startup guard fail-closed: production requires both `DATABASE_URL` and `GARAGE_POSTGRES_READY=true`. Set the readiness flag only after verified migration/import, backup/restore and smoke tests.
 - Add PostgreSQL-backed integration tests for tenant isolation, concurrent writes, unique usernames, session lifecycle, transaction rollback, restart/multi-process behavior, JSON import and backup/restore.

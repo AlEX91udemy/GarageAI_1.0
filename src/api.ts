@@ -15,6 +15,7 @@ let authSessionActive = false;
 
 export interface AuthSession {
   username: string;
+  email?: string;
   csrfToken: string;
 }
 
@@ -27,15 +28,16 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string): Promise<AuthSession> {
+export async function register(username: string, password: string, email?: string): Promise<AuthSession | null> {
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(email ? { email } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
+  if (data.emailVerificationRequired) return null;
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
   return data.session;
@@ -50,6 +52,32 @@ export async function login(username: string, password: string): Promise<AuthSes
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  return data.session;
+}
+
+export async function requestEmailLoginCode(email: string, password: string): Promise<string> {
+  const res = await authenticatedFetch("/api/auth/email-code/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось отправить код");
+  return typeof data.message === "string" ? data.message : "Код отправлен на почту.";
+}
+
+export async function verifyEmailLoginCode(email: string, code: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/email-code/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось подтвердить код");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
   return data.session;
