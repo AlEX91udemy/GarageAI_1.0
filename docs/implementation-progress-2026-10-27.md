@@ -37,18 +37,18 @@
 
 ## Результаты проверок
 
-Последний полностью завершённый CI run для текущего кода: [40463231392](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40463231392).
+Последний полностью завершённый CI run: [40463851227](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40463851227).
 - TypeScript check — passed.
-- **112 тестов в 18 файлах — passed** (Node/Vitest), включая изоляцию данных, restore/registration race, клиент приватного agent service и frontend API helper.
+- **113 тестов в 18 файлах — passed** (Node/Vitest), включая изоляцию данных, restore/registration race, клиент приватного agent service и frontend API helper.
 - Production build — passed.
 - Сборки web и private-agent Docker — passed.
 - Catalog audit — passed.
 - `npm audit --omit=dev` и `npm audit` — 0 vulnerabilities.
 - Gitleaks — passed.
-- Python syntax check и **9 Python-тестов** — passed, включая аутентификацию, ограничение запросов и очистку ADK runner.
+- Python syntax check и **10 Python-тестов** — passed, включая аутентификацию, ограничение запросов и очистку ADK runner.
 - Python dependency audit — failed: `opentelemetry-api 1.44.0` flagged for `CVE-2026-114603`.
 
-**Общий CI остаётся красным** из-за блокирующего `pip-audit`. Исправление доступно в `1.45.1`, но официальная версия Google ADK `2.13.0` ограничивает OpenTelemetry API/SDK версиями `<=1.44`. По данным текущего списка релизов upstream, v2.13.0 — последний опубликованный релиз; небезопасное принудительное обновление и подавление аудита не применяются.
+**Общий CI остаётся красным** из-за блокирующего `pip-audit`. Исправление OpenTelemetry доступно в `1.45.1`, но опубликованный Google ADK `2.13.0` и текущая upstream-ветка `main` всё ещё ограничивают OpenTelemetry API/SDK версиями `<=1.44`. Проверена актуальная upstream-метаинформация: совместимого опубликованного релиза ADK пока не найдено. Поэтому зависимость не форсируется, ограничения установщика не обходятся, `pip-audit` остаётся обязательным. Необходимо дождаться совместимого upstream-релиза либо отдельно спроектировать замену ADK на SDK без уязвимой зависимости; это изменение архитектуры и требует отдельного плана/проверок.
 
 ## Открытые блокеры
 
@@ -61,7 +61,7 @@
 
 ## Рекомендуемый порядок продолжения
 
-1. Проверить свежий CI: run 40463231392 подтвердил 112 Node-тестов, 9 Python-тестов, TypeScript/build, две Docker-сборки, npm-аудиты и Gitleaks; общий результат неуспешен только из-за Python CVE.
+1. Проверить свежий CI: run 40463851227 подтвердил 113 Node-тестов, 10 Python-тестов, TypeScript/build, две Docker-сборки, npm-аудиты и Gitleaks; общий результат неуспешен только из-за Python CVE.
 2. Устранить CVE через совместимое обновление ADK/зависимостей и повторить pip-audit.
 3. Завершить интеграционные тесты гостевого режима и полного набора сценариев импорта/восстановления.
 4. Спроектировать миграцию JSON-хранилища в managed database и проверить backup/restore.
