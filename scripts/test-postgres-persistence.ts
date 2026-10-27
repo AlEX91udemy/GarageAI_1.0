@@ -18,6 +18,7 @@ async function main() {
   const suffix = randomUUID().replace(/-/g, "").slice(0, 8);
   const userId = `ci-user-${suffix}`;
   const username = `ci-${suffix}`;
+  const email = `ci-${suffix}@example.test`;
   const sessionHash = randomUUID().replace(/-/g, "").padEnd(64, "a").slice(0, 64);
 
   try {
@@ -25,10 +26,12 @@ async function main() {
     await peerRepository.initialize();
     await repository.healthCheck();
 
-    const user = await repository.createUser(username, "test-only-password-hash", userId);
+    const user = await repository.createUser(username, "test-only-password-hash", userId, email);
     assert(user.id === userId, "createUser should return the persisted ID");
     assert(user.username === username, "createUser should return the persisted username");
     assert((await repository.getUserByName(username.toUpperCase()))?.id === userId, "username lookup should be case-insensitive");
+    assert((await repository.getUserByEmail(email.toUpperCase()))?.id === userId, "email lookup should be case-insensitive");
+    assert((await repository.getUserById(userId))?.email === email, "ID lookup should include account email");
     assert((await repository.getUserById(userId))?.id === userId, "ID lookup should return the persisted user");
     assert((await repository.listUsers()).some((item) => item.id === userId), "listUsers should include the persisted user");
     assert((await repository.countUsers()) >= 1, "countUsers should report at least one user");
@@ -40,6 +43,18 @@ async function main() {
       duplicateRejected = error instanceof UserAlreadyExistsError;
     }
     assert(duplicateRejected, "normalized duplicate usernames must be rejected");
+
+    const emailCodeNow = Date.now();
+    const emailCodeHash = "a".repeat(64);
+    const emailCodeStored = await repository.putEmailLoginCode(email, userId, emailCodeHash, emailCodeNow + 600_000, emailCodeNow, 60_000);
+    assert(emailCodeStored, "first email login code should be stored");
+    const cooldownRejected = await peerRepository.putEmailLoginCode(email, userId, "b".repeat(64), emailCodeNow + 600_000, emailCodeNow + 1_000, 60_000);
+    assert(!cooldownRejected, "concurrent database clients must respect the email code resend cooldown");
+    assert((await repository.getEmailLoginCode(email))?.codeHash === emailCodeHash, "email login code hash should be persisted");
+    assert(await repository.consumeEmailLoginCode(email, "b".repeat(64), emailCodeNow + 2_000, 5) === null, "incorrect email code should not authenticate");
+    assert((await repository.getEmailLoginCode(email))?.attempts === 1, "incorrect email code should increment attempts");
+    assert(await peerRepository.consumeEmailLoginCode(email, emailCodeHash, emailCodeNow + 3_000, 5) === userId, "correct email code should return its account ID");
+    assert(await repository.getEmailLoginCode(email) === undefined, "successful email code should be consumed");
 
     const initial = await repository.snapshotForUserWithRevision(userId, true);
     assert(Array.isArray(initial.garage.vehicles) && initial.garage.vehicles.length === 0, "new garage should start empty");
