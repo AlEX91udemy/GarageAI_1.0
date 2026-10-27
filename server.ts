@@ -55,6 +55,7 @@ import {
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
+import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -2139,6 +2140,61 @@ app.post("/api/backup/reset", requireAuth, (_req, res) => {
 // ---------------------------------------------------------------------------
 // AI Diagnostic & Gemini Endpoints
 // ---------------------------------------------------------------------------
+
+// Private ADK multi-agent orchestration proxy. Global /api auth and CSRF
+// middleware protect this endpoint; Cloud Run IAM plus X-Agents-Token protect
+// the upstream service.
+const ALLOWED_AGENT_NAMES = new Set(["architect", "developer", "qa", "ops", "argon_reviewer"]);
+
+function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
+    return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
+  }
+  return enforceAiRateLimit(req, res, next);
+}
+
+app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+  const task = typeof body.task === "string" ? body.task.trim() : "";
+  if (task.length < 3 || task.length > 8000) {
+    return res.status(400).json({ error: "Задача должна содержать от 3 до 8000 символов." });
+  }
+
+  let agents: string[] | undefined;
+  if (body.agents !== undefined) {
+    if (
+      !Array.isArray(body.agents) ||
+      body.agents.length > ALLOWED_AGENT_NAMES.size ||
+      body.agents.some((agent) => typeof agent !== "string" || !ALLOWED_AGENT_NAMES.has(agent)) ||
+      new Set(body.agents).size !== body.agents.length
+    ) {
+      return res.status(400).json({ error: "Список AI-агентов содержит неизвестные или повторяющиеся значения." });
+    }
+    agents = body.agents as string[];
+  }
+
+  try {
+    const result = await runAgentService(process.env, { task, agents });
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof AgentServiceClientError) {
+      if (error.statusCode === 429) {
+        if (error.retryAfter) res.setHeader("Retry-After", error.retryAfter);
+        return res.status(429).json({ error: "Слишком много запросов к AI-агентам. Повторите позже." });
+      }
+      if (error.statusCode === 503) {
+        return res.status(503).json({ error: error.message });
+      }
+      if (error.statusCode === 504) {
+        return res.status(504).json({ error: "AI-агенты не успели ответить. Повторите попытку позже." });
+      }
+    }
+    console.error("Agent service request failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(502).json({ error: "AI-агенты временно недоступны." });
+  }
+});
 
 // 1. Diagnostic Assistant
 app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
