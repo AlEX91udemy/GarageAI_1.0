@@ -30,7 +30,7 @@ The external Cloudflare dashboard build still reports failure even though Wrangl
   - Secret scanning: passed.
 - [PR #28 — receipt scanner UX and error handling](https://github.com/AlEX91udemy/GarageAI_1.0/pull/28): merged to `main`.
 - [PR #23 — add Cloudflare dry-run CI validation](https://github.com/AlEX91udemy/GarageAI_1.0/pull/23)
-- [Latest Cloudflare Workers Build](https://dash.cloudflare.com/373ffb2da5bfc40fc40779da44950ff5/workers/services/view/garageai-1-0/production/builds/e5d8fa36-f1ab-4147-a1ae-c0845ea26375): failed. Exact remote log details still need inspection.
+- [Cloudflare Workers Build triggered by PR #28](https://dash.cloudflare.com/373ffb2da5bfc40fc40779da44950ff5/workers/services/view/garageai-1-0/production/builds/e5d8fa36-f1ab-4147-a1ae-c0845ea26375): failed. Exact remote log details still need inspection.
 - [Cloud Build run for private agents](https://console.cloud.google.com/cloud-build/builds;region=europe-west1/ef9421f7-cf8e-4d8d-a774-4b32853f7275?project=garage-ai-512223): Pull, Build and Push passed; Deploy failed.
 - Project ID needs to be reconciled before cloud changes: the trigger is using `garage-ai-512223`, while existing project notes/runbook have also referenced `garageai-512320`. Do not change IAM or deploy resources until the intended project is confirmed.
 
