@@ -32,17 +32,20 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Location: `agents_service/app.py`, `server.ts`, `server/agentServiceClient.ts`.
 - Initial evidence: the endpoint accepted requests without application-level authentication, which could allow paid model calls if publicly reachable.
 - Remediation on this branch: Python `POST /agents/run` fails closed with 503 if `AGENTS_API_TOKEN` is missing and returns 401 unless `X-Agents-Token` matches using constant-time comparison. Python and Node both have per-instance rate limits; the Node service forwards the authenticated internal user ID to the private Python service so its quota is also per caller instead of all Cloud Run requests sharing one proxy-IP bucket.
-- Remediation on this branch: Node `POST /api/agents/run` validates task size and agent names, requires an authenticated session/CSRF, and in production uses fail-closed `AGENTS_ALLOWED_USERNAMES` so only configured admin logins can invoke paid agents. The web settings now include an agent console with role selection, task-length guard, loading/error states and result rendering. Node and Python reject more than three selected agents per run to cap model fan-out cost. The service client uses Cloud Run metadata-server ID tokens plus the shared application token; responses are bounded to 250 KB while streaming.
-- Remaining risk: rate limits are in-memory and do not coordinate multiple instances; the real Cloud Run OIDC/IAM/token/Vertex request path has not been smoke-tested. Configure IAM and both services' tokens through Secret Manager before production.
+- Remediation merged to `main`: Node `POST /api/agents/run` validates task size and agent names, requires an authenticated session/CSRF, and in production uses fail-closed `AGENTS_ALLOWED_USERNAMES` so only configured admin logins can invoke paid agents. The web settings include an agent console with role selection, task-length guard, loading/error states and result rendering. Node and Python reject more than three selected agents per run to cap model fan-out cost. The service client uses Cloud Run metadata-server ID tokens plus the shared application token; responses are bounded to 250 KB while streaming.
+- Remediation merged to `main`: Node AI and login/registration rate limits use atomic PostgreSQL buckets across instances; identifiers are hashed before storage and stale buckets are cleaned periodically. Local JSON development retains in-memory limits.
+- Remaining risk: real Cloud Run OIDC/IAM/token/Vertex request paths have not been smoke-tested. Configure IAM and both services' tokens through Secret Manager before production.
 
 ### HIGH — Tenant isolation coverage is expanded but not complete
 - Location: `server.ts`, `server/store.ts`, `server/tenant-isolation.integration.test.ts`.
 - Tests verify cross-user isolation across vehicles, service records, reminders, fuel, inventory, repair tasks, OEM schedules and tuning, including export leakage, mutation denial, invalid cross-user restore references, valid restore, export → reset → import round-trip, per-user reset isolation, atomic rejection of invalid restore, and concurrent requests. Garage writes are queued per user within one Node process; duplicate usernames are atomically rejected with HTTP 409.
-- Latest completed Node job passed 116 tests across 19 files. This does not prove every route/edge case: guest-mode lifecycle, exhaustive malformed-input coverage, and coordination across separate instances remain open.
+- Latest completed Node job passed 116 tests across 19 files. Separate PostgreSQL integration checks also verify shared rate limits across independent repository clients. This does not prove every route/edge case: guest-mode lifecycle and exhaustive malformed-input coverage remain open.
 
-### MEDIUM — JSON persistence is not safe for horizontal scaling
-- Location: `server/store.ts`.
-- The store serializes its own file writes, and the HTTP layer serializes garage mutations per user inside a single Node process. Neither coordinates separate service instances or survives ephemeral Cloud Run filesystems. A transactional managed database and shared session store are required before scaling or production.
+### HIGH — Production database cutover is not yet verified
+- Location: `server/postgresPersistence.ts`, `server.ts`, `scripts/import-legacy-json.ts`.
+- Remediation merged to `main`: the server selects PostgreSQL when `DATABASE_URL` is configured, stores users/garages/sessions in PostgreSQL, uses revision-checked garage commits and shared atomic rate limits, and blocks production startup unless `GARAGE_POSTGRES_READY=true` is explicitly set.
+- CI covers schema migration/upgrade, tenant isolation, concurrent/stale writes, sessions, rate limits and JSON importer dry-run/apply/idempotency/conflict behavior against disposable PostgreSQL 16.
+- Remaining risk: the importer has not been run against real user files; Cloud SQL backup/restore, live connection/IAM, canary, restart/scale and data reconciliation have not been verified. Keep `GARAGE_POSTGRES_READY` unset until those checks pass.
 
 ### HIGH — Agent review context previously contained only file names
 - Location: `agents_service/app.py`, `_repo_snapshot()`.
@@ -57,14 +60,14 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed run [40467458312](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467458312) passed after migrating from ADK to Google GenAI SDK and adding the explicit `opentelemetry-api>=1.45.1,<2` pin. All three jobs passed: Python syntax/tests/dependency audit, Node typecheck/tests/build and both Docker builds/npm audits, plus Gitleaks.
+- Latest completed full code run [40475616003](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40475616003) passed after adding shared PostgreSQL rate limits and fixing the revision migration upgrade path. All three jobs passed: Python dependency audit, Node typecheck/unit tests/build, both Docker builds, schema contract, PostgreSQL migration/repository/importer/smoke tests, npm audits and Gitleaks.
 - Remediation: remove the ADK dependency instead of bypassing its version constraints. The current agent runner calls the Google GenAI SDK directly and pins a patched OpenTelemetry minimum. The latest code CI run verified the Python audit passed with `opentelemetry-api 1.45.1`; the overall workflow also passed.
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests before production.
-- The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling. A new startup guard now blocks `NODE_ENV=production` by default until that migration is complete; `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
-- The in-process per-user write queue does not coordinate separate application instances.
+- The web app has a PostgreSQL adapter and a fail-closed production startup gate. Real-data migration and deployment remain outstanding: run the dry-run importer against a verified copy, review conflicts/orphans, apply transactionally, validate row counts/ownership, demonstrate backup restore, and smoke-test a private Cloud Run canary before setting `GARAGE_POSTGRES_READY=true`. `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
+- The in-process write queue is only a local optimization; PostgreSQL revision checks and database transactions are the cross-instance concurrency controls.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
 - Runtime garage data was removed from the current tree, but historical Git copies remain. Determine whether the records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
 
 ## Release decision
 
-**Not cleared for production yet.** Passing build/tests and a clean secret scan do not establish application-level authorization or remove data from repository history.
+**Not cleared for production yet.** Code-level persistence and rate-limit work is merged and CI is green, but real Cloud SQL cutover/restore/canary tests and Git-history privacy assessment remain incomplete. Passing CI does not prove the deployed IAM/model path or remove historical runtime data from Git.
