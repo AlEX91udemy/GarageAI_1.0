@@ -9,7 +9,7 @@ export interface ReceiptClassification {
   };
 }
 
-const FUEL_TYPE_PATTERN = /\b(АИ[- ]?\s?\d{2}|АИ[- ]?\d{2}\s?К\d|ДТ|дизел(?:ь|ьное топливо)|diesel|gasoline|бензин)\b/i;
+const FUEL_TYPE_PATTERN = /(АИ[- ]?\s?\d{2}(?:\s?К\d)?|ДТ|дизел(?:ь|ьное топливо)|diesel|gasoline|бензин)/i;
 
 function parseRussianNumber(value: string): number | null {
   const parsed = Number(value.replace(/\s/g, "").replace(",", "."));
