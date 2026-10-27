@@ -218,7 +218,7 @@ export function LandingPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
-                  <div className="font-mono text-lg font-extrabold text-[#10B981]">
+                  <div className="font-mono text-lg font-extrabold text-[#B91C1C]">
                     1 клик
                   </div>
                   <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
@@ -226,7 +226,7 @@ export function LandingPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
-                  <div className="font-mono text-lg font-extrabold text-[#3B82F6]">
+                  <div className="font-mono text-lg font-extrabold text-[#B91C1C]">
                     PDF
                   </div>
                   <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
@@ -399,7 +399,12 @@ export function LandingPage() {
           id="workspace"
           className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-12 dark:border-[#243044] dark:bg-[#17202E]"
         >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.18 }}
+            transition={{ duration: 0.45, delay: 0, ease: "easeOut" }}
+            className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#EF3038]">
@@ -577,7 +582,7 @@ export function LandingPage() {
                 </div>
               </article>
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* =================================================================
@@ -587,7 +592,12 @@ export function LandingPage() {
           id="how-it-works"
           className="border-t border-[#E2E8F0] bg-[#F4F5F8] py-12 dark:border-[#243044] dark:bg-[#0D131D]"
         >
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.18 }}
+            transition={{ duration: 0.45, delay: 0.08, ease: "easeOut" }}
+            className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="text-2xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
               Как работает приложение
             </h2>
@@ -626,7 +636,7 @@ export function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* =================================================================
