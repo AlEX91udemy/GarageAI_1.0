@@ -2054,18 +2054,18 @@ async function establishSession(req: express.Request, res: express.Response, use
   return { username, csrfToken: record.csrfSecret };
 }
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   if (rateLimitedLogin(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
-  if (store.getUserByName(credentials.username!)) {
+  if (await store.getUserByName(credentials.username!)) {
     return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
   }
   void (async () => {
     const userId = newId("user");
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
     loginAttempts.delete(req.ip || "unknown");
-    res.status(201).json({ success: true, session: establishSession(req, res, userId, credentials.username!) });
+    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
@@ -2075,7 +2075,7 @@ app.post("/api/auth/register", (req, res) => {
   });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   if (rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
   const username = asTrimmedString(body.username, 32).toLowerCase();
@@ -2083,26 +2083,31 @@ app.post("/api/auth/login", (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: "Введите логин и пароль" });
   }
-  const user = store.getUserByName(username);
+  const user = await store.getUserByName(username);
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
   }
   loginAttempts.delete(req.ip || "unknown");
-  res.json({ success: true, session: establishSession(req, res, user.id, user.username) });
+  res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
 });
 
-app.post("/api/auth/logout", (req, res) => {
-  const session = getSession(req);
-  if (session) session.revokedAt = Date.now();
-  persistSessions();
+app.post("/api/auth/logout", async (req, res) => {
+  const session = await getSession(req);
+  if (session) {
+    if (store instanceof PostgresPersistence) await store.revokeSession(session.tokenHash, Date.now());
+    else {
+      session.revokedAt = Date.now();
+      await persistSessions();
+    }
+  }
   res.setHeader("Set-Cookie", clearSessionCookie());
   res.json({ success: true });
 });
 
-app.get("/api/auth/session", (req, res) => {
-  const session = getSession(req);
+app.get("/api/auth/session", async (req, res) => {
+  const session = await getSession(req);
   if (!session) return res.status(401).json({ error: "Сессия не найдена" });
-  const user = store.getUserById(session.userId);
+  const user = await store.getUserById(session.userId);
   if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
   // Скользящее продление сессии при активной работе.
@@ -2113,12 +2118,18 @@ app.get("/api/auth/session", (req, res) => {
   }
   if (renewedToken) {
     const token = crypto.randomBytes(32).toString("base64url");
+    const previousHash = session.tokenHash;
     const nextHash = hashToken(token);
-    sessions.delete(session.tokenHash);
     session.tokenHash = nextHash;
     session.csrfSecret = crypto.randomBytes(24).toString("base64url");
-    sessions.set(nextHash, session);
-    persistSessions();
+    if (store instanceof PostgresPersistence) {
+      await store.revokeSession(previousHash, Date.now());
+      await store.putSession(session);
+    } else {
+      sessions.delete(previousHash);
+      sessions.set(nextHash, session);
+      await persistSessions();
+    }
     res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
   }
   res.json({ username: user.username, csrfToken: session.csrfSecret });
@@ -2177,13 +2188,13 @@ app.post("/api/backup/reset", requireAuth, async (_req, res) => {
 const ALLOWED_AGENT_NAMES = new Set(["architect", "developer", "qa", "ops", "argon_reviewer"]);
 const MAX_AGENTS_PER_RUN = 3;
 
-function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+async function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
     return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
   }
 
-  const session = getSession(req);
-  const user = session ? store.getUserById(session.userId) : undefined;
+  const session = await getSession(req);
+  const user = session ? await store.getUserById(session.userId) : undefined;
   if (!user) {
     return res.status(401).json({ error: "Требуется вход в аккаунт" });
   }
