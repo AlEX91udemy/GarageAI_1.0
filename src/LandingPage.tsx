@@ -59,7 +59,7 @@ const SCAN_PRESETS: ScanDemoPreset[] = [
     ],
     total: "14 900 ₽",
     targetBadge: "→ В сервисную книжку",
-    targetColor: "text-[#EF3038]",
+    targetColor: "text-[#3B82F6]",
   },
   {
     id: "fuel",
@@ -82,7 +82,7 @@ const SCAN_PRESETS: ScanDemoPreset[] = [
     ],
     total: "2 650 ₽",
     targetBadge: "→ В учёт топлива и расходов",
-    targetColor: "text-[#EF3038]",
+    targetColor: "text-[#10B981]",
   },
 ];
 
@@ -167,7 +167,7 @@ export function LandingPage() {
               title={isDark ? "Светлая тема" : "Тёмная тема"}
               className="garage-btn-anim inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[#536171] hover:text-[#0F172A] dark:border-[#243044] dark:bg-[#1E293B] dark:text-[#94A3B8] dark:hover:text-[#F8FAFC]"
             >
-              {isDark ? <Sun className="h-4 w-4 text-[#EF3038]" /> : <Moon className="h-4 w-4" />}
+              {isDark ? <Sun className="h-4 w-4 text-[#F59E0B]" /> : <Moon className="h-4 w-4" />}
             </button>
             <a
               href="/app"
@@ -218,7 +218,7 @@ export function LandingPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
-                  <div className="font-mono text-lg font-extrabold text-[#B91C1C]">
+                  <div className="font-mono text-lg font-extrabold text-[#10B981]">
                     1 клик
                   </div>
                   <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
@@ -226,7 +226,7 @@ export function LandingPage() {
                   </div>
                 </div>
                 <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
-                  <div className="font-mono text-lg font-extrabold text-[#B91C1C]">
+                  <div className="font-mono text-lg font-extrabold text-[#3B82F6]">
                     PDF
                   </div>
                   <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
@@ -334,7 +334,7 @@ export function LandingPage() {
                         {/* Шапка результата */}
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3.5 py-2.5 dark:border-[#243044] dark:bg-[#1E293B]">
                           <div>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-[#EF3038]">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-[#10B981]">
                               <CheckCircle2 className="h-4 w-4" />
                               <span>Распознано автоматически</span>
                             </div>
@@ -461,10 +461,10 @@ export function LandingPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#EF3038] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#3B82F6] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
                       <BookOpen className="h-5 w-5" />
                     </span>
-                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#EF3038]">
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#3B82F6]">
                       <FileDown className="h-3.5 w-3.5" /> PDF-выписка
                     </span>
                   </div>
@@ -493,10 +493,10 @@ export function LandingPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#EF3038] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#10B981] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
                       <Fuel className="h-5 w-5" />
                     </span>
-                    <span className="font-mono text-xs font-semibold text-[#EF3038]">
+                    <span className="font-mono text-xs font-semibold text-[#10B981]">
                       Аналитика владения
                     </span>
                   </div>
@@ -512,7 +512,7 @@ export function LandingPage() {
                   <span className="text-[#536171] dark:text-[#94A3B8]">
                     Стоимость километра
                   </span>
-                  <span className="font-mono font-bold text-[#EF3038]">
+                  <span className="font-mono font-bold text-[#10B981]">
                     7.40 ₽ / км
                   </span>
                 </div>
@@ -525,10 +525,10 @@ export function LandingPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#EF3038] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#F59E0B] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
                       <BrainCircuit className="h-5 w-5" />
                     </span>
-                    <span className="font-mono text-xs font-semibold text-[#EF3038]">
+                    <span className="font-mono text-xs font-semibold text-[#F59E0B]">
                       Диагностика
                     </span>
                   </div>
@@ -544,7 +544,7 @@ export function LandingPage() {
                   <span className="text-[#536171] dark:text-[#94A3B8]">
                     Чек-лист перед поездкой
                   </span>
-                  <span className="font-mono font-semibold text-[#EF3038]">
+                  <span className="font-mono font-semibold text-[#F59E0B]">
                     → В план работ
                   </span>
                 </div>
@@ -557,10 +557,10 @@ export function LandingPage() {
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#EF3038] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#F59E0B] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
                       <Bell className="h-5 w-5" />
                     </span>
-                    <span className="font-mono text-xs font-semibold text-[#EF3038]">
+                    <span className="font-mono text-xs font-semibold text-[#F59E0B]">
                       Контроль интервалов ТО и ОСАГО
                     </span>
                   </div>
