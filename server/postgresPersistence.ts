@@ -189,6 +189,11 @@ export class PostgresPersistence {
     `;
   }
 
+  async deleteEmailLoginCode(email: string): Promise<void> {
+    this.assertInitialized();
+    await this.sql`DELETE FROM garageai_email_login_codes WHERE email_normalized = ${email.trim().toLowerCase()}`;
+  }
+
   async consumeEmailLoginCode(email: string, codeHash: string, now: number, maxAttempts: number): Promise<string | null> {
     this.assertInitialized();
     return await this.sql.begin(async (tx) => {
