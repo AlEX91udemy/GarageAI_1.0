@@ -54,6 +54,7 @@ import {
   normalizeRussianPlate,
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
@@ -230,8 +231,14 @@ function isSafeAssetUrl(value: unknown): value is string {
 // Refuse accidental production deployment while the backend still uses local JSON files.
 assertProductionStorageSafe(process.env);
 
-// In-memory cache synced to disk
-const store = new GarageStore(DB_FILE, () => getInitialDatabase());
+// PostgreSQL is selected only when explicitly configured; local development keeps JSON storage.
+const store = process.env.DATABASE_URL?.trim()
+  ? new PostgresPersistence({
+      connectionString: process.env.DATABASE_URL,
+      maxConnections: Number(process.env.DATABASE_POOL_MAX) || 5,
+      ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
+    })
+  : new GarageStore(DB_FILE, () => getInitialDatabase());
 
 // Текущий пользователь определяется в requireAuth и кладётся в контекст запроса.
 // Обращения во всех маршрутах идут через dbMemory, который проксирует в данные
@@ -241,6 +248,7 @@ interface RequestContext {
   userId: string;
   garage: GarageData;
   session: SessionRecord;
+  revision?: number;
 }
 
 const requestContext = new AsyncLocalStorage<RequestContext>();
@@ -270,10 +278,17 @@ const dbMemory = new Proxy({} as GarageDatabase, {
   },
 });
 
-function saveDatabase(): Promise<void> {
+async function saveDatabase(): Promise<void> {
   const context = requestContext.getStore();
-  if (!context) return Promise.resolve();
-  return store.schedulePersist(context.userId, context.garage);
+  if (!context) return;
+  if (store instanceof PostgresPersistence) {
+    const revision = context.revision ?? 0;
+    const result = await store.commitGarageVersioned(context.userId, context.garage, revision);
+    context.garage = result.garage;
+    context.revision = result.revision;
+    return;
+  }
+  await store.schedulePersist(context.userId, context.garage);
 }
 
 // ---------------------------------------------------------------------------
@@ -705,31 +720,31 @@ app.get("/api/reminders", (_req, res) => {
   res.json(dbMemory.reminders);
 });
 
-app.post("/api/reminders", (req, res) => {
+app.post("/api/reminders", async (req, res) => {
   const { value, error } = normalizeReminder(req.body || {});
   if (error) return res.status(400).json({ error });
   if (!value) return res.status(400).json({ error: "Некорректное напоминание" });
   const reminder = { ...value, id: uniqueId(value.id, "reminder", dbMemory.reminders) };
   dbMemory.reminders.push(reminder);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(reminder);
 });
 
-app.put("/api/reminders/:id", (req, res) => {
+app.put("/api/reminders/:id", async (req, res) => {
   const index = dbMemory.reminders.findIndex((item) => item.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Напоминание не найдено" });
   const { value, error } = normalizeReminder({ ...req.body, id: req.params.id });
   if (error) return res.status(400).json({ error });
   dbMemory.reminders[index] = value as ReminderRecord;
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.reminders[index]);
 });
 
-app.delete("/api/reminders/:id", (req, res) => {
+app.delete("/api/reminders/:id", async (req, res) => {
   const len = dbMemory.reminders.length;
   dbMemory.reminders = dbMemory.reminders.filter((item) => item.id !== req.params.id);
   if (dbMemory.reminders.length === len) return res.status(404).json({ error: "Напоминание не найдено" });
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true });
 });
 
@@ -786,7 +801,7 @@ app.get("/api/vehicles/:id", (req, res) => {
   res.json(vehicle);
 });
 
-app.post("/api/vehicles", (req, res) => {
+app.post("/api/vehicles", async (req, res) => {
   const body = req.body as Partial<Vehicle>;
   if (typeof body.make !== "string" || !body.make.trim() || typeof body.model !== "string" || !body.model.trim()) {
     return res.status(400).json({ error: "Марка и модель обязательны для заполнения" });
@@ -833,11 +848,11 @@ app.post("/api/vehicles", (req, res) => {
   };
 
   dbMemory.vehicles.push(newVehicle);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newVehicle);
 });
 
-app.put("/api/vehicles/:id", (req, res) => {
+app.put("/api/vehicles/:id", async (req, res) => {
   const index = dbMemory.vehicles.findIndex((v) => v.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Автомобиль не найден" });
@@ -903,11 +918,11 @@ app.put("/api/vehicles/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.vehicles[index]);
 });
 
-app.patch("/api/vehicles/:id/mileage", (req, res) => {
+app.patch("/api/vehicles/:id/mileage", async (req, res) => {
   const { mileage } = req.body;
   const numMileage = Number(mileage);
   if (isNaN(numMileage) || numMileage < 0) {
@@ -921,11 +936,11 @@ app.patch("/api/vehicles/:id/mileage", (req, res) => {
 
   vehicle.currentMileage = numMileage;
   vehicle.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
-  saveDatabase();
+  await saveDatabase();
   res.json(vehicle);
 });
 
-app.delete("/api/vehicles/:id", (req, res) => {
+app.delete("/api/vehicles/:id", async (req, res) => {
   const id = req.params.id;
   const initialCount = dbMemory.vehicles.length;
   dbMemory.vehicles = dbMemory.vehicles.filter((v) => v.id !== id);
@@ -943,7 +958,7 @@ app.delete("/api/vehicles/:id", (req, res) => {
   dbMemory.toFixTasks = dbMemory.toFixTasks.filter((t) => t.vehicleId !== id);
   dbMemory.tuningStages = dbMemory.tuningStages.filter((t) => t.vehicleId !== id);
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Автомобиль и связанные записи удалены" });
 });
 
@@ -981,7 +996,7 @@ app.get("/api/services", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/services", (req, res) => {
+app.post("/api/services", async (req, res) => {
   const body = req.body as Partial<ServiceRecord> & {
     completedTaskId?: string;
     installedPartIds?: string[];
@@ -1076,11 +1091,11 @@ app.post("/api/services", (req, res) => {
     });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newRecord);
 });
 
-app.put("/api/services/:id", (req, res) => {
+app.put("/api/services/:id", async (req, res) => {
   const index = dbMemory.serviceRecords.findIndex((r) => r.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
@@ -1127,11 +1142,11 @@ app.put("/api/services/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.serviceRecords[index]);
 });
 
-app.delete("/api/services/:id", (req, res) => {
+app.delete("/api/services/:id", async (req, res) => {
   const id = req.params.id;
   const initialLen = dbMemory.serviceRecords.length;
   dbMemory.serviceRecords = dbMemory.serviceRecords.filter((r) => r.id !== id);
@@ -1140,7 +1155,7 @@ app.delete("/api/services/:id", (req, res) => {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Запись сервиса удалена" });
 });
 
@@ -1158,7 +1173,7 @@ app.get("/api/fuel", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/fuel", (req, res) => {
+app.post("/api/fuel", async (req, res) => {
   const body = req.body as Partial<FuelRecord>;
   if (
     typeof body.vehicleId !== "string" ||
@@ -1218,11 +1233,11 @@ app.post("/api/fuel", (req, res) => {
     car.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newFuel);
 });
 
-app.delete("/api/fuel/:id", (req, res) => {
+app.delete("/api/fuel/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.fuelRecords.length;
   dbMemory.fuelRecords = dbMemory.fuelRecords.filter((f) => f.id !== id);
@@ -1231,7 +1246,7 @@ app.delete("/api/fuel/:id", (req, res) => {
     return res.status(404).json({ error: "Запись заправки не найдена" });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Запись заправки удалена" });
 });
 
@@ -1253,7 +1268,7 @@ app.get("/api/inventory", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/inventory", (req, res) => {
+app.post("/api/inventory", async (req, res) => {
   const body = req.body as Partial<GaragePart>;
   if (typeof body.name !== "string" || !body.name.trim()) {
     return res.status(400).json({ error: "Название детали обязательно" });
@@ -1279,11 +1294,11 @@ app.post("/api/inventory", (req, res) => {
   };
 
   dbMemory.garageParts.unshift(newPart);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newPart);
 });
 
-app.put("/api/inventory/:id", (req, res) => {
+app.put("/api/inventory/:id", async (req, res) => {
   const index = dbMemory.garageParts.findIndex((p) => p.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Деталь не найдена" });
@@ -1317,22 +1332,22 @@ app.put("/api/inventory/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.garageParts[index]);
 });
 
-app.post("/api/inventory/:id/install", (req, res) => {
+app.post("/api/inventory/:id/install", async (req, res) => {
   const part = dbMemory.garageParts.find((p) => p.id === req.params.id);
   if (!part) {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
   part.status = "installed";
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, part });
 });
 
-app.delete("/api/inventory/:id", (req, res) => {
+app.delete("/api/inventory/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.garageParts.length;
   dbMemory.garageParts = dbMemory.garageParts.filter((p) => p.id !== id);
@@ -1341,7 +1356,7 @@ app.delete("/api/inventory/:id", (req, res) => {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Деталь удалена со склада" });
 });
 
@@ -1459,7 +1474,7 @@ app.get("/api/to-fix", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/to-fix", (req, res) => {
+app.post("/api/to-fix", async (req, res) => {
   const body = req.body as Partial<ToFixTask>;
   if (typeof body.vehicleId !== "string" || !body.vehicleId.trim() || typeof body.title !== "string" || !body.title.trim()) {
     return res.status(400).json({ error: "vehicleId и title задачи обязательны" });
@@ -1484,11 +1499,11 @@ app.post("/api/to-fix", (req, res) => {
   };
 
   dbMemory.toFixTasks.unshift(newTask);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newTask);
 });
 
-app.put("/api/to-fix/:id", (req, res) => {
+app.put("/api/to-fix/:id", async (req, res) => {
   const index = dbMemory.toFixTasks.findIndex((t) => t.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Задача не найдена" });
@@ -1523,22 +1538,22 @@ app.put("/api/to-fix/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.toFixTasks[index]);
 });
 
-app.post("/api/to-fix/:id/complete", (req, res) => {
+app.post("/api/to-fix/:id/complete", async (req, res) => {
   const task = dbMemory.toFixTasks.find((t) => t.id === req.params.id);
   if (!task) {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
   task.status = "completed";
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, task });
 });
 
-app.delete("/api/to-fix/:id", (req, res) => {
+app.delete("/api/to-fix/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.toFixTasks.length;
   dbMemory.toFixTasks = dbMemory.toFixTasks.filter((t) => t.id !== id);
@@ -1547,7 +1562,7 @@ app.delete("/api/to-fix/:id", (req, res) => {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Задача удалена" });
 });
 
@@ -1564,7 +1579,7 @@ app.get("/api/oem-schedule", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/oem-schedule", (req, res) => {
+app.post("/api/oem-schedule", async (req, res) => {
   const { vehicleId, items } = req.body;
   if (!vehicleId || !Array.isArray(items)) {
     return res.status(400).json({ error: "vehicleId и items обязательны" });
@@ -1587,11 +1602,11 @@ app.post("/api/oem-schedule", (req, res) => {
   }));
 
   dbMemory.oemSchedules.push(...formatted);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(formatted);
 });
 
-app.put("/api/oem-schedule/:id", (req, res) => {
+app.put("/api/oem-schedule/:id", async (req, res) => {
   const index = dbMemory.oemSchedules.findIndex((s) => s.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Пункт регламента не найден" });
@@ -1616,7 +1631,7 @@ app.put("/api/oem-schedule/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.oemSchedules[index]);
 });
 
@@ -1633,7 +1648,7 @@ app.get("/api/tuning", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/tuning", (req, res) => {
+app.post("/api/tuning", async (req, res) => {
   const body = req.body as Partial<TuningStage>;
   if (!body.vehicleId || !body.title) {
     return res.status(400).json({ error: "vehicleId и title обязательны" });
@@ -1654,11 +1669,11 @@ app.post("/api/tuning", (req, res) => {
   };
 
   dbMemory.tuningStages.push(newStage);
-  saveDatabase();
+  await saveDatabase();
   res.status(201).json(newStage);
 });
 
-app.put("/api/tuning/:id", (req, res) => {
+app.put("/api/tuning/:id", async (req, res) => {
   const index = dbMemory.tuningStages.findIndex((t) => t.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Тюнинг-этап не найден" });
@@ -1686,11 +1701,11 @@ app.put("/api/tuning/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  await saveDatabase();
   res.json(dbMemory.tuningStages[index]);
 });
 
-app.delete("/api/tuning/:id", (req, res) => {
+app.delete("/api/tuning/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.tuningStages.length;
   dbMemory.tuningStages = dbMemory.tuningStages.filter((t) => t.id !== id);
@@ -1699,7 +1714,7 @@ app.delete("/api/tuning/:id", (req, res) => {
     return res.status(404).json({ error: "Этап не найден" });
   }
 
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Этап тюнинга удален" });
 });
 
@@ -2126,12 +2141,12 @@ app.get("/api/backup/export", requireAuth, (req, res) => {
   res.json(exported);
 });
 
-app.post("/api/backup/import", requireAuth, (req, res) => {
+app.post("/api/backup/import", requireAuth, async (req, res) => {
   try {
     const imported = { ...validateGarageBackup(req.body), lastUpdated: new Date().toISOString() };
     Object.assign(currentContext().garage, imported);
 
-    saveDatabase();
+    await saveDatabase();
     res.json({ success: true, message: "Данные успешно импортированы", counts: {
       vehicles: dbMemory.vehicles.length,
       services: dbMemory.serviceRecords.length,
@@ -2141,9 +2156,9 @@ app.post("/api/backup/import", requireAuth, (req, res) => {
   }
 });
 
-app.post("/api/backup/reset", requireAuth, (_req, res) => {
+app.post("/api/backup/reset", requireAuth, async (_req, res) => {
   Object.assign(currentContext().garage, emptyGarage());
-  saveDatabase();
+  await saveDatabase();
   res.json({ success: true, message: "Данные текущего гаража очищены", data: dbMemory });
 });
 
