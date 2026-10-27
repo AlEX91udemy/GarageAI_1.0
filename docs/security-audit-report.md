@@ -58,6 +58,11 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Finding: explicit selections above three agents were rejected, but omitting `agents` selected all five configured agents, bypassing the intended paid-model fan-out limit and potentially multiplying request cost.
 - Remediation on this branch: omitted selections now default to `architect`, `qa`, and `ops`; a regression test verifies the default invokes no more than three agents.
 - Verification: CI must pass before merge. The fix is not yet merged or deployed.
+### MEDIUM — Agent source-snapshot redaction missed generic secret/token variable names
+- Location: `agents_service/app.py`, `_repo_snapshot()`.
+- Finding: the snapshot redaction covered API keys, passwords, and several named credential patterns, but not generic assignments such as `secret`, `authToken`, or `clientSecret`. If a developer accidentally committed such a value, it could be forwarded to the paid model in the source snapshot.
+- Remediation on branch `fix/agent-snapshot-secret-redaction`: extend assignment and mapping-key redaction to generic secret/token/credential names and add regression coverage with sentinel values.
+- Verification: CI must pass before merge. This defense-in-depth does not replace secret scanning or removing leaked credentials.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
