@@ -7,7 +7,9 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from starlette.requests import Request
 
-import re\n\nfrom agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
+import re
+
+from agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
 
 
 def make_request(client_ip: str = "127.0.0.1") -> Request:
