@@ -25,9 +25,9 @@ The PostgreSQL-backed HTTP integration test passed in [run 40490904322](https://
 
 ### HIGH — Runtime garage data is tracked in Git
 - Location: `data/garage_store.json`.
-- Evidence: tracked JSON contains 16 user-keyed garage records, including non-empty vehicle, service, fuel, parts and maintenance records. It does not appear to contain email addresses or obvious token/password fields in the current snapshot.
+- Evidence: a historical commit (`29ad3e1b`) in this **public** repository contains 16 user-keyed garages, 15 vehicles, 9 non-empty VIN fields and 13 non-empty license-plate fields, plus service/fuel/maintenance records. The inspected snapshot did not contain email addresses or obvious password/session-token fields. Treat the vehicle identifiers and records as potentially publicly exposed.
 - Risk: real or user-associated vehicle/maintenance information may be exposed in a public repository and retained in Git history.
-- Action on this branch: remove the runtime data file from the current tree; `.gitignore` already excludes it. This does **not** remove historical copies. Before deploying the PR, preserve any legitimate production data outside Git and confirm the runtime uses persistent storage or a managed database. If any record belongs to a real user, assess notification/privacy obligations. Purge repository history separately if required; coordinate any force-push with collaborators.
+- Action merged to `main`: remove the runtime data file from the current tree; `.gitignore` already excludes it. This does **not** remove historical copies. The repository remains public and the old commit is still addressable. Before deploying the PR, preserve any legitimate production data outside Git and confirm the runtime uses persistent storage or a managed database. If any record belongs to a real user, assess notification/privacy obligations. A history rewrite and force-push are needed to remove the historical blob from GitHub's reachable history; this is a destructive repository operation and has not been performed. Coordinate it with collaborators and obtain explicit approval before rewriting history.
 
 ### HIGH — Agent API authentication and quota protection
 - Location: `agents_service/app.py`, `server.ts`, `server/agentServiceClient.ts`.
