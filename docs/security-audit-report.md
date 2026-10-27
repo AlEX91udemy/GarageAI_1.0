@@ -5,15 +5,16 @@
 - Review branch: `audit/security-hardening-2026-10-27`
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (run 40455145043)
+## CI results (latest completed run 40460730602)
 
 - TypeScript check (`npm run lint`): passed.
-- Unit tests: **85 passed across 14 test files**.
+- Unit tests: **94 passed across 16 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
 - Production build: passed.
 - Catalog audit: passed.
 - npm production dependency audit: **0 vulnerabilities**.
 - Full npm dependency audit: **0 vulnerabilities**.
-- Gitleaks scan of the change range: **no leaks detected**.
+- Web and private-agent Docker image builds: passed.
+- Gitleaks scan: passed; no leaks detected in the scanned repository history/range.
 - Python dependency audit: **failed**; `opentelemetry-api 1.44.0` is flagged for `CVE-2026-114603`, fixed in `1.45.1`. An attempted direct minimum-version constraint conflicts with the dependency constraints of `google-adk==2.13.0`, so it was reverted rather than leaving an un-installable environment. The Python audit remains a blocking failure until upstream ADK constraints are updated or a tested compatible upgrade path is established.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
@@ -33,13 +34,14 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Remediation on this branch: POST now fails closed with 503 if `AGENTS_API_TOKEN` is not configured and returns 401 unless the `X-Agents-Token` header matches using constant-time comparison. README documents local setup and recommends Cloud Run IAM/Secret Manager.
 - Remediation on this branch: also adds a per-instance limit of five authorized requests per minute per client IP and automated tests for missing/invalid tokens and rate limiting. Remaining risk: this limiter is in-memory and can be bypassed across multiple instances; Cloud Run ingress/IAM remains the primary boundary. Configure the token as a secret and restrict the service to trusted callers before production.
 
-### HIGH — Tenant isolation coverage is partial
-- Location: `server.ts` and protected CRUD routes.
-- Added `server/tenant-isolation.integration.test.ts` with two-user checks for vehicle and service-record reads, updates, deletes, and export, plus anonymous denial. Store-level tests cover per-user state, concurrent writes and reload. Coverage remains incomplete for other resource families, import/restore semantics and guest mode; do not treat the current tests as proof of all-route isolation.
+### HIGH — Tenant isolation coverage is expanded but not complete
+- Location: `server.ts`, `server/store.ts`, `server/tenant-isolation.integration.test.ts`.
+- Tests now verify cross-user isolation across vehicles, service records, reminders, fuel, inventory, repair tasks, OEM schedules and tuning, including export leakage, mutation denial, invalid restore references and concurrent mutation requests. Garage writes are queued per user in one Node process so the next request takes its snapshot after the preceding save completes. Concurrent duplicate usernames are rejected atomically by the store and the HTTP route returns 409.
+- Latest completed Node job passed 94 tests across 16 files. This does not prove every route or edge case: guest-mode lifecycle, valid backup restore, malformed input permutations and coordination across separate server instances remain open.
 
 ### MEDIUM — JSON persistence is not safe for horizontal scaling
 - Location: `server/store.ts`.
-- The in-process write queue and atomic file replacement do not coordinate separate instances. Keep one instance with persistent disk only as a temporary arrangement, or migrate to a transactional database before scaling horizontally.
+- The store serializes its own file writes, and the HTTP layer serializes garage mutations per user inside a single Node process. Neither coordinates separate service instances or survives ephemeral Cloud Run filesystems. A transactional managed database and shared session store are required before scaling or production.
 
 ### HIGH — Agent review context previously contained only file names
 - Location: `agents_service/app.py`, `_repo_snapshot()`.
@@ -54,13 +56,13 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Confirmed CI run 40459339384: TypeScript check passed; **90 tests passed across 16 files**, including the HTTP integration and store tests; production build, catalog audit, both npm audits, and Gitleaks passed. Python syntax and the agent API tests passed. The Python dependency audit fails on `opentelemetry-api 1.44.0` / `CVE-2026-114603`. Follow-up runs were started after adding Docker build jobs and a mocked orchestration test; check the Actions page for their latest result before release.
-- Added `server/store.test.ts` for multi-user store isolation, serialized concurrent writes, persistence reload, and defensive copying.
-- Added `server/tenant-isolation.integration.test.ts` to start the HTTP server with temporary storage and verify anonymous denial plus cross-user vehicle and service-record read/update/delete/export isolation. It does not yet cover every resource family, restore/import semantics, or client-side guest mode. This is intended coverage and must be validated by CI before treating it as passing.
-- Resolve the `opentelemetry-api` finding without breaking `google-adk==2.13.0`; keep Python audit blocking and do not force an incompatible dependency or suppress the finding.
-- Verify the per-instance agent rate limiter behind the actual Cloud Run proxy. Cloud Run IAM/ingress must remain the primary boundary.
-- Container build files and a Cloud Run runbook have been added, but no cloud resources have been created and no deployment has been executed. The web service is not production-ready until JSON persistence is replaced by a managed transactional database and the agent service is integrated through authenticated service-to-service calls.
-- Confirm no live data is required from the tracked JSON file before merging. Historical data exposure remains unresolved until Git history and deployment copies are assessed.
+- Latest completed run [40460730602](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40460730602): **94 tests across 16 files passed**; TypeScript, production build, web and private-agent container builds, catalog audit, both npm audits, and Gitleaks passed. Python syntax and agent API tests passed, but the Python dependency audit failed on `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
+- Tests now cover the main garage collection families for cross-user visibility and mutation, cross-user export, invalid restore references, concurrent vehicle writes, and duplicate registration races. Valid restore and guest-mode lifecycle tests are still needed.
+- The currently released Google ADK dependency constraints cap OpenTelemetry API/SDK at `<=1.44`, while the CVE is fixed in 1.45.1. Do not force-install an incompatible version or suppress the audit. Retest when a compatible ADK dependency set is available.
+- The HTTP mutation queue is process-local. Do not run multiple Cloud Run instances against local JSON state; migrate to managed transactional storage and shared sessions.
+- Verify the agent API rate limiter behind the actual Cloud Run proxy. Cloud Run IAM/ingress must remain the primary boundary.
+- Container builds and a Cloud Run runbook exist, but no cloud resources have been created and no deployment has been executed. The Node service still needs authenticated service-to-service integration with the private agent API.
+- Confirm whether the tracked JSON file contains real user data before merging. Historical exposure remains unresolved until Git history and deployment copies are assessed.
 
 ## Release decision
 
