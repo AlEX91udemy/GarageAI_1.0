@@ -5,28 +5,64 @@ import unittest
 from unittest.mock import patch
 
 from fastapi import HTTPException
+from starlette.requests import Request
 
-from agents_service.app import AgentRequest, run_agents
+from agents_service.app import AgentRequest, run_agents, _agent_request_windows
+
+
+def make_request(client_ip: str = "127.0.0.1") -> Request:
+    return Request({
+        "type": "http",
+        "method": "POST",
+        "path": "/agents/run",
+        "headers": [],
+        "client": (client_ip, 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+        "query_string": b"",
+    })
 
 
 class AgentEndpointAuthTests(unittest.TestCase):
+    def setUp(self):
+        _agent_request_windows.clear()
+
     def test_disabled_when_api_token_is_not_configured(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": ""}, clear=False):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(run_agents(AgentRequest(task="review project"), None))
+                asyncio.run(run_agents(AgentRequest(task="review project"), make_request(), None))
         self.assertEqual(ctx.exception.status_code, 503)
 
     def test_rejects_missing_token(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": "expected-secret"}, clear=False):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(run_agents(AgentRequest(task="review project"), None))
+                asyncio.run(run_agents(AgentRequest(task="review project"), make_request(), None))
         self.assertEqual(ctx.exception.status_code, 401)
 
     def test_rejects_wrong_token(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": "expected-secret"}, clear=False):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(run_agents(AgentRequest(task="review project"), "wrong-secret"))
+                asyncio.run(run_agents(AgentRequest(task="review project"), make_request(), "wrong-secret"))
         self.assertEqual(ctx.exception.status_code, 401)
+
+    def test_rate_limit_blocks_sixth_authorized_request(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AGENTS_API_TOKEN": "expected-secret",
+                "GEMINI_API_KEY": "",
+                "GOOGLE_GENAI_USE_VERTEXAI": "",
+            },
+            clear=False,
+        ):
+            for _ in range(5):
+                with self.assertRaises(HTTPException) as ctx:
+                    asyncio.run(run_agents(AgentRequest(task="review project"), make_request("192.0.2.1"), "expected-secret"))
+                self.assertEqual(ctx.exception.status_code, 503)
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(run_agents(AgentRequest(task="review project"), make_request("192.0.2.1"), "expected-secret"))
+        self.assertEqual(ctx.exception.status_code, 429)
+        self.assertIn("Retry-After", ctx.exception.headers)
 
     def test_valid_token_reaches_provider_configuration_check(self):
         with patch.dict(
@@ -39,7 +75,7 @@ class AgentEndpointAuthTests(unittest.TestCase):
             clear=False,
         ):
             with self.assertRaises(HTTPException) as ctx:
-                asyncio.run(run_agents(AgentRequest(task="review project"), "expected-secret"))
+                asyncio.run(run_agents(AgentRequest(task="review project"), make_request(), "expected-secret"))
         self.assertEqual(ctx.exception.status_code, 503)
         self.assertIn("GEMINI_API_KEY", str(ctx.exception.detail))
 
