@@ -2155,6 +2155,7 @@ app.post("/api/backup/reset", requireAuth, (_req, res) => {
 // middleware protect this endpoint; Cloud Run IAM plus X-Agents-Token protect
 // the upstream service.
 const ALLOWED_AGENT_NAMES = new Set(["architect", "developer", "qa", "ops", "argon_reviewer"]);
+const MAX_AGENTS_PER_RUN = 3;
 
 function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
