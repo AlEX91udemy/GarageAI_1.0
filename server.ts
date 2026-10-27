@@ -2145,7 +2145,6 @@ app.get("/api/auth/session", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
     // Скользящее продление сессии при активной работе.
-    let renewedToken = false;
     if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
       const token = crypto.randomBytes(32).toString("base64url");
       const previousHash = session.tokenHash;
@@ -2161,9 +2160,8 @@ app.get("/api/auth/session", async (req, res) => {
         await persistSessions();
       }
       res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-      renewedToken = true;
     }
-    return res.json({ username: user.username, csrfToken: session.csrfSecret, ...(renewedToken ? {} : {}) });
+    return res.json({ username: user.username, csrfToken: session.csrfSecret });
   } catch (error) {
     console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });
