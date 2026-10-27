@@ -74,7 +74,7 @@ export class PostgresPersistence {
   async getUserByName(username: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", created_at AS "createdAt"
+      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE username_normalized = ${username.trim().toLowerCase()}
       LIMIT 1
@@ -189,8 +189,8 @@ export class PostgresPersistence {
     this.assertInitialized();
     const rows = await this.sql`
       SELECT token_hash AS "tokenHash", csrf_secret AS "csrfSecret",
-             user_id AS "userId", created_at_ms AS "createdAt",
-             expires_at_ms AS "expiresAt", revoked_at_ms AS "revokedAt"
+             user_id AS "userId", created_at_ms::float8 AS "createdAt",
+             expires_at_ms::float8 AS "expiresAt", revoked_at_ms::float8 AS "revokedAt"
       FROM garageai_sessions
       WHERE token_hash = ${tokenHash}
         AND expires_at_ms > ${Date.now()}
