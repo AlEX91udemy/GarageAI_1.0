@@ -1,4 +1,3 @@
-import postgres from "postgres";
 import { PostgresPersistence } from "../server/postgresPersistence";
 
 async function main() {
