@@ -200,6 +200,7 @@ async def run_agents(
     request: AgentRequest,
     http_request: Request,
     x_agents_token: str | None = Header(default=None, alias="X-Agents-Token"),
+    x_agents_caller: str | None = Header(default=None, alias="X-Agents-Caller"),
 ) -> AgentResponse:
     # Fail closed: never allow paid model calls unless an application token is configured.
     expected_token = os.getenv("AGENTS_API_TOKEN", "")
@@ -207,8 +208,14 @@ async def run_agents(
         raise HTTPException(503, "Agent API is disabled: configure AGENTS_API_TOKEN.")
     if not x_agents_token or not hmac.compare_digest(x_agents_token, expected_token):
         raise HTTPException(401, "Invalid or missing agent API token.")
-    client_ip = http_request.client.host if http_request.client else "unknown"
-    allowed, retry_after = _allow_agent_request(client_ip)
+    # Node forwards the authenticated internal user ID after validating the
+    # session/allowlist. Fall back to the network peer for direct trusted callers.
+    caller_key = (
+        f"user:{x_agents_caller}"
+        if x_agents_caller and re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", x_agents_caller)
+        else f"ip:{http_request.client.host if http_request.client else 'unknown'}"
+    )
+    allowed, retry_after = _allow_agent_request(caller_key)
     if not allowed:
         raise HTTPException(
             status_code=429,
