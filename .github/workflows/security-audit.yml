@@ -17,6 +17,20 @@ jobs:
     name: Node.js tests, typecheck and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: garageai_test
+          POSTGRES_PASSWORD: garageai_test_only
+          POSTGRES_DB: garageai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U garageai_test -d garageai_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +55,14 @@ jobs:
         run: npm run catalog:audit
       - name: PostgreSQL schema contract audit
         run: node scripts/audit-postgres-schema.mjs
+      - name: PostgreSQL migration integration tests
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: garageai_test
+          PGDATABASE: garageai_test
+          PGPASSWORD: garageai_test_only
+        run: bash scripts/test-postgres-schema.sh
       - name: Production dependency audit
         run: npm audit --omit=dev
       - name: Full dependency audit
