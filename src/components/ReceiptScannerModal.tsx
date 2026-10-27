@@ -165,9 +165,10 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         return;
       }
       setImagePreview(image);
+      setSampleFallbackResult(null);
       setScanResult(null);
       setScanError(null);
-      void handleScan(image);
+      void handleScan(image, null);
     };
     reader.onerror = () => {
       setScanError("Не удалось прочитать файл. Попробуйте другое фото.");
@@ -281,6 +282,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   type="button"
                   onClick={() => {
                     setImagePreview(preset.dataUrl);
+                    setSampleFallbackResult(preset.fallbackResult);
                     setScanResult(null);
                     setScanError(null);
                   }}
