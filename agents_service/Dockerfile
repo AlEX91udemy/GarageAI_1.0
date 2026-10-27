@@ -19,8 +19,6 @@ ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV GOOGLE_CLOUD_LOCATION=europe-west1
 EXPOSE 8080
 USER app
-# Force h11 so the explicit 8 KiB incomplete-event limit is active. This is
-# defense in depth for oversized/malformed headers while the upstream ADK
-# OpenTelemetry dependency constraint remains unresolved; it does not replace
-# upgrading to a patched OpenTelemetry release.
+# Force h11 so the explicit 8 KiB incomplete-event limit is active as defense
+# in depth against oversized/malformed HTTP request headers.
 CMD ["sh", "-c", "uvicorn agents_service.app:app --host 0.0.0.0 --port ${PORT:-8080} --http h11 --h11-max-incomplete-event-size 8192"]
