@@ -8,6 +8,12 @@ Status: **deployment prepared, not executed**. This document does not claim that
 2. The Python dependency audit flags `opentelemetry-api` pulled by `google-adk==2.13.0` for CVE-2026-114603. Do not suppress the audit or force an incompatible version. Keep agent deployment private until a compatible upstream dependency set is available and tested.
 3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
+## Production startup safety gate
+
+The Node server now refuses to start when `NODE_ENV=production` and only the local JSON garage/session store is configured. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
+
+Before production deployment, implement and verify a durable database-backed garage store plus shared session persistence, including migration, concurrency, backup/restore and restart/scale tests. The current runbook is not a deploy-now checklist while this gate is active.
+
 ## Suggested initial resources
 
 - Region: `europe-west1` (Belgium), subject to model availability and data-residency requirements.
