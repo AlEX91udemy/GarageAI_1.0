@@ -2693,8 +2693,11 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
+startServer().catch(async (error) => {
   console.error("Server startup failed:", error instanceof Error ? error.message : "unknown error");
+  if (store instanceof PostgresPersistence) {
+    await store.close().catch(() => undefined);
+  }
   process.exitCode = 1;
 });
 
