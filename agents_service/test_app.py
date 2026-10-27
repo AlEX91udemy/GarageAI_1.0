@@ -130,5 +130,67 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertIn("GEMINI_API_KEY", str(ctx.exception.detail))
 
 
+class AgentRunnerLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_runner_closes_and_text_chunks_are_joined_with_newlines(self):
+        from types import SimpleNamespace
+
+        from agents_service.app import _run_agent
+
+        class FakeSessionService:
+            async def create_session(self, **_kwargs):
+                return SimpleNamespace(id="session-1")
+
+        class FakeRunner:
+            def __init__(self, **_kwargs):
+                self.session_service = FakeSessionService()
+                self.closed = False
+
+            async def run_async(self, **_kwargs):
+                for value in ("first line", "second line"):
+                    yield SimpleNamespace(
+                        content=SimpleNamespace(
+                            parts=[SimpleNamespace(text=value)]
+                        )
+                    )
+
+            async def close(self):
+                self.closed = True
+
+        runner = FakeRunner()
+        with patch("agents_service.app.InMemoryRunner", return_value=runner):
+            result = await _run_agent(object(), "qa", "test prompt")
+
+        self.assertEqual(result, "first line\\nsecond line")
+        self.assertTrue(runner.closed)
+
+    async def test_runner_closes_when_model_execution_raises(self):
+        from types import SimpleNamespace
+
+        from agents_service.app import _run_agent
+
+        class FakeSessionService:
+            async def create_session(self, **_kwargs):
+                return SimpleNamespace(id="session-1")
+
+        class FakeRunner:
+            def __init__(self, **_kwargs):
+                self.session_service = FakeSessionService()
+                self.closed = False
+
+            async def run_async(self, **_kwargs):
+                raise RuntimeError("simulated provider failure")
+                yield  # Make this an async generator.
+
+            async def close(self):
+                self.closed = True
+
+        runner = FakeRunner()
+        with patch("agents_service.app.InMemoryRunner", return_value=runner):
+            with self.assertRaisesRegex(RuntimeError, "simulated provider failure"):
+                await _run_agent(object(), "qa", "test prompt")
+
+        self.assertTrue(runner.closed)
+
+
 if __name__ == "__main__":
     unittest.main()
