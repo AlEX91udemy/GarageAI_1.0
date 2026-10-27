@@ -154,6 +154,30 @@ class AgentEndpointAuthTests(unittest.TestCase):
                         )
                     self.assertEqual(ctx.exception.status_code, 400)
 
+    def test_omitted_agent_selection_uses_bounded_default(self):
+        calls = []
+
+        async def fake_run_agent(agent, name, prompt):
+            calls.append(name)
+            return f"{name} result"
+
+        with patch.dict(os.environ, {
+            "AGENTS_API_TOKEN": "expected-secret",
+            "GEMINI_API_KEY": "",
+            "GOOGLE_GENAI_USE_VERTEXAI": "true",
+        }, clear=False), patch("agents_service.app._build_agents", return_value={
+            name: {"model": "test", "instruction": "review"}
+            for name in ("architect", "developer", "qa", "ops", "argon_reviewer")
+        }), patch("agents_service.app._run_agent", side_effect=fake_run_agent):
+            response = asyncio.run(run_agents(
+                AgentRequest(task="review project"),
+                make_request("192.0.2.77"),
+                "expected-secret",
+            ))
+
+        self.assertEqual(set(response.results), {"architect", "qa", "ops"})
+        self.assertLessEqual(len(calls), 3)
+
     def test_valid_token_reaches_provider_configuration_check(self):
         with patch.dict(
             os.environ,
