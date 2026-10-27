@@ -32,9 +32,8 @@ const MIGRATION_FILES = ["001_initial_postgres.sql"] as const;
 /**
  * PostgreSQL repository primitives for the Cloud Run persistence cutover.
  *
- * This adapter is deliberately not selected by server.ts yet. The HTTP layer
- * still has synchronous GarageStore/session assumptions and must be refactored
- * before this class can safely replace JSON persistence.
+ * The HTTP layer selects this adapter when DATABASE_URL is configured. Local
+ * development without DATABASE_URL retains GarageStore for fast disposable runs.
  */
 export class PostgresPersistence {
   private readonly sql: Sql;
@@ -101,7 +100,7 @@ export class PostgresPersistence {
   async getUserById(id: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", created_at AS "createdAt"
+      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE id = ${id}
       LIMIT 1
@@ -112,7 +111,7 @@ export class PostgresPersistence {
   async listUsers(): Promise<UserRecord[]> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", created_at AS "createdAt"
+      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       ORDER BY created_at, id
     `;
@@ -132,7 +131,7 @@ export class PostgresPersistence {
         const rows = await tx`
           INSERT INTO garageai_users (id, username, password_hash)
           VALUES (${id}, ${username.trim()}, ${passwordHash})
-          RETURNING id, username, password_hash AS "passwordHash", created_at AS "createdAt"
+          RETURNING id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
         `;
         await tx`
           INSERT INTO garageai_garages (user_id, data)
