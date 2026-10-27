@@ -2231,7 +2231,11 @@ app.post("/api/auth/email-code/request", async (req, res) => {
     const codeHash = hashEmailLoginCode(email, code, pepper);
     const expiresAtMs = now + EMAIL_LOGIN_CODE_TTL_MS;
     if (store instanceof PostgresPersistence) {
-      await store.putEmailLoginCode(email, user.id, codeHash, expiresAtMs, now);
+      const stored = await store.putEmailLoginCode(email, user.id, codeHash, expiresAtMs, now, EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS);
+      if (!stored) {
+        res.setHeader("Retry-After", Math.ceil(EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS / 1000));
+        return res.status(429).json({ error: "Код уже отправлен. Подождите минуту перед повторной отправкой." });
+      }
     } else {
       localEmailLoginCodes.set(email, { userId: user.id, codeHash, expiresAtMs, attempts: 0, sentAtMs: now });
     }
