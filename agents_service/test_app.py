@@ -114,6 +114,28 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertTrue(all("Audit tenant isolation" in prompt for _, prompt in calls))
         self.assertTrue(all("--- FILE: server.ts ---" in prompt for _, prompt in calls))
 
+    def test_rejects_empty_or_duplicate_agent_selections(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AGENTS_API_TOKEN": "expected-secret",
+                "GEMINI_API_KEY": "",
+                "GOOGLE_GENAI_USE_VERTEXAI": "false",
+            },
+            clear=False,
+        ):
+            for index, selection in enumerate(([], ["qa", "qa"])):
+                with self.subTest(selection=selection):
+                    with self.assertRaises(HTTPException) as ctx:
+                        asyncio.run(
+                            run_agents(
+                                AgentRequest(task="review project", agents=selection),
+                                make_request(f"192.0.2.{10 + index}"),
+                                "expected-secret",
+                            )
+                        )
+                    self.assertEqual(ctx.exception.status_code, 400)
+
     def test_valid_token_reaches_provider_configuration_check(self):
         with patch.dict(
             os.environ,
