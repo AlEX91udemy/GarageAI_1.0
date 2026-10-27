@@ -622,7 +622,12 @@ app.get("/api/health", (_req, res) => {
   const garage = requestContext.getStore()?.garage;
   res.json({
     status: "ok",
+    // Keep the legacy field for older clients, but expose explicit provider
+    // state so Vertex AI/ADC is not misreported as a missing API key.
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasAiConfigured: hasAiConfiguration(process.env),
+    hasGeminiConfigured: hasGeminiConfiguration(process.env),
+    vertexAiEnabled: process.env.GOOGLE_GENAI_USE_VERTEXAI === "true",
     authenticated: Boolean(garage),
     vehiclesCount: garage ? dbMemory.vehicles.length : 0,
     serviceRecordsCount: garage ? dbMemory.serviceRecords.length : 0,
