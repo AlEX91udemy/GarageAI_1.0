@@ -31,7 +31,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 ### HIGH — Agent API authentication and quota protection
 - Location: `agents_service/app.py`, `server.ts`, `server/agentServiceClient.ts`.
 - Initial evidence: the endpoint accepted requests without application-level authentication, which could allow paid model calls if publicly reachable.
-- Remediation on this branch: Python `POST /agents/run` fails closed with 503 if `AGENTS_API_TOKEN` is missing and returns 401 unless `X-Agents-Token` matches using constant-time comparison. Python and Node both have per-instance rate limits.
+- Remediation on this branch: Python `POST /agents/run` fails closed with 503 if `AGENTS_API_TOKEN` is missing and returns 401 unless `X-Agents-Token` matches using constant-time comparison. Python and Node both have per-instance rate limits; the Node service forwards the authenticated internal user ID to the private Python service so its quota is also per caller instead of all Cloud Run requests sharing one proxy-IP bucket.
 - Remediation on this branch: Node `POST /api/agents/run` validates task size and agent names, requires an authenticated session/CSRF, and in production uses fail-closed `AGENTS_ALLOWED_USERNAMES` so only configured admin logins can invoke paid agents. The service client uses Cloud Run metadata-server ID tokens plus the shared application token; responses are bounded to 250 KB while streaming.
 - Remaining risk: rate limits are in-memory and do not coordinate multiple instances; the real Cloud Run OIDC/IAM/token/Vertex request path has not been smoke-tested. Configure IAM and both services' tokens through Secret Manager before production.
 
