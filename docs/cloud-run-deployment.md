@@ -5,7 +5,7 @@ Status: **deployment prepared, not executed**. This document does not claim that
 ## Production blockers
 
 1. `server/store.ts` stores user data in JSON files on the container filesystem. Cloud Run's writable filesystem is ephemeral and not shared between instances. **Do not serve real user data until persistence is migrated to a managed transactional database** and backup/restore tests pass.
-2. The Python dependency audit flags `opentelemetry-api` pulled by `google-adk==2.13.0` for CVE-2026-114603. Do not suppress the audit or force an incompatible version. Keep agent deployment private until a compatible upstream dependency set is available and tested. The agent container now explicitly uses Uvicorn's h11 parser with an 8 KiB incomplete-event limit as defense in depth against oversized/malformed headers. This is only a mitigation, not a CVE fix; the dependency audit must still pass before release.
+2. **Resolved in the current branch:** the agent service no longer depends on `google-adk==2.13.0`; it uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. The latest completed Python audit installed 1.45.1 and reported no known vulnerabilities. Re-run CI after the explicit minimum pin, and keep the agent service private regardless.
 3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
 ## Production startup safety gate
@@ -59,7 +59,7 @@ gcloud run deploy garageai-agents \
   --set-secrets "AGENTS_API_TOKEN=agents-api-token:latest"
 ```
 
-This is a template, not a completed deployment. Check model availability and resolve the dependency-audit blocker first. Do not make the service public to work around authentication.
+This is a template, not a completed deployment. Check model availability and complete the latest CI run first. Do not make the service public to work around authentication.
 
 ## Connect the web service to the private agent service
 
