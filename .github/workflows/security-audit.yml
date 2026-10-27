@@ -73,6 +73,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Ensure PR base branch history is present
+        run: git fetch origin main
       - name: Scan repository and Git history with Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
