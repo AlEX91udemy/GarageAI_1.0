@@ -1,6 +1,6 @@
 # PostgreSQL persistence migration plan
 
-Status: schema foundation added; application adapter and production migration are **not yet complete**. Do not remove the production storage guard or send production traffic to local JSON storage.
+Status: PostgreSQL schema, async repository primitives, session persistence selection, revision-checked garage writes, and CI integration tests are implemented on the feature branch. **The legacy JSON importer, end-to-end cutover validation, and real Cloud SQL smoke tests are not complete.** Keep the production readiness gate closed until those are verified.
 
 ## Target architecture
 
@@ -15,9 +15,9 @@ Status: schema foundation added; application adapter and production migration ar
 
 File: `db/migrations/001_initial_postgres.sql`
 
-The SQL creates the schema-migrations ledger, user/garage/session tables, a normalized unique username index, ownership foreign keys, JSON object validation and expiry indexes. It is intentionally additive and does not import or delete application data.
+The SQL creates the schema-migrations ledger, user/garage/session tables, a normalized unique username index, ownership foreign keys, JSON object validation, expiry indexes, and a garage revision for optimistic concurrency. It is intentionally additive and does not import or delete application data.
 
-Apply only after a verified backup and from a migration identity with DDL permissions. The runtime service account should not have schema-owner privileges.
+Apply with `DATABASE_URL=... npx tsx scripts/migrate-postgres.ts` from a controlled migration environment after a verified backup. The runtime service account should not have schema-owner privileges. Production app startup verifies migration 001 but does not run DDL by default; `DATABASE_AUTO_MIGRATE=true` is an explicit override and should not be used for normal production rollout.
 
 ## JSON import requirements
 
@@ -40,10 +40,10 @@ Do not run a migration against production data until the tool and its tests exis
 
 ## Required application changes before production
 
-- Replace the synchronous in-memory methods currently used by `server.ts` with an asynchronous persistence interface. PostgreSQL calls are asynchronous; pretending they are synchronous is not acceptable.
-- Remove `sessions: Map`, `loadSessions()`, and `persistSessions()` as authoritative stores. Read, renew, revoke and create sessions in PostgreSQL.
-- Commit garage changes before returning successful HTTP responses; propagate storage failures as safe 5xx responses.
-- Enforce per-user ownership in SQL and use transactions/optimistic concurrency or row locking for updates.
+- Finish the migration/import and cutover verification before enabling `GARAGE_POSTGRES_READY=true` in production.
+- The async PostgreSQL repository is selected by `DATABASE_URL`; PostgreSQL-backed auth/session reads, writes, renewal and revocation are now wired into `server.ts`. The in-memory session map is used only in local JSON mode.
+- Garage mutations are committed before success responses. PostgreSQL uses a per-garage revision check; stale writes are rejected with HTTP 409 rather than overwriting newer data.
+- Keep the startup guard fail-closed: production requires both `DATABASE_URL` and `GARAGE_POSTGRES_READY=true`. Set the readiness flag only after verified migration/import, backup/restore and smoke tests.
 - Add PostgreSQL-backed integration tests for tenant isolation, concurrent writes, unique usernames, session lifecycle, transaction rollback, restart/multi-process behavior, JSON import and backup/restore.
 - Keep `assertProductionStorageSafe` fail-closed until the configured PostgreSQL adapter is actually active and validated. An environment variable alone must not be treated as proof that a database is connected.
 
@@ -53,9 +53,10 @@ Do not run a migration against production data until the tool and its tests exis
 - [ ] Create a dedicated runtime service account and least-privilege Cloud SQL connectivity.
 - [ ] Configure Cloud Run private IP or Cloud SQL connector/socket; use a bounded pool sized for maximum instances.
 - [ ] Store connection configuration in Secret Manager where applicable.
-- [ ] Apply migrations from a controlled one-off migration job, not every web instance at startup.
+- [ ] Apply migrations from a controlled one-off migration job using `npx tsx scripts/migrate-postgres.ts`, not every web instance at startup.
 - [ ] Run migration dry-run, take a verified backup, import, compare row counts/digests, then test a restore.
-- [ ] Deploy a canary revision with the database adapter; test auth, CRUD, logout/revocation, tenant isolation and restart/scale.
+- [ ] Keep `GARAGE_POSTGRES_READY` unset while migration/import is incomplete; after successful validation, set it to `true` and deploy a canary revision.
+- [ ] Test auth, CRUD, logout/revocation, tenant isolation, stale-write conflicts and restart/scale.
 - [ ] Configure billing budget alerts, Cloud SQL connection/CPU/storage alerts, error-rate alerts and log redaction.
 - [ ] Keep the old revision and a documented rollback plan until the smoke tests pass.
 - [ ] Do not enable real-user traffic before all checks pass.
