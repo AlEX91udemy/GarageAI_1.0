@@ -54,14 +54,13 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Resolve the `opentelemetry-api 1.44.0` vulnerability without breaking `google-adk==2.13.0` dependency resolution; keep Python audit blocking until resolved.
-- Python syntax validation and all six agent endpoint/source-snapshot tests passed in the latest observed run; the dependency audit remains unresolved.
-- Verify rate-limit behavior under the actual Cloud Run proxy configuration.
-- Resolve the upstream OpenTelemetry version cap without forcing an incompatible dependency set.
-- Keep npm and Python dependency audits blocking.
-- Add route-level integration tests for two-user tenant isolation across CRUD, backup/restore and guest-mode behavior.
-- Confirm no live data is required from the tracked JSON file before merging.
-- Treat historical data exposure as unresolved until Git history and deployment copies are assessed.
+- The last fully observed CI result is historical: Node checks/build and Gitleaks passed, Python syntax and all six agent tests passed, but `pip-audit` failed on `opentelemetry-api 1.44.0` / `CVE-2026-114603`. Later commits added tests and container/deployment files; their CI status has not yet been confirmed.
+- Added `server/store.test.ts` for multi-user store isolation, serialized concurrent writes, persistence reload, and defensive copying.
+- Added `server/tenant-isolation.integration.test.ts` to start the HTTP server with temporary storage and verify anonymous denial plus cross-user read/update/delete/export isolation. This is intended coverage and must be validated by CI before treating it as passing.
+- Resolve the `opentelemetry-api` finding without breaking `google-adk==2.13.0`; keep Python audit blocking and do not force an incompatible dependency or suppress the finding.
+- Verify the per-instance agent rate limiter behind the actual Cloud Run proxy. Cloud Run IAM/ingress must remain the primary boundary.
+- Container build files and a Cloud Run runbook have been added, but no cloud resources have been created and no deployment has been executed. The web service is not production-ready until JSON persistence is replaced by a managed transactional database and the agent service is integrated through authenticated service-to-service calls.
+- Confirm no live data is required from the tracked JSON file before merging. Historical data exposure remains unresolved until Git history and deployment copies are assessed.
 
 ## Release decision
 
