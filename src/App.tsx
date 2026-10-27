@@ -930,6 +930,7 @@ export default function App() {
           }}
           onOpenBackup={() => setShowBackupModal(true)}
           onSwitchToMobile={() => handleSetPlatform("mobile")}
+          onAuthSuccess={handleAuthSuccess}
           onLogout={() => {
             void apiLogout().catch(console.error);
             setVehicles([]);
