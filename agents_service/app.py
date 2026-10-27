@@ -78,7 +78,7 @@ def _repo_snapshot() -> str:
     max_files, max_file_chars, max_total_chars = 40, 3500, 45000
     secret_assignment = re.compile(
         r"(?im)^([ \t]*(?:(?:export[ \t]+)?(?:const|let|var)[ \t]+)?[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|PASSWORD|CLIENT[_-]?SECRET|PRIVATE[_-]?KEY|AUTHORIZATION|SECRET|TOKEN|CREDENTIAL)[A-Z0-9_]*[ \t]*=[ \t]*)([^\n]+)$"
-        r"|^([ \t]*[\"']?(?:api[_-]?key|access[_-]?token|password|client[_-]?secret|private[_-]?key|authorization|secret|token|credential)[\"']?[ \t]*:[ \t]*)([\"'][^\"']+[\"']|[A-Za-z0-9_./+=-]{16,})[ \t]*$"
+        r"|^([ \t]*[\"']?(?:[A-Z0-9_-]*(?:api[_-]?key|access[_-]?token|password|client[_-]?secret|private[_-]?key|authorization|secret|token|credential)[A-Z0-9_-]*)[\"']?[ \t]*:[ \t]*)([\"'][^\"']+[\"']|[A-Za-z0-9_./+=-]{16,})[ \t]*$"
     )
     for _, relative, path in candidates:
         if len(sections) >= max_files or total_chars >= max_total_chars:
