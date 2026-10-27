@@ -1909,95 +1909,86 @@ async function getSession(req: express.Request): Promise<SessionRecord | null> {
  * Обязательная аутентификация для всего доступа к данным гаража.
  * GET-запросы не требуют CSRF-токен, изменяющие — требуют.
  */
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  // Backup routes also declare requireAuth explicitly. Reuse the context created
-  // by the global /api middleware rather than acquiring a second lock.
-  if (requestContext.getStore()) return next();
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    // Backup routes also declare requireAuth explicitly. Reuse the context created
+    // by the global /api middleware rather than acquiring a second lock.
+    if (requestContext.getStore()) return next();
 
-  const session = getSession(req);
-  if (!session) {
-    return res.status(401).json({ error: "Требуется вход в аккаунт" });
-  }
-  const user = store.getUserById(session.userId);
-  if (!user) {
-    return res.status(401).json({ error: "Аккаунт не найден" });
-  }
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    if (!verifyCsrf(session, req.headers["x-csrf-token"])) {
-      return res.status(403).json({ error: "CSRF-токен недействителен" });
-    }
-  }
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Требуется вход в аккаунт" });
+    const user = await store.getUserById(session.userId);
+    if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
-  const userId = session.userId;
-  const runWithSnapshot = () => {
-    const garage = store.snapshotForUser(userId, true);
-    requestContext.run({ userId, garage, session }, next);
-  };
-
-  // Keep independent read requests concurrent. Mutations of stored garage
-  // collections share one per-user queue; this is important because handlers
-  // work on request-local snapshots and otherwise a later stale snapshot could
-  // replace an earlier successful write.
-  const method = req.method.toUpperCase();
-  const pathname = req.originalUrl.split("?")[0];
-  const garageWritePrefixes = [
-    "/api/vehicles",
-    "/api/reminders",
-    "/api/services",
-    "/api/fuel",
-    "/api/inventory",
-    "/api/to-fix",
-    "/api/oem-schedule",
-    "/api/tuning",
-    "/api/backup/import",
-    "/api/backup/reset",
-  ];
-  const isGarageWrite =
-    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
-    garageWritePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
-
-  if (!isGarageWrite) {
-    runWithSnapshot();
-    return;
-  }
-
-  const previous = pendingUserWrites.get(userId) ?? Promise.resolve();
-  let unlockCurrent!: () => void;
-  const current = new Promise<void>((resolve) => { unlockCurrent = resolve; });
-  const queueEntry = previous.then(() => current);
-  pendingUserWrites.set(userId, queueEntry);
-
-  let releasing = false;
-  const release = () => {
-    if (releasing) return;
-    releasing = true;
-    // Do not let the next write take its snapshot before queued persistence
-    // has finished updating the store's in-memory state.
-    void store.flush().catch((error) => {
-      console.error("Ошибка ожидания записи перед следующим изменением гаража:", error);
-    }).finally(() => {
-      unlockCurrent();
-      if (pendingUserWrites.get(userId) === queueEntry) {
-        pendingUserWrites.delete(userId);
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      if (!verifyCsrf(session, req.headers["x-csrf-token"])) {
+        return res.status(403).json({ error: "CSRF-токен недействителен" });
       }
-    });
-  };
+    }
 
-  void previous.then(() => {
-    if (res.destroyed || res.writableEnded) {
-      release();
+    const userId = session.userId;
+    const runWithSnapshot = async () => {
+      if (store instanceof PostgresPersistence) {
+        const snapshot = await store.snapshotForUserWithRevision(userId, true);
+        requestContext.run({ userId, garage: snapshot.garage, session, revision: snapshot.revision }, next);
+      } else {
+        const garage = await store.snapshotForUser(userId, true);
+        requestContext.run({ userId, garage, session }, next);
+      }
+    };
+
+    // Process-local serialization is an optimization only; PostgreSQL revision
+    // checks remain the cross-instance concurrency boundary on Cloud Run.
+    const method = req.method.toUpperCase();
+    const pathname = req.originalUrl.split("?")[0];
+    const garageWritePrefixes = [
+      "/api/vehicles", "/api/reminders", "/api/services", "/api/fuel",
+      "/api/inventory", "/api/to-fix", "/api/oem-schedule", "/api/tuning",
+      "/api/backup/import", "/api/backup/reset",
+    ];
+    const isGarageWrite =
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+      garageWritePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+
+    if (!isGarageWrite) {
+      await runWithSnapshot();
       return;
     }
-    res.once("finish", release);
-    res.once("close", release);
-    runWithSnapshot();
-  }).catch((error) => {
-    unlockCurrent();
-    if (pendingUserWrites.get(userId) === queueEntry) {
-      pendingUserWrites.delete(userId);
-    }
+
+    const previous = pendingUserWrites.get(userId) ?? Promise.resolve();
+    let unlockCurrent!: () => void;
+    const current = new Promise<void>((resolve) => { unlockCurrent = resolve; });
+    const queueEntry = previous.then(() => current);
+    pendingUserWrites.set(userId, queueEntry);
+
+    let releasing = false;
+    const release = () => {
+      if (releasing) return;
+      releasing = true;
+      void store.flush().catch((error) => {
+        console.error("Ошибка ожидания записи перед следующим изменением гаража:", error instanceof Error ? error.message : "unknown error");
+      }).finally(() => {
+        unlockCurrent();
+        if (pendingUserWrites.get(userId) === queueEntry) pendingUserWrites.delete(userId);
+      });
+    };
+
+    void previous.then(async () => {
+      if (res.destroyed || res.writableEnded) {
+        release();
+        return;
+      }
+      res.once("finish", release);
+      res.once("close", release);
+      await runWithSnapshot();
+    }).catch((error) => {
+      unlockCurrent();
+      if (pendingUserWrites.get(userId) === queueEntry) pendingUserWrites.delete(userId);
+      next(error);
+    });
+  } catch (error) {
     next(error);
-  });
+  }
 }
 
 function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
