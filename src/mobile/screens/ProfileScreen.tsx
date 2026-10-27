@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode } from "../../api";
+import { login, register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -59,6 +59,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [authEmail, setAuthEmail] = React.useState("");
   const [authCode, setAuthCode] = React.useState("");
   const [emailCodeRequested, setEmailCodeRequested] = React.useState(false);
+  const [useLegacyLogin, setUseLegacyLogin] = React.useState(false);
   const [authNotice, setAuthNotice] = React.useState<string | null>(null);
   const [authPassword, setAuthPassword] = React.useState("");
   const [authError, setAuthError] = React.useState<string | null>(null);
@@ -83,7 +84,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setAuthBusy(true);
     setAuthError(null);
     try {
-      if (authMode === "login" && !emailCodeRequested) {
+      if (authMode === "login" && !useLegacyLogin && !emailCodeRequested) {
         const message = await requestEmailLoginCode(authEmail.trim(), authPassword);
         setEmailCodeRequested(true);
         setAuthNotice(message);
@@ -91,7 +92,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         return;
       }
       const session = authMode === "login"
-        ? await verifyEmailLoginCode(authEmail.trim(), authCode.trim())
+        ? useLegacyLogin ? await login(authUsername.trim(), authPassword) : await verifyEmailLoginCode(authEmail.trim(), authCode.trim())
         : await register(authUsername.trim(), authPassword, authEmail.trim());
       setIsAuthenticated(true);
       setSessionUsername(session.username);
@@ -157,7 +158,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("login"); setAuthError(null); setAuthNotice(null); setEmailCodeRequested(false); setAuthCode(""); }}
+                  onClick={() => { setAuthMode("login"); setAuthError(null); setAuthNotice(null); setEmailCodeRequested(false); setUseLegacyLogin(false); setAuthCode(""); }}
                   className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
                 >
                   <LogIn className="mr-1 inline h-4 w-4" />
@@ -186,7 +187,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <input
                     value={authUsername}
                     onChange={(event) => setAuthUsername(event.target.value)}
-                    placeholder="Логин (3–32 символа)"
+                    placeholder="Логин"
                     autoComplete="username"
                     required
                     maxLength={32}
@@ -201,7 +202,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   autoComplete="email"
                   required
                   maxLength={254}
-                  disabled={authMode === "login" && emailCodeRequested}
+                  disabled={authMode === "login" && emailCodeRequested && !useLegacyLogin}
                   className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong disabled:opacity-70"
                 />
                 {!emailCodeRequested && (
@@ -232,7 +233,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {authNotice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{authNotice}</p>}
                 {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
-                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? "Создать аккаунт" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? "Создать аккаунт" : useLegacyLogin ? "Войти" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
                 </button>
                 {emailCodeRequested && (
                   <button type="button" onClick={() => { setEmailCodeRequested(false); setAuthCode(""); setAuthNotice(null); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
