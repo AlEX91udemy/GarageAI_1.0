@@ -54,7 +54,7 @@ import {
   normalizeRussianPlate,
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
-import { hasAiConfiguration } from "./server/aiConfig";
+import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -1965,11 +1965,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   });
 }
 
-function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!hasAiConfiguration(process.env)) {
-    return res.status(503).json({ error: "AI-функции не настроены на сервере." });
-  }
-
+function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
   const clientId = req.ip || "unknown";
   const now = Date.now();
   const current = aiRequestWindows.get(clientId);
@@ -1984,6 +1980,20 @@ function requireAiAccess(req: express.Request, res: express.Response, next: expr
     return res.status(429).json({ error: "Слишком много AI-запросов. Повторите попытку позже." });
   }
   return next();
+}
+
+function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasAiConfiguration(process.env)) {
+    return res.status(503).json({ error: "AI-функции не настроены на сервере." });
+  }
+  return enforceAiRateLimit(req, res, next);
+}
+
+function requireGeminiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasGeminiConfiguration(process.env)) {
+    return res.status(503).json({ error: "Для этой AI-функции требуется GEMINI_API_KEY или настройка Vertex AI." });
+  }
+  return enforceAiRateLimit(req, res, next);
 }
 
 // -------------------------------------------------------------------------
@@ -2131,7 +2141,7 @@ app.post("/api/backup/reset", requireAuth, (_req, res) => {
 // ---------------------------------------------------------------------------
 
 // 1. Diagnostic Assistant
-app.post("/api/ai/diagnose", requireAiAccess, async (req, res) => {
+app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
   try {
     const problemDescription =
       req.body.problemDescription || req.body.symptoms || "";
@@ -2390,7 +2400,7 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
 });
 
 // 3. OEM Factory Schedule Generator
-app.post("/api/ai/oem-schedule", requireAiAccess, async (req, res) => {
+app.post("/api/ai/oem-schedule", requireGeminiAccess, async (req, res) => {
   try {
     const { make, model, year, engine, fuelType } = req.body;
     const ai = getAi();
@@ -2443,7 +2453,7 @@ app.post("/api/ai/oem-schedule", requireAiAccess, async (req, res) => {
 });
 
 // 4. Smart Spare Part Cross-Reference & Advisor
-app.post("/api/ai/part-lookup", requireAiAccess, async (req, res) => {
+app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
   try {
     const { partName, vehicle, partNumber } = req.body;
     const ai = getAi();
