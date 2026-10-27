@@ -2638,6 +2638,10 @@ app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
 // ---------------------------------------------------------------------------
 
 async function startServer() {
+  if (store instanceof PostgresPersistence) {
+    await store.initialize();
+    await store.healthCheck();
+  }
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -2657,5 +2661,8 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error("Server startup failed:", error instanceof Error ? error.message : "unknown error");
+  process.exitCode = 1;
+});
 
