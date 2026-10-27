@@ -11,7 +11,7 @@ const required = [
   /user_id text PRIMARY KEY REFERENCES garageai_users\(id\) ON DELETE CASCADE/i,
   /jsonb_typeof\(data\) = 'object'/i,
   /revision bigint NOT NULL DEFAULT 0/i,
-  /garageai_garages_revision_nonnegative CHECK \\(revision >= 0\\)/i,
+  /garageai_garages_revision_nonnegative CHECK \(revision >= 0\)/i,
   /CREATE TABLE IF NOT EXISTS garageai_sessions/i,
   /token_hash char\(64\) PRIMARY KEY/i,
   /user_id text NOT NULL REFERENCES garageai_users\(id\) ON DELETE CASCADE/i,
