@@ -128,6 +128,20 @@ describe("HTTP tenant isolation", () => {
     expect(created.status).toBe(201);
     const aliceVehicle = await created.json() as { id: string };
 
+    const serviceResponse = await request(alice, "/api/services", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        vehicleId: aliceVehicle.id,
+        title: "Private service record",
+        date: "2026-10-01",
+        mileage: 12000,
+        description: "Isolation integration test",
+      }),
+    });
+    expect(serviceResponse.status).toBe(201);
+    const aliceService = await serviceResponse.json() as { id: string };
+
     const bobList = await request(bob, "/api/vehicles");
     expect(bobList.status).toBe(200);
     expect(await bobList.json()).toEqual([]);
@@ -140,14 +154,29 @@ describe("HTTP tenant isolation", () => {
     })).status).toBe(404);
     expect((await request(bob, `/api/vehicles/${aliceVehicle.id}`, { method: "DELETE" })).status).toBe(404);
 
+    const bobServices = await request(bob, "/api/services");
+    expect(bobServices.status).toBe(200);
+    expect(await bobServices.json()).toEqual([]);
+    expect((await request(bob, `/api/services/${aliceService.id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Hijacked service" }),
+    })).status).toBe(404);
+    expect((await request(bob, `/api/services/${aliceService.id}`, { method: "DELETE" })).status).toBe(404);
+
     const bobBackup = await request(bob, "/api/backup/export");
     expect(bobBackup.status).toBe(200);
     const backupText = await bobBackup.text();
     expect(backupText).not.toContain(aliceVehicle.id);
+    expect(backupText).not.toContain(aliceService.id);
     expect(backupText).not.toContain("IsolationTest");
+    expect(backupText).not.toContain("Private service record");
 
     const aliceList = await request(alice, "/api/vehicles");
     expect(aliceList.status).toBe(200);
     expect(await aliceList.json()).toEqual([expect.objectContaining({ id: aliceVehicle.id, model: "IsolationTest" })]);
+    const aliceServices = await request(alice, "/api/services");
+    expect(aliceServices.status).toBe(200);
+    expect(await aliceServices.json()).toEqual([expect.objectContaining({ id: aliceService.id, title: "Private service record" })]);
   });
 });
