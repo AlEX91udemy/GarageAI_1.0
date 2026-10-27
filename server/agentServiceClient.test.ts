@@ -72,6 +72,18 @@ describe("private agent service client", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("stops reading an oversized agent response", async () => {
+    const fetchMock: typeof fetch = async () => new Response("x".repeat(260000), { status: 200 });
+    await expect(runAgentService({
+      AGENTS_SERVICE_URL: "http://127.0.0.1:8081",
+      AGENTS_API_TOKEN: "local-test-token",
+      NODE_ENV: "development",
+    }, { task: "Run qa" }, fetchMock)).rejects.toMatchObject({
+      name: "AgentServiceClientError",
+      statusCode: 502,
+    });
+  });
+
   it("rejects malformed upstream responses without exposing raw contents", async () => {
     const fetchMock: typeof fetch = async () => new Response("not-json", { status: 200 });
     await expect(runAgentService({
