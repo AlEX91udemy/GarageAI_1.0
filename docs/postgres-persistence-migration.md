@@ -57,7 +57,7 @@ DATABASE_URL="$DATABASE_URL" npx tsx scripts/import-legacy-json.ts --source-dir=
 
 The importer refuses conflicting user IDs, normalized usernames, garage contents, or session token hashes and wraps writes in one transaction. It preserves scrypt password hashes and imports only unexpired, non-revoked sessions. Garage/session records whose owner is absent from the imported user list are skipped and counted; ownerless root-level legacy garage data is never assigned automatically. It prints counts only, not account hashes, session tokens, CSRF secrets, VINs, receipts, or garage payloads.
 
-Do not set `GARAGE_POSTGRES_READY=true` until the import has been reviewed, a backup restore has been demonstrated, and application smoke tests pass. If any conflict is reported, stop and reconcile ownership/data manually; do not delete destination records to force an import.
+After reviewing the import and proving backup/restore, set `GARAGE_POSTGRES_READY=true` only on a private canary revision so HTTP smoke tests can run. Keep public traffic disabled until auth/session lifecycle, tenant isolation, CRUD, concurrency, restart/scale, and model calls pass. Set the flag on the production service only after that validation. If any conflict is reported, stop and reconcile ownership/data manually; do not delete destination records to force an import.
 
 Do not run a migration against production data until the tool and its tests exist and a backup restore has been demonstrated.
 
