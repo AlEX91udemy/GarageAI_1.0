@@ -249,6 +249,7 @@ interface RequestContext {
   garage: GarageData;
   session: SessionRecord;
   revision?: number;
+  response: express.Response;
 }
 
 const requestContext = new AsyncLocalStorage<RequestContext>();
@@ -278,17 +279,28 @@ const dbMemory = new Proxy({} as GarageDatabase, {
   },
 });
 
-async function saveDatabase(): Promise<void> {
+async function saveDatabase(): Promise<boolean> {
   const context = requestContext.getStore();
-  if (!context) return;
-  if (store instanceof PostgresPersistence) {
-    const revision = context.revision ?? 0;
-    const result = await store.commitGarageVersioned(context.userId, context.garage, revision);
-    context.garage = result.garage;
-    context.revision = result.revision;
-    return;
+  if (!context) return true;
+  try {
+    if (store instanceof PostgresPersistence) {
+      const revision = context.revision ?? 0;
+      const result = await store.commitGarageVersioned(context.userId, context.garage, revision);
+      context.garage = result.garage;
+      context.revision = result.revision;
+      return true;
+    }
+    await store.schedulePersist(context.userId, context.garage);
+    return true;
+  } catch (error) {
+    if (error instanceof ConcurrentGarageUpdateError) {
+      if (!context.response.headersSent) context.response.status(409).json({ error: "Данные гаража изменились в другом запросе. Обновите данные и повторите попытку." });
+      return false;
+    }
+    console.error("Garage persistence failed:", error instanceof Error ? error.message : "unknown error");
+    if (!context.response.headersSent) context.response.status(503).json({ error: "Не удалось сохранить данные гаража. Повторите попытку позже." });
+    return false;
   }
-  await store.schedulePersist(context.userId, context.garage);
 }
 
 // ---------------------------------------------------------------------------
@@ -726,7 +738,7 @@ app.post("/api/reminders", async (req, res) => {
   if (!value) return res.status(400).json({ error: "Некорректное напоминание" });
   const reminder = { ...value, id: uniqueId(value.id, "reminder", dbMemory.reminders) };
   dbMemory.reminders.push(reminder);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(reminder);
 });
 
@@ -1930,10 +1942,10 @@ async function requireAuth(req: express.Request, res: express.Response, next: ex
     const runWithSnapshot = async () => {
       if (store instanceof PostgresPersistence) {
         const snapshot = await store.snapshotForUserWithRevision(userId, true);
-        requestContext.run({ userId, garage: snapshot.garage, session, revision: snapshot.revision }, next);
+        requestContext.run({ userId, garage: snapshot.garage, session, revision: snapshot.revision, response: res }, next);
       } else {
         const garage = await store.snapshotForUser(userId, true);
-        requestContext.run({ userId, garage, session }, next);
+        requestContext.run({ userId, garage, session, response: res }, next);
       }
     };
 
