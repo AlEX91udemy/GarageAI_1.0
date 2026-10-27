@@ -20,7 +20,7 @@ psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
 # A second re-apply must be idempotent and retain the revision guard.
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
 psql -v ON_ERROR_STOP=1 <<'SQL'
-DO $
+DO $migration$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -29,7 +29,8 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'revision constraint missing after upgrade';
   END IF;
-END $;
+END;
+$migration$;
 SQL
 
 psql -v ON_ERROR_STOP=1 <<'SQL'
