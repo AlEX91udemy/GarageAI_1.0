@@ -117,6 +117,13 @@ async function main() {
     assert(initialA.response.status === 200 && Array.isArray(initialA.body) && initialA.body.length === 0,
       "new account should have an empty garage");
 
+    const invalidCsrf = await requestJson(baseUrl, "/api/vehicles", {
+      method: "POST",
+      headers: { cookie: authA.cookie, "x-csrf-token": "invalid-csrf-token" },
+      body: JSON.stringify({ make: "CI", model: "ShouldNotPersist", year: 2026 }),
+    });
+    assert(invalidCsrf.response.status === 403, "invalid CSRF token should be rejected");
+
     const created = await requestJson(baseUrl, "/api/vehicles", {
       method: "POST",
       headers: { cookie: authA.cookie, "x-csrf-token": authA.csrfToken },
