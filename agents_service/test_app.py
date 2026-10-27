@@ -160,7 +160,7 @@ class AgentRunnerLifecycleTests(unittest.IsolatedAsyncioTestCase):
         with patch("agents_service.app.InMemoryRunner", return_value=runner):
             result = await _run_agent(object(), "qa", "test prompt")
 
-        self.assertEqual(result, "first line\\nsecond line")
+        self.assertEqual(result, "first line\nsecond line")
         self.assertTrue(runner.closed)
 
     async def test_runner_closes_when_model_execution_raises(self):
