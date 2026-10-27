@@ -53,12 +53,13 @@ import {
   normalizeExtractedVin,
   normalizeRussianPlate,
 } from "./server/documentOcr";
-import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData, type EmailAuthChallengeRecord } from "./server/store";
 import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
+import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
 import { classifyReceiptText } from "./server/receiptClassification";
 import {
@@ -1816,9 +1817,14 @@ const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LIMIT = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_LIMIT = 5;
+const EMAIL_CODE_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+const EMAIL_VERIFY_LIMIT = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
 const loginAttempts = new Map<string, { count: number; startedAt: number }>();
+const emailCodeAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
 const SESSION_COOKIE = "garagehub_session";
 
@@ -1877,6 +1883,9 @@ const rateLimitCleanupTimer = setInterval(() => {
     if (now - attempt.startedAt >= LOGIN_WINDOW_MS) {
       loginAttempts.delete(key);
     }
+  }
+  for (const [key, attempt] of emailCodeAttempts) {
+    if (now - attempt.startedAt >= EMAIL_CODE_WINDOW_MS) emailCodeAttempts.delete(key);
   }
   if (store instanceof PostgresPersistence) {
     void Promise.all([
@@ -2137,7 +2146,12 @@ app.post("/api/auth/register", async (req, res) => {
   }
   void (async () => {
     const userId = newId("user");
-    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
+    const email = req.body?.email ? normalizeEmail(req.body.email) : null;
+    if (req.body?.email && !email) { res.status(400).json({ error: "Введите корректный email" }); return; }
+    if (email && (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email))) {
+      res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
+    }
+    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email ?? undefined);
     await clearLoginAttempts(req.ip || "unknown");
     res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
@@ -2173,6 +2187,120 @@ app.post("/api/auth/login", async (req, res) => {
   } catch (error) {
     console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
+});
+
+async function consumeEmailCodeLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-code-ip", hashToken(req.ip || "unknown"), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-code-email", hashToken(email), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`ip:${req.ip || "unknown"}`, `email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_CODE_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function consumeEmailVerifyLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-verify-ip", hashToken(req.ip || "unknown"), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-verify-email", hashToken(email), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`verify-ip:${req.ip || "unknown"}`, `verify-email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_VERIFY_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function sendEmailCode(email: string, code: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!apiKey || !from) throw new Error("Email provider is not configured");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
+  });
+  if (!response.ok) throw new Error("Email provider rejected the request");
+}
+
+app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Введите корректный email" });
+  if (!(await consumeEmailCodeLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много запросов. Повторите позже." });
+  }
+  try {
+    if (!process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+      return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+    }
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (user) {
+      const id = newId("email-challenge");
+      const code = generateEmailCode();
+      const secret = process.env.EMAIL_CODE_SECRET?.trim();
+      if (!secret) throw new Error("Email code secret is not configured");
+      const record: EmailAuthChallengeRecord = { id, userId: user.id, codeHash: hashEmailCode(id, code, secret), expiresAtMs: Date.now() + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs: Date.now() };
+      await sendEmailCode(email, code);
+      await store.createEmailChallenge(record);
+    }
+    return res.json({ success: true, message: "Если аккаунт существует, код отправлен на email." });
+  } catch (error) {
+    console.error("Email code request failed");
+    return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+  }
+});
+
+app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Введите email и шестизначный код" });
+  if (!(await consumeEmailVerifyLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много попыток. Повторите позже." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (!user) return res.status(401).json({ error: "Неверный или просроченный код" });
+    const secret = process.env.EMAIL_CODE_SECRET?.trim();
+    if (!secret) return res.status(503).json({ error: "Сервис входа временно недоступен." });
+    const accepted = await store.verifyEmailChallenge(user.id, code, secret);
+    if (!accepted) {
+      return res.status(401).json({ error: "Неверный или просроченный код" });
+    }
+    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+  } catch {
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
 });
 

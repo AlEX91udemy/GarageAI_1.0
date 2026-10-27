@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { hashEmailCode } from "./emailCodeAuth";
 
 export interface GarageData {
   vehicles: unknown[];
@@ -25,6 +26,17 @@ export interface UserRecord {
   username: string;
   passwordHash: string;
   createdAt: string;
+  email?: string;
+}
+
+export interface EmailAuthChallengeRecord {
+  id: string;
+  userId: string;
+  codeHash: string;
+  expiresAtMs: number;
+  attempts: number;
+  consumedAtMs?: number;
+  createdAtMs: number;
 }
 
 interface StoreShape {
@@ -32,6 +44,7 @@ interface StoreShape {
   users: UserRecord[];
   // Данные разделённые по владельцу. Ключ — id пользователя.
   garages: Record<string, GarageData>;
+  emailChallenges: EmailAuthChallengeRecord[];
 }
 
 const EMPTY_KEYS: Array<keyof Omit<GarageData, "lastUpdated">> = [
@@ -93,11 +106,13 @@ export class GarageStore {
   private writeChain: Promise<unknown> = Promise.resolve();
   private lastPersistError: Error | null = null;
   private readonly usersFile: string;
+  private readonly emailChallengesFile: string;
 
   constructor(private readonly dataFile: string, private readonly seed: () => GarageData) {
     const baseDir = path.dirname(dataFile);
     fs.mkdirSync(baseDir, { recursive: true });
     this.usersFile = path.join(baseDir, "users.json");
+    this.emailChallengesFile = path.join(baseDir, "email_auth_challenges.json");
     this.state = this.load();
   }
 
@@ -130,7 +145,14 @@ export class GarageStore {
       }
     }
 
-    return { version: 2, users, garages };
+    let emailChallenges: EmailAuthChallengeRecord[] = [];
+    if (fs.existsSync(this.emailChallengesFile)) {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(this.emailChallengesFile, "utf-8"));
+        if (Array.isArray(parsed)) emailChallenges = parsed.filter((item) => item && typeof item.id === "string");
+      } catch { /* ignore malformed disposable challenge state */ }
+    }
+    return { version: 2, users, garages, emailChallenges };
   }
 
   private persistUsers(usersSnapshot: UserRecord[]): void {
@@ -246,10 +268,13 @@ export class GarageStore {
     return this.state.users.map((u) => ({ ...u }));
   }
 
-  async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
+  async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
     const task = this.writeChain.then(() => {
       const normalizedUsername = username.trim().toLowerCase();
       if (this.state.users.some((user) => user.username.trim().toLowerCase() === normalizedUsername)) {
+        throw new UserAlreadyExistsError();
+      }
+      if (email && this.state.users.some((user) => user.email?.trim().toLowerCase() === email.trim().toLowerCase())) {
         throw new UserAlreadyExistsError();
       }
       const created: UserRecord = {
@@ -257,6 +282,7 @@ export class GarageStore {
         username,
         passwordHash,
         createdAt: new Date().toISOString(),
+        ...(email ? { email } : {}),
       };
       const nextUsers = [...this.state.users, created];
       const nextGarage = emptyGarage();
@@ -282,6 +308,38 @@ export class GarageStore {
       }
     );
 
+    return task;
+  }
+
+  getUserByEmail(email: string): UserRecord | undefined {
+    const key = email.trim().toLowerCase();
+    return this.state.users.find((user) => user.email?.trim().toLowerCase() === key);
+  }
+
+  async createEmailChallenge(record: EmailAuthChallengeRecord): Promise<void> {
+    const task = this.writeChain.then(() => {
+      const next = this.state.emailChallenges.filter((item) => item.userId !== record.userId || item.consumedAtMs || item.expiresAtMs <= Date.now());
+      next.push({ ...record });
+      writeJsonAtomic(this.emailChallengesFile, next);
+      this.state.emailChallenges = next;
+    });
+    this.writeChain = task.then(() => undefined, () => undefined);
+    await task;
+  }
+
+  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+    const task = this.writeChain.then(() => {
+      const challenge = this.state.emailChallenges
+        .filter((item) => item.userId === userId && !item.consumedAtMs)
+        .sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
+      if (!challenge || challenge.expiresAtMs <= now || challenge.attempts >= maxAttempts) return false;
+      challenge.attempts += 1;
+      const accepted = challenge.codeHash === hashEmailCode(challenge.id, code, secret);
+      if (accepted) challenge.consumedAtMs = now;
+      writeJsonAtomic(this.emailChallengesFile, this.state.emailChallenges);
+      return accepted;
+    });
+    this.writeChain = task.then(() => undefined, () => undefined);
     return task;
   }
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./emailCodeAuth";
+import { GarageStore, emptyGarage } from "./store";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 describe("email authentication helpers", () => {
   it("normalizes email addresses and rejects malformed values", () => {
@@ -23,5 +27,20 @@ describe("email authentication helpers", () => {
     expect(hashEmailCode("challenge-1", "001234", secret)).toBe(hash);
     expect(hashEmailCode("challenge-2", "001234", secret)).not.toBe(hash);
     expect(hashEmailCode("challenge-1", "001235", secret)).not.toBe(hash);
+  });
+});
+
+describe("email challenge persistence", () => {
+  it("expires, limits attempts, and consumes a valid code once", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "garage-email-"));
+    const store = new GarageStore(path.join(dir, "garage.json"), emptyGarage);
+    const user = await store.createUser("email-user", "hash", "user-1", "user@example.com");
+    const id = "challenge-1";
+    const secret = "test-secret";
+    await store.createEmailChallenge({ id, userId: user.id, codeHash: hashEmailCode(id, "123456", secret), expiresAtMs: 10_000, attempts: 0, createdAtMs: 1 });
+    expect(await store.verifyEmailChallenge(user.id, "000000", secret, 2)).toBe(false);
+    expect(await store.verifyEmailChallenge(user.id, "123456", secret, 3)).toBe(true);
+    expect(await store.verifyEmailChallenge(user.id, "123456", secret, 4)).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });

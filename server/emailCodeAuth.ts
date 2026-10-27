@@ -11,5 +11,5 @@ export function generateEmailCode(): string {
 }
 
 export function hashEmailCode(challengeId: string, code: string, secret: string): string {
-  return createHmac("sha256", secret).update(\`${challengeId}:${code}\`).digest("hex");
+  return createHmac("sha256", secret).update(`${challengeId}:${code}`).digest("hex");
 }
