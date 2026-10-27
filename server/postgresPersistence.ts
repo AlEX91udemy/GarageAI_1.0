@@ -168,22 +168,6 @@ export class PostgresPersistence {
     return { garage: normalizeGarage(rows[0].data), revision: Number(rows[0].revision) };
   }
 
-  async commitGarage(userId: string, snapshot: GarageData): Promise<GarageData> {
-    this.assertInitialized();
-    const committed = normalizeGarage(cloneGarage(snapshot));
-    committed.lastUpdated = new Date().toISOString();
-    const rows = await this.sql`
-      INSERT INTO garageai_garages (user_id, data, updated_at)
-      SELECT id, ${this.sql.json(JSON.parse(JSON.stringify(committed)))}, now()
-      FROM garageai_users WHERE id = ${userId}
-      ON CONFLICT (user_id) DO UPDATE
-      SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
-      RETURNING data
-    `;
-    if (!rows[0]) throw new Error("Cannot persist garage: owner account does not exist");
-    return normalizeGarage(rows[0].data);
-  }
-
   async commitGarageVersioned(
     userId: string,
     snapshot: GarageData,
@@ -206,10 +190,6 @@ export class PostgresPersistence {
       throw new ConcurrentGarageUpdateError();
     }
     return { garage: normalizeGarage(rows[0].data), revision: Number(rows[0].revision) };
-  }
-
-  async schedulePersist(userId: string, snapshot: GarageData): Promise<void> {
-    await this.commitGarage(userId, snapshot);
   }
 
   async flush(): Promise<void> {
