@@ -147,7 +147,7 @@ async def _run_agent(agent: LlmAgent, name: str, prompt: str) -> str:
         async for event in runner.run_async(user_id="local-user", session_id=session.id, new_message=content):
             if event.content and event.content.parts:
                 chunks.extend(part.text for part in event.content.parts if part.text)
-        return "\\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
+        return "\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
     finally:
         # Clean up the runner if session creation or model execution fails too.
         await runner.close()
