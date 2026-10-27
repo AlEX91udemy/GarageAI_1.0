@@ -30,7 +30,8 @@
     "react-dom": "^19.0.1",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
