@@ -91,7 +91,7 @@ async function register(baseUrl: string, username: string, password: string) {
   });
   assert(response.status === 201, "registration failed with HTTP " + response.status);
   const cookie = (response.headers.get("set-cookie") || "").split(";")[0];
-  assert(cookie.startsWith("garage_session="), "registration did not set session cookie");
+  assert(cookie.startsWith("garagehub_session="), "registration did not set session cookie");
   assert(typeof body.session?.csrfToken === "string", "registration did not return CSRF token");
   return { cookie, csrfToken: body.session.csrfToken as string };
 }
@@ -140,7 +140,7 @@ async function main() {
     assert(login.response.status === 200, "login after restart failed with HTTP " + login.response.status);
     const loginCookie = (login.response.headers.get("set-cookie") || "").split(";")[0];
     const loginCsrf = login.body.session?.csrfToken;
-    assert(loginCookie.startsWith("garage_session=") && typeof loginCsrf === "string",
+    assert(loginCookie.startsWith("garagehub_session=") && typeof loginCsrf === "string",
       "login after restart did not establish a valid session");
 
     const persisted = await requestJson(baseUrl, "/api/vehicles", { headers: { cookie: loginCookie } });
