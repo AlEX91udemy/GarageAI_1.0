@@ -4,15 +4,15 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 ## Production blockers
 
-1. `server/store.ts` stores user data in JSON files on the container filesystem. Cloud Run's writable filesystem is ephemeral and not shared between instances. **Do not serve real user data until persistence is migrated to a managed transactional database** and backup/restore tests pass.
+1. PostgreSQL persistence is now wired behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. **The JSON import/cutover and real Cloud SQL smoke tests are still outstanding.** Do not serve real user data until import ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
 2. **Resolved in the current branch:** the agent service no longer depends on `google-adk==2.13.0`; it uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. The latest completed Python audit installed 1.45.1 and reported no known vulnerabilities. Re-run CI after the explicit minimum pin, and keep the agent service private regardless.
 3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
 ## Production startup safety gate
 
-The Node server now refuses to start when `NODE_ENV=production` and only the local JSON garage/session store is configured. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
+The Node server refuses to start in production unless `DATABASE_URL` is configured and `GARAGE_POSTGRES_READY=true` explicitly records that migration/import and restore checks have passed. PostgreSQL schema migrations are verified on startup but are not executed by the runtime service by default. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
 
-Before production deployment, implement and verify a durable database-backed garage store plus shared session persistence, including migration, concurrency, backup/restore and restart/scale tests. The current runbook is not a deploy-now checklist while this gate is active.
+Before production deployment, complete the JSON importer, verify ownership and row counts, restore a database backup, and pass Cloud SQL canary tests for auth/session lifecycle, concurrent writes, tenant isolation and restart/scale. The current runbook is not a deploy-now checklist while this gate is active.
 
 ## Suggested initial resources
 
@@ -38,7 +38,7 @@ gcloud artifacts repositories create garageai --repository-format=docker --locat
 gcloud builds submit --tag "europe-west1-docker.pkg.dev/$PROJECT_ID/garageai/garageai-web:latest" .
 ```
 
-Do not deploy the web service with real user data until database migration and backup/restore tests are complete.
+Do not deploy the web service with real user data until the Cloud SQL schema migration, JSON import, and backup/restore tests are complete. Configure `DATABASE_URL` through Secret Manager or the approved Cloud SQL connection path. Keep `GARAGE_POSTGRES_READY` unset until cutover validation is complete.
 
 ## Build the private agent container
 
