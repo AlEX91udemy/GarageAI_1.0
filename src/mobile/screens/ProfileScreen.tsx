@@ -221,7 +221,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     value={authCode}
-                    onChange={(event) => setAuthCode(event.target.value.replace(/\\D/g, "").slice(0, 8))}
+                    onChange={(event) => setAuthCode(event.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
                     placeholder="Код из письма (8 цифр)"
                     minLength={8}
                     maxLength={8}
