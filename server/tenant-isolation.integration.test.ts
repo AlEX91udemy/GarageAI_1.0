@@ -288,6 +288,19 @@ describe("HTTP tenant isolation", () => {
     expect(ownerData.tuningStages).toEqual([expect.objectContaining({ id: "owner-tuning" })]);
   });
 
+  it("returns conflict when two registrations race for the same username", async () => {
+    const createAccount = () => fetch(`${baseUrl}/api/auth/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ username: "concurrent-signup", password: "TestPassword-123!" }),
+    });
+
+    const responses = await Promise.all([createAccount(), createAccount()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    const bodies = await Promise.all(responses.map((response) => response.json() as Promise<{ error?: string }>));
+    expect(bodies.some((body) => body.error === "Пользователь с таким логином уже существует")).toBe(true);
+  });
+
   it("does not drop records when one user creates vehicles concurrently", async () => {
     const owner = await register("concurrent-owner");
     const makeVehicleRequest = (model: string) => request(owner, "/api/vehicles", {
