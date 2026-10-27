@@ -14,6 +14,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
 COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/db/migrations ./db/migrations
 # Keep only the runtime data directory writable; run the service without root.
 RUN mkdir -p /app/data && chown -R node:node /app/data
 EXPOSE 8080

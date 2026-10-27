@@ -54,6 +54,7 @@ import {
   normalizeRussianPlate,
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
@@ -230,8 +231,15 @@ function isSafeAssetUrl(value: unknown): value is string {
 // Refuse accidental production deployment while the backend still uses local JSON files.
 assertProductionStorageSafe(process.env);
 
-// In-memory cache synced to disk
-const store = new GarageStore(DB_FILE, () => getInitialDatabase());
+// PostgreSQL is selected only when explicitly configured; local development keeps JSON storage.
+const store = process.env.DATABASE_URL?.trim()
+  ? new PostgresPersistence({
+      connectionString: process.env.DATABASE_URL,
+      maxConnections: Number(process.env.DATABASE_POOL_MAX) || 5,
+      ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
+      runMigrations: process.env.NODE_ENV !== "production" || process.env.DATABASE_AUTO_MIGRATE === "true",
+    })
+  : new GarageStore(DB_FILE, () => getInitialDatabase());
 
 // Текущий пользователь определяется в requireAuth и кладётся в контекст запроса.
 // Обращения во всех маршрутах идут через dbMemory, который проксирует в данные
@@ -241,6 +249,8 @@ interface RequestContext {
   userId: string;
   garage: GarageData;
   session: SessionRecord;
+  revision?: number;
+  response: express.Response;
 }
 
 const requestContext = new AsyncLocalStorage<RequestContext>();
@@ -270,10 +280,28 @@ const dbMemory = new Proxy({} as GarageDatabase, {
   },
 });
 
-function saveDatabase(): Promise<void> {
+async function saveDatabase(): Promise<boolean> {
   const context = requestContext.getStore();
-  if (!context) return Promise.resolve();
-  return store.schedulePersist(context.userId, context.garage);
+  if (!context) return true;
+  try {
+    if (store instanceof PostgresPersistence) {
+      const revision = context.revision ?? 0;
+      const result = await store.commitGarageVersioned(context.userId, context.garage, revision);
+      context.garage = result.garage;
+      context.revision = result.revision;
+      return true;
+    }
+    await store.schedulePersist(context.userId, context.garage);
+    return true;
+  } catch (error) {
+    if (error instanceof ConcurrentGarageUpdateError) {
+      if (!context.response.headersSent) context.response.status(409).json({ error: "Данные гаража изменились в другом запросе. Обновите данные и повторите попытку." });
+      return false;
+    }
+    console.error("Garage persistence failed:", error instanceof Error ? error.message : "unknown error");
+    if (!context.response.headersSent) context.response.status(503).json({ error: "Не удалось сохранить данные гаража. Повторите попытку позже." });
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -622,10 +650,18 @@ app.use("/api", (req, res, next) => {
 });
 
 // 1. Health and Meta Check
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", async (_req, res) => {
   const garage = requestContext.getStore()?.garage;
+  if (store instanceof PostgresPersistence) {
+    try {
+      await store.healthCheck();
+    } catch {
+      return res.status(503).json({ status: "degraded", storageProvider: "postgresql", timestamp: new Date().toISOString() });
+    }
+  }
   res.json({
     status: "ok",
+    storageProvider: store instanceof PostgresPersistence ? "postgresql" : "local-json",
     // Keep the legacy field for older clients, but expose explicit provider
     // state so Vertex AI/ADC is not misreported as a missing API key.
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
@@ -705,31 +741,31 @@ app.get("/api/reminders", (_req, res) => {
   res.json(dbMemory.reminders);
 });
 
-app.post("/api/reminders", (req, res) => {
+app.post("/api/reminders", async (req, res) => {
   const { value, error } = normalizeReminder(req.body || {});
   if (error) return res.status(400).json({ error });
   if (!value) return res.status(400).json({ error: "Некорректное напоминание" });
   const reminder = { ...value, id: uniqueId(value.id, "reminder", dbMemory.reminders) };
   dbMemory.reminders.push(reminder);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(reminder);
 });
 
-app.put("/api/reminders/:id", (req, res) => {
+app.put("/api/reminders/:id", async (req, res) => {
   const index = dbMemory.reminders.findIndex((item) => item.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: "Напоминание не найдено" });
   const { value, error } = normalizeReminder({ ...req.body, id: req.params.id });
   if (error) return res.status(400).json({ error });
   dbMemory.reminders[index] = value as ReminderRecord;
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.reminders[index]);
 });
 
-app.delete("/api/reminders/:id", (req, res) => {
+app.delete("/api/reminders/:id", async (req, res) => {
   const len = dbMemory.reminders.length;
   dbMemory.reminders = dbMemory.reminders.filter((item) => item.id !== req.params.id);
   if (dbMemory.reminders.length === len) return res.status(404).json({ error: "Напоминание не найдено" });
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true });
 });
 
@@ -786,7 +822,7 @@ app.get("/api/vehicles/:id", (req, res) => {
   res.json(vehicle);
 });
 
-app.post("/api/vehicles", (req, res) => {
+app.post("/api/vehicles", async (req, res) => {
   const body = req.body as Partial<Vehicle>;
   if (typeof body.make !== "string" || !body.make.trim() || typeof body.model !== "string" || !body.model.trim()) {
     return res.status(400).json({ error: "Марка и модель обязательны для заполнения" });
@@ -833,11 +869,11 @@ app.post("/api/vehicles", (req, res) => {
   };
 
   dbMemory.vehicles.push(newVehicle);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newVehicle);
 });
 
-app.put("/api/vehicles/:id", (req, res) => {
+app.put("/api/vehicles/:id", async (req, res) => {
   const index = dbMemory.vehicles.findIndex((v) => v.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Автомобиль не найден" });
@@ -903,11 +939,11 @@ app.put("/api/vehicles/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.vehicles[index]);
 });
 
-app.patch("/api/vehicles/:id/mileage", (req, res) => {
+app.patch("/api/vehicles/:id/mileage", async (req, res) => {
   const { mileage } = req.body;
   const numMileage = Number(mileage);
   if (isNaN(numMileage) || numMileage < 0) {
@@ -921,11 +957,11 @@ app.patch("/api/vehicles/:id/mileage", (req, res) => {
 
   vehicle.currentMileage = numMileage;
   vehicle.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(vehicle);
 });
 
-app.delete("/api/vehicles/:id", (req, res) => {
+app.delete("/api/vehicles/:id", async (req, res) => {
   const id = req.params.id;
   const initialCount = dbMemory.vehicles.length;
   dbMemory.vehicles = dbMemory.vehicles.filter((v) => v.id !== id);
@@ -943,7 +979,7 @@ app.delete("/api/vehicles/:id", (req, res) => {
   dbMemory.toFixTasks = dbMemory.toFixTasks.filter((t) => t.vehicleId !== id);
   dbMemory.tuningStages = dbMemory.tuningStages.filter((t) => t.vehicleId !== id);
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Автомобиль и связанные записи удалены" });
 });
 
@@ -981,7 +1017,7 @@ app.get("/api/services", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/services", (req, res) => {
+app.post("/api/services", async (req, res) => {
   const body = req.body as Partial<ServiceRecord> & {
     completedTaskId?: string;
     installedPartIds?: string[];
@@ -1076,11 +1112,11 @@ app.post("/api/services", (req, res) => {
     });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newRecord);
 });
 
-app.put("/api/services/:id", (req, res) => {
+app.put("/api/services/:id", async (req, res) => {
   const index = dbMemory.serviceRecords.findIndex((r) => r.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
@@ -1127,11 +1163,11 @@ app.put("/api/services/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.serviceRecords[index]);
 });
 
-app.delete("/api/services/:id", (req, res) => {
+app.delete("/api/services/:id", async (req, res) => {
   const id = req.params.id;
   const initialLen = dbMemory.serviceRecords.length;
   dbMemory.serviceRecords = dbMemory.serviceRecords.filter((r) => r.id !== id);
@@ -1140,7 +1176,7 @@ app.delete("/api/services/:id", (req, res) => {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Запись сервиса удалена" });
 });
 
@@ -1158,7 +1194,7 @@ app.get("/api/fuel", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/fuel", (req, res) => {
+app.post("/api/fuel", async (req, res) => {
   const body = req.body as Partial<FuelRecord>;
   if (
     typeof body.vehicleId !== "string" ||
@@ -1218,11 +1254,11 @@ app.post("/api/fuel", (req, res) => {
     car.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newFuel);
 });
 
-app.delete("/api/fuel/:id", (req, res) => {
+app.delete("/api/fuel/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.fuelRecords.length;
   dbMemory.fuelRecords = dbMemory.fuelRecords.filter((f) => f.id !== id);
@@ -1231,7 +1267,7 @@ app.delete("/api/fuel/:id", (req, res) => {
     return res.status(404).json({ error: "Запись заправки не найдена" });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Запись заправки удалена" });
 });
 
@@ -1253,7 +1289,7 @@ app.get("/api/inventory", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/inventory", (req, res) => {
+app.post("/api/inventory", async (req, res) => {
   const body = req.body as Partial<GaragePart>;
   if (typeof body.name !== "string" || !body.name.trim()) {
     return res.status(400).json({ error: "Название детали обязательно" });
@@ -1279,11 +1315,11 @@ app.post("/api/inventory", (req, res) => {
   };
 
   dbMemory.garageParts.unshift(newPart);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newPart);
 });
 
-app.put("/api/inventory/:id", (req, res) => {
+app.put("/api/inventory/:id", async (req, res) => {
   const index = dbMemory.garageParts.findIndex((p) => p.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Деталь не найдена" });
@@ -1317,22 +1353,22 @@ app.put("/api/inventory/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.garageParts[index]);
 });
 
-app.post("/api/inventory/:id/install", (req, res) => {
+app.post("/api/inventory/:id/install", async (req, res) => {
   const part = dbMemory.garageParts.find((p) => p.id === req.params.id);
   if (!part) {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
   part.status = "installed";
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, part });
 });
 
-app.delete("/api/inventory/:id", (req, res) => {
+app.delete("/api/inventory/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.garageParts.length;
   dbMemory.garageParts = dbMemory.garageParts.filter((p) => p.id !== id);
@@ -1341,7 +1377,7 @@ app.delete("/api/inventory/:id", (req, res) => {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Деталь удалена со склада" });
 });
 
@@ -1459,7 +1495,7 @@ app.get("/api/to-fix", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/to-fix", (req, res) => {
+app.post("/api/to-fix", async (req, res) => {
   const body = req.body as Partial<ToFixTask>;
   if (typeof body.vehicleId !== "string" || !body.vehicleId.trim() || typeof body.title !== "string" || !body.title.trim()) {
     return res.status(400).json({ error: "vehicleId и title задачи обязательны" });
@@ -1484,11 +1520,11 @@ app.post("/api/to-fix", (req, res) => {
   };
 
   dbMemory.toFixTasks.unshift(newTask);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newTask);
 });
 
-app.put("/api/to-fix/:id", (req, res) => {
+app.put("/api/to-fix/:id", async (req, res) => {
   const index = dbMemory.toFixTasks.findIndex((t) => t.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Задача не найдена" });
@@ -1523,22 +1559,22 @@ app.put("/api/to-fix/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.toFixTasks[index]);
 });
 
-app.post("/api/to-fix/:id/complete", (req, res) => {
+app.post("/api/to-fix/:id/complete", async (req, res) => {
   const task = dbMemory.toFixTasks.find((t) => t.id === req.params.id);
   if (!task) {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
   task.status = "completed";
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, task });
 });
 
-app.delete("/api/to-fix/:id", (req, res) => {
+app.delete("/api/to-fix/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.toFixTasks.length;
   dbMemory.toFixTasks = dbMemory.toFixTasks.filter((t) => t.id !== id);
@@ -1547,7 +1583,7 @@ app.delete("/api/to-fix/:id", (req, res) => {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Задача удалена" });
 });
 
@@ -1564,7 +1600,7 @@ app.get("/api/oem-schedule", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/oem-schedule", (req, res) => {
+app.post("/api/oem-schedule", async (req, res) => {
   const { vehicleId, items } = req.body;
   if (!vehicleId || !Array.isArray(items)) {
     return res.status(400).json({ error: "vehicleId и items обязательны" });
@@ -1587,11 +1623,11 @@ app.post("/api/oem-schedule", (req, res) => {
   }));
 
   dbMemory.oemSchedules.push(...formatted);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(formatted);
 });
 
-app.put("/api/oem-schedule/:id", (req, res) => {
+app.put("/api/oem-schedule/:id", async (req, res) => {
   const index = dbMemory.oemSchedules.findIndex((s) => s.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Пункт регламента не найден" });
@@ -1616,7 +1652,7 @@ app.put("/api/oem-schedule/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.oemSchedules[index]);
 });
 
@@ -1633,7 +1669,7 @@ app.get("/api/tuning", (req, res) => {
   res.json(list);
 });
 
-app.post("/api/tuning", (req, res) => {
+app.post("/api/tuning", async (req, res) => {
   const body = req.body as Partial<TuningStage>;
   if (!body.vehicleId || !body.title) {
     return res.status(400).json({ error: "vehicleId и title обязательны" });
@@ -1654,11 +1690,11 @@ app.post("/api/tuning", (req, res) => {
   };
 
   dbMemory.tuningStages.push(newStage);
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newStage);
 });
 
-app.put("/api/tuning/:id", (req, res) => {
+app.put("/api/tuning/:id", async (req, res) => {
   const index = dbMemory.tuningStages.findIndex((t) => t.id === req.params.id);
   if (index === -1) {
     return res.status(404).json({ error: "Тюнинг-этап не найден" });
@@ -1686,11 +1722,11 @@ app.put("/api/tuning/:id", (req, res) => {
     id: req.params.id,
   };
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.tuningStages[index]);
 });
 
-app.delete("/api/tuning/:id", (req, res) => {
+app.delete("/api/tuning/:id", async (req, res) => {
   const id = req.params.id;
   const len = dbMemory.tuningStages.length;
   dbMemory.tuningStages = dbMemory.tuningStages.filter((t) => t.id !== id);
@@ -1699,7 +1735,7 @@ app.delete("/api/tuning/:id", (req, res) => {
     return res.status(404).json({ error: "Этап не найден" });
   }
 
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Этап тюнинга удален" });
 });
 
@@ -1808,7 +1844,8 @@ function loadSessions(): void {
   }
 }
 
-function persistSessions(): void {
+async function persistSessions(): Promise<void> {
+  if (store instanceof PostgresPersistence) return;
   try {
     fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
     const now = Date.now();
@@ -1839,12 +1876,18 @@ const rateLimitCleanupTimer = setInterval(() => {
       loginAttempts.delete(key);
     }
   }
-  for (const [key, session] of sessions) {
-    if (session.expiresAt <= now || (session.revokedAt && session.revokedAt <= now)) {
-      sessions.delete(key);
+  if (store instanceof PostgresPersistence) {
+    void store.deleteExpiredSessions(now).catch((error) => {
+      console.error("Session cleanup failed:", error instanceof Error ? error.message : "unknown error");
+    });
+  } else {
+    for (const [key, session] of sessions) {
+      if (session.expiresAt <= now || (session.revokedAt && session.revokedAt <= now)) {
+        sessions.delete(key);
+      }
     }
+    void persistSessions();
   }
-  persistSessions();
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 // Не удерживаем процесс живым только ради очистки таймеров
 rateLimitCleanupTimer.unref?.();
@@ -1872,10 +1915,13 @@ function clearSessionCookie(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
-function getSession(req: express.Request): SessionRecord | null {
+async function getSession(req: express.Request): Promise<SessionRecord | null> {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (!token) return null;
-  const record = sessions.get(hashToken(token));
+  const tokenHash = hashToken(token);
+  const record = store instanceof PostgresPersistence
+    ? await store.getSession(tokenHash)
+    : sessions.get(tokenHash);
   if (!record || record.revokedAt || record.expiresAt <= Date.now()) return null;
   return record;
 }
@@ -1884,95 +1930,86 @@ function getSession(req: express.Request): SessionRecord | null {
  * Обязательная аутентификация для всего доступа к данным гаража.
  * GET-запросы не требуют CSRF-токен, изменяющие — требуют.
  */
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  // Backup routes also declare requireAuth explicitly. Reuse the context created
-  // by the global /api middleware rather than acquiring a second lock.
-  if (requestContext.getStore()) return next();
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    // Backup routes also declare requireAuth explicitly. Reuse the context created
+    // by the global /api middleware rather than acquiring a second lock.
+    if (requestContext.getStore()) return next();
 
-  const session = getSession(req);
-  if (!session) {
-    return res.status(401).json({ error: "Требуется вход в аккаунт" });
-  }
-  const user = store.getUserById(session.userId);
-  if (!user) {
-    return res.status(401).json({ error: "Аккаунт не найден" });
-  }
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    if (!verifyCsrf(session, req.headers["x-csrf-token"])) {
-      return res.status(403).json({ error: "CSRF-токен недействителен" });
-    }
-  }
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Требуется вход в аккаунт" });
+    const user = await store.getUserById(session.userId);
+    if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
-  const userId = session.userId;
-  const runWithSnapshot = () => {
-    const garage = store.snapshotForUser(userId, true);
-    requestContext.run({ userId, garage, session }, next);
-  };
-
-  // Keep independent read requests concurrent. Mutations of stored garage
-  // collections share one per-user queue; this is important because handlers
-  // work on request-local snapshots and otherwise a later stale snapshot could
-  // replace an earlier successful write.
-  const method = req.method.toUpperCase();
-  const pathname = req.originalUrl.split("?")[0];
-  const garageWritePrefixes = [
-    "/api/vehicles",
-    "/api/reminders",
-    "/api/services",
-    "/api/fuel",
-    "/api/inventory",
-    "/api/to-fix",
-    "/api/oem-schedule",
-    "/api/tuning",
-    "/api/backup/import",
-    "/api/backup/reset",
-  ];
-  const isGarageWrite =
-    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
-    garageWritePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
-
-  if (!isGarageWrite) {
-    runWithSnapshot();
-    return;
-  }
-
-  const previous = pendingUserWrites.get(userId) ?? Promise.resolve();
-  let unlockCurrent!: () => void;
-  const current = new Promise<void>((resolve) => { unlockCurrent = resolve; });
-  const queueEntry = previous.then(() => current);
-  pendingUserWrites.set(userId, queueEntry);
-
-  let releasing = false;
-  const release = () => {
-    if (releasing) return;
-    releasing = true;
-    // Do not let the next write take its snapshot before queued persistence
-    // has finished updating the store's in-memory state.
-    void store.flush().catch((error) => {
-      console.error("Ошибка ожидания записи перед следующим изменением гаража:", error);
-    }).finally(() => {
-      unlockCurrent();
-      if (pendingUserWrites.get(userId) === queueEntry) {
-        pendingUserWrites.delete(userId);
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      if (!verifyCsrf(session, req.headers["x-csrf-token"])) {
+        return res.status(403).json({ error: "CSRF-токен недействителен" });
       }
-    });
-  };
+    }
 
-  void previous.then(() => {
-    if (res.destroyed || res.writableEnded) {
-      release();
+    const userId = session.userId;
+    const runWithSnapshot = async () => {
+      if (store instanceof PostgresPersistence) {
+        const snapshot = await store.snapshotForUserWithRevision(userId, true);
+        requestContext.run({ userId, garage: snapshot.garage, session, revision: snapshot.revision, response: res }, next);
+      } else {
+        const garage = await store.snapshotForUser(userId, true);
+        requestContext.run({ userId, garage, session, response: res }, next);
+      }
+    };
+
+    // Process-local serialization is an optimization only; PostgreSQL revision
+    // checks remain the cross-instance concurrency boundary on Cloud Run.
+    const method = req.method.toUpperCase();
+    const pathname = req.originalUrl.split("?")[0];
+    const garageWritePrefixes = [
+      "/api/vehicles", "/api/reminders", "/api/services", "/api/fuel",
+      "/api/inventory", "/api/to-fix", "/api/oem-schedule", "/api/tuning",
+      "/api/backup/import", "/api/backup/reset",
+    ];
+    const isGarageWrite =
+      ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+      garageWritePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+
+    if (!isGarageWrite) {
+      await runWithSnapshot();
       return;
     }
-    res.once("finish", release);
-    res.once("close", release);
-    runWithSnapshot();
-  }).catch((error) => {
-    unlockCurrent();
-    if (pendingUserWrites.get(userId) === queueEntry) {
-      pendingUserWrites.delete(userId);
-    }
+
+    const previous = pendingUserWrites.get(userId) ?? Promise.resolve();
+    let unlockCurrent!: () => void;
+    const current = new Promise<void>((resolve) => { unlockCurrent = resolve; });
+    const queueEntry = previous.then(() => current);
+    pendingUserWrites.set(userId, queueEntry);
+
+    let releasing = false;
+    const release = () => {
+      if (releasing) return;
+      releasing = true;
+      void store.flush().catch((error) => {
+        console.error("Ошибка ожидания записи перед следующим изменением гаража:", error instanceof Error ? error.message : "unknown error");
+      }).finally(() => {
+        unlockCurrent();
+        if (pendingUserWrites.get(userId) === queueEntry) pendingUserWrites.delete(userId);
+      });
+    };
+
+    void previous.then(async () => {
+      if (res.destroyed || res.writableEnded) {
+        release();
+        return;
+      }
+      res.once("finish", release);
+      res.once("close", release);
+      await runWithSnapshot();
+    }).catch((error) => {
+      unlockCurrent();
+      if (pendingUserWrites.get(userId) === queueEntry) pendingUserWrites.delete(userId);
+      next(error);
+    });
+  } catch (error) {
     next(error);
-  });
+  }
 }
 
 function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -2026,26 +2063,35 @@ function rateLimitedLogin(req: express.Request, res: express.Response): boolean 
   return false;
 }
 
-function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
   const { record, token } = createSession(userId);
-  sessions.set(record.tokenHash, record);
-  persistSessions();
+  if (store instanceof PostgresPersistence) {
+    await store.putSession(record);
+  } else {
+    sessions.set(record.tokenHash, record);
+    await persistSessions();
+  }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
   return { username, csrfToken: record.csrfSecret };
 }
 
-app.post("/api/auth/register", (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
   if (rateLimitedLogin(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
-  if (store.getUserByName(credentials.username!)) {
-    return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
+  try {
+    if (await store.getUserByName(credentials.username!)) {
+      return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
+    }
+  } catch (error) {
+    console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
   void (async () => {
     const userId = newId("user");
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
     loginAttempts.delete(req.ip || "unknown");
-    res.status(201).json({ success: true, session: establishSession(req, res, userId, credentials.username!) });
+    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
@@ -2055,7 +2101,7 @@ app.post("/api/auth/register", (req, res) => {
   });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   if (rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
   const username = asTrimmedString(body.username, 32).toLowerCase();
@@ -2063,45 +2109,71 @@ app.post("/api/auth/login", (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: "Введите логин и пароль" });
   }
-  const user = store.getUserByName(username);
+  let user;
+  try {
+    user = await store.getUserByName(username);
+  } catch (error) {
+    console.error("Login lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
+  }
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
   }
   loginAttempts.delete(req.ip || "unknown");
-  res.json({ success: true, session: establishSession(req, res, user.id, user.username) });
+  try {
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+  } catch (error) {
+    console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
 });
 
-app.post("/api/auth/logout", (req, res) => {
-  const session = getSession(req);
-  if (session) session.revokedAt = Date.now();
-  persistSessions();
-  res.setHeader("Set-Cookie", clearSessionCookie());
-  res.json({ success: true });
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (session) {
+      if (store instanceof PostgresPersistence) await store.revokeSession(session.tokenHash, Date.now());
+      else {
+        session.revokedAt = Date.now();
+        await persistSessions();
+      }
+    }
+    res.setHeader("Set-Cookie", clearSessionCookie());
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Logout failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось завершить сессию. Повторите попытку." });
+  }
 });
 
-app.get("/api/auth/session", (req, res) => {
-  const session = getSession(req);
-  if (!session) return res.status(401).json({ error: "Сессия не найдена" });
-  const user = store.getUserById(session.userId);
-  if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
+app.get("/api/auth/session", async (req, res) => {
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Сессия не найдена" });
+    const user = await store.getUserById(session.userId);
+    if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
-  // Скользящее продление сессии при активной работе.
-  let renewedToken: string | null = null;
-  if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
-    session.expiresAt = Date.now() + SESSION_TTL_MS;
-    renewedToken = session.csrfSecret;
+    // Скользящее продление сессии при активной работе.
+    if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+      const token = crypto.randomBytes(32).toString("base64url");
+      const previousHash = session.tokenHash;
+      session.tokenHash = hashToken(token);
+      session.expiresAt = Date.now() + SESSION_TTL_MS;
+      session.csrfSecret = crypto.randomBytes(24).toString("base64url");
+      if (store instanceof PostgresPersistence) {
+        await store.rotateSession(previousHash, session, Date.now());
+      } else {
+        sessions.delete(previousHash);
+        sessions.set(session.tokenHash, session);
+        await persistSessions();
+      }
+      res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+    }
+    return res.json({ username: user.username, csrfToken: session.csrfSecret });
+  } catch (error) {
+    console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });
   }
-  if (renewedToken) {
-    const token = crypto.randomBytes(32).toString("base64url");
-    const nextHash = hashToken(token);
-    sessions.delete(session.tokenHash);
-    session.tokenHash = nextHash;
-    session.csrfSecret = crypto.randomBytes(24).toString("base64url");
-    sessions.set(nextHash, session);
-    persistSessions();
-    res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-  }
-  res.json({ username: user.username, csrfToken: session.csrfSecret });
 });
 
 // Backup, Export, and Restore API (только для владельца гаража)
@@ -2126,12 +2198,12 @@ app.get("/api/backup/export", requireAuth, (req, res) => {
   res.json(exported);
 });
 
-app.post("/api/backup/import", requireAuth, (req, res) => {
+app.post("/api/backup/import", requireAuth, async (req, res) => {
   try {
     const imported = { ...validateGarageBackup(req.body), lastUpdated: new Date().toISOString() };
     Object.assign(currentContext().garage, imported);
 
-    saveDatabase();
+    if (!(await saveDatabase())) return;
     res.json({ success: true, message: "Данные успешно импортированы", counts: {
       vehicles: dbMemory.vehicles.length,
       services: dbMemory.serviceRecords.length,
@@ -2141,9 +2213,9 @@ app.post("/api/backup/import", requireAuth, (req, res) => {
   }
 });
 
-app.post("/api/backup/reset", requireAuth, (_req, res) => {
+app.post("/api/backup/reset", requireAuth, async (_req, res) => {
   Object.assign(currentContext().garage, emptyGarage());
-  saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Данные текущего гаража очищены", data: dbMemory });
 });
 
@@ -2157,29 +2229,32 @@ app.post("/api/backup/reset", requireAuth, (_req, res) => {
 const ALLOWED_AGENT_NAMES = new Set(["architect", "developer", "qa", "ops", "argon_reviewer"]);
 const MAX_AGENTS_PER_RUN = 3;
 
-function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
-    return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
-  }
+async function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  try {
+    if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
+      return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
+    }
 
-  const session = getSession(req);
-  const user = session ? store.getUserById(session.userId) : undefined;
-  if (!user) {
-    return res.status(401).json({ error: "Требуется вход в аккаунт" });
-  }
+    const session = await getSession(req);
+    const user = session ? await store.getUserById(session.userId) : undefined;
+    if (!user) return res.status(401).json({ error: "Требуется вход в аккаунт" });
 
-  const allowlist = (process.env.AGENTS_ALLOWED_USERNAMES || "")
-    .split(",")
-    .map((username) => username.trim().toLowerCase())
-    .filter(Boolean);
-  if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
-    return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
-  }
-  if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
-    return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
-  }
+    const allowlist = (process.env.AGENTS_ALLOWED_USERNAMES || "")
+      .split(",")
+      .map((username) => username.trim().toLowerCase())
+      .filter(Boolean);
+    if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
+      return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
+    }
+    if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
+      return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
+    }
 
-  return enforceAiRateLimit(req, res, next);
+    return enforceAiRateLimit(req, res, next);
+  } catch (error) {
+    console.error("Agent authorization failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось проверить доступ к AI-агентам." });
+  }
 }
 
 app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
@@ -2595,6 +2670,10 @@ app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
 // ---------------------------------------------------------------------------
 
 async function startServer() {
+  if (store instanceof PostgresPersistence) {
+    await store.initialize();
+    await store.healthCheck();
+  }
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -2614,5 +2693,11 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch(async (error) => {
+  console.error("Server startup failed:", error instanceof Error ? error.message : "unknown error");
+  if (store instanceof PostgresPersistence) {
+    await store.close().catch(() => undefined);
+  }
+  process.exitCode = 1;
+});
 
