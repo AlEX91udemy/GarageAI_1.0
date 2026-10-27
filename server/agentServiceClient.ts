@@ -26,6 +26,35 @@ export class AgentServiceClientError extends Error {
   }
 }
 
+async function readBoundedResponseText(response: Response, maximumBytes: number): Promise<string> {
+  const headerLength = response.headers.get("content-length");
+  if (headerLength && /^\\d+$/.test(headerLength) && Number(headerLength) > maximumBytes) {
+    throw new Error("Agent response exceeds the size limit.");
+  }
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let totalBytes = 0;
+  let output = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel();
+        throw new Error("Agent response exceeds the size limit.");
+      }
+      output += decoder.decode(value, { stream: true });
+    }
+    output += decoder.decode();
+    return output;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -132,10 +161,7 @@ export async function runAgentService(
 
   let parsed: unknown;
   try {
-    const text = await response.text();
-    if (text.length > 250000) {
-      throw new Error("Agent response is too large.");
-    }
+    const text = await readBoundedResponseText(response, 250000);
     parsed = JSON.parse(text);
   } catch {
     throw new AgentServiceClientError("Agent service returned an invalid response.", 502);
