@@ -79,7 +79,12 @@ def _allow_agent_request(client_ip: str, now: float | None = None) -> tuple[bool
     import time
 
     current_time = time.monotonic() if now is None else now
+    for key, (started_at, _) in list(_agent_request_windows.items()):
+        if current_time - started_at >= _AGENT_RATE_WINDOW_SECONDS:
+            _agent_request_windows.pop(key, None)
     window = _agent_request_windows.get(client_ip)
+    if window is None and len(_agent_request_windows) >= 10000:
+        return False, _AGENT_RATE_WINDOW_SECONDS
     if window is None or current_time - window[0] >= _AGENT_RATE_WINDOW_SECONDS:
         _agent_request_windows[client_ip] = (current_time, 1)
         return True, 0
