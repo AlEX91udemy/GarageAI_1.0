@@ -246,6 +246,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
                   {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? emailCodeRequested ? "Подтвердить код" : "Создать аккаунт" : useLegacyLogin ? "Войти" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
                 </button>
+                {authMode === "login" && !emailCodeRequested && (
+                  <button type="button" onClick={() => { setUseLegacyLogin((value) => !value); setAuthError(null); setAuthNotice(null); setAuthPassword(""); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                    {useLegacyLogin ? "Войти по email с кодом" : "Войти по старому логину"}
+                  </button>
+                )}
                 {authMode === "login" && emailCodeRequested && (
                   <button type="button" onClick={() => { setEmailCodeRequested(false); setAuthCode(""); setAuthNotice(null); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
                     Вернуться к вводу пароля
@@ -384,8 +389,3 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     </div>
   );
 };
-                {authMode === "login" && !emailCodeRequested && (
-                  <button type="button" onClick={() => { setUseLegacyLogin((value) => !value); setAuthError(null); setAuthNotice(null); setAuthPassword(""); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
-                    {useLegacyLogin ? "Войти по email с кодом" : "Войти по старому логину"}
-                  </button>
-                )}
