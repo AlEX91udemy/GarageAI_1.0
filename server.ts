@@ -2134,6 +2134,9 @@ app.post("/api/auth/register", async (req, res) => {
   const body = (req.body || {}) as Record<string, unknown>;
   const email = normalizeEmail(body.email);
   if (body.email !== undefined && !isValidEmail(email)) return res.status(400).json({ error: "Укажите корректный адрес электронной почты." });
+  if (email && ((process.env.EMAIL_CODE_PEPPER || "").length < 32 || !process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim())) {
+    return res.status(503).json({ error: "Регистрация по email временно недоступна: настройте Resend и EMAIL_CODE_PEPPER." });
+  }
   if (email) {
     try {
       if (await store.getUserByEmail(email)) return res.status(409).json({ error: "Аккаунт с такой почтой уже существует." });
@@ -2153,7 +2156,29 @@ app.post("/api/auth/register", async (req, res) => {
     const userId = newId("user");
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email || undefined);
     await clearLoginAttempts(req.ip || "unknown");
-    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!, email || undefined) });
+    if (email) {
+      const now = Date.now();
+      const code = generateEmailLoginCode();
+      const codeHash = hashEmailLoginCode(email, code, process.env.EMAIL_CODE_PEPPER || "");
+      const expiresAtMs = now + EMAIL_LOGIN_CODE_TTL_MS;
+      try {
+        if (store instanceof PostgresPersistence) {
+          const stored = await store.putEmailLoginCode(email, userId, codeHash, expiresAtMs, now, EMAIL_LOGIN_CODE_RESEND_COOLDOWN_MS);
+          if (!stored) throw new Error("Email verification cooldown active");
+        } else {
+          localEmailLoginCodes.set(email, { userId, codeHash, expiresAtMs, attempts: 0, sentAtMs: now });
+        }
+        await sendEmailLoginCode(email, code);
+        res.status(201).json({ success: true, emailVerificationRequired: true, message: "Аккаунт создан. Введите код из письма для завершения входа." });
+      } catch (emailError) {
+        if (store instanceof PostgresPersistence) await store.deleteEmailLoginCode(email).catch(() => undefined);
+        else localEmailLoginCodes.delete(email);
+        console.error("Registration email delivery failed:", emailError instanceof Error ? emailError.message : "unknown error");
+        res.status(503).json({ error: "Аккаунт создан, но письмо с кодом не отправлено. Попробуйте войти позже." });
+      }
+      return;
+    }
+    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
