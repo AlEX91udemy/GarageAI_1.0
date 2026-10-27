@@ -60,6 +60,7 @@ import { AgentServiceClientError, runAgentService } from "./server/agentServiceC
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
+import { classifyReceiptText } from "./server/receiptClassification";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -2529,6 +2530,7 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
           ? Number(totalEntity.normalizedValue.moneyValue.units) + Number(totalEntity.normalizedValue.moneyValue.nanos || 0) / 1e9
           : totalText ? Number(String(totalText).replace(/[^0-9.,-]/g, "").replace(",", ".")) : null;
         const googleResult = { merchantName: documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"]), date: documentEntityValue(entities, ["receipt_date", "date"]), totalAmount, category: "other", description: doc?.text || "", notes: doc?.text || "", _source: "google-document-ai" };
+        const initialClassification = classifyReceiptText(doc?.text || "", googleResult.category);
         if (doc?.text && getOpenRouterConfig("receipt").key) {
           try {
             const refined = await requestOpenRouterReceiptFields(doc.text);
@@ -2537,7 +2539,8 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
               merchantName: refined.merchantName || googleResult.merchantName,
               date: refined.date || googleResult.date,
               totalAmount: Number.isFinite(Number(refined.totalAmount)) ? Number(refined.totalAmount) : googleResult.totalAmount,
-              category: refined.category || googleResult.category,
+              category: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).category,
+              fuelDetails: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).fuelDetails || refined.fuelDetails,
               description: refined.description || googleResult.description,
               notes: refined.notes || googleResult.notes,
               _source: "google-document-ai+openrouter-text",
@@ -2545,7 +2548,7 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
           }
           catch (error) { console.warn("OpenRouter receipt refinement failed; using Google result:", error); }
         }
-        return res.json(googleResult);
+        return res.json({ ...googleResult, ...initialClassification });
       } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
     }
     const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
@@ -2557,7 +2560,17 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
           config: { responseMimeType: "application/json" },
         })).text;
     const parsed = parseJsonSafely(responseText, {});
-    res.json(parsed);
+    const classification = classifyReceiptText(
+      `${responseText}\n${JSON.stringify(parsed)}`,
+      parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).category : undefined,
+    );
+    res.json({
+      ...parsed,
+      category: classification.category,
+      ...(classification.fuelDetails && !("fuelDetails" in (parsed as Record<string, unknown>))
+        ? { fuelDetails: classification.fuelDetails }
+        : {}),
+    });
   } catch (error: any) {
     console.error("Receipt OCR error:", error);
     res.status(500).json({
