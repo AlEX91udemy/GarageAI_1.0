@@ -17,6 +17,10 @@ const required = [
   /user_id text NOT NULL REFERENCES garageai_users\(id\) ON DELETE CASCADE/i,
   /expires_at_ms bigint NOT NULL/i,
   /revoked_at_ms bigint/i,
+  /CREATE TABLE IF NOT EXISTS garageai_rate_limits/i,
+  /PRIMARY KEY \\(scope, bucket_key\\)/i,
+  /hit_count integer NOT NULL DEFAULT 0/i,
+  /garageai_rate_limits_count_nonnegative CHECK \\(hit_count >= 0\\)/i,
   /INSERT INTO garageai_schema_migrations/i,
   /ON CONFLICT \(version\) DO NOTHING/i,
 ];
