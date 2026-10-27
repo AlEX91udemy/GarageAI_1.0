@@ -75,9 +75,15 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImagePreview(reader.result as string);
+      const image = typeof reader.result === "string" ? reader.result : null;
+      if (!image) {
+        setScanError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
+        return;
+      }
+      setImagePreview(image);
       setScanResult(null);
       setScanError(null);
+      void handleScan(image);
     };
     reader.readAsDataURL(file);
   };
