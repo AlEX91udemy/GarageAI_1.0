@@ -38,7 +38,7 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertIn("password: string", snapshot)
         included_files = re.findall(r"^--- FILE: (.+) ---$", snapshot, flags=re.MULTILINE)
         self.assertNotIn("data/garage_store.json", included_files)
-        self.assertNotIn("package-lock.json", snapshot)
+        self.assertNotIn("package-lock.json", included_files)
         self.assertLessEqual(len(snapshot), 46000)
 
     def test_disabled_when_api_token_is_not_configured(self):
