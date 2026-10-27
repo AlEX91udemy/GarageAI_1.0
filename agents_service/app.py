@@ -140,14 +140,17 @@ def _build_agents() -> dict[str, LlmAgent]:
 
 async def _run_agent(agent: LlmAgent, name: str, prompt: str) -> str:
     runner = InMemoryRunner(agent=agent, app_name=f"garageai_{name}")
-    session = await runner.session_service.create_session(app_name=f"garageai_{name}", user_id="local-user")
-    content = types.Content(role="user", parts=[types.Part(text=prompt)])
-    chunks = []
-    async for event in runner.run_async(user_id="local-user", session_id=session.id, new_message=content):
-        if event.content and event.content.parts:
-            chunks.extend(part.text for part in event.content.parts if part.text)
-    await runner.close()
-    return "\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
+    try:
+        session = await runner.session_service.create_session(app_name=f"garageai_{name}", user_id="local-user")
+        content = types.Content(role="user", parts=[types.Part(text=prompt)])
+        chunks = []
+        async for event in runner.run_async(user_id="local-user", session_id=session.id, new_message=content):
+            if event.content and event.content.parts:
+                chunks.extend(part.text for part in event.content.parts if part.text)
+        return "\\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
+    finally:
+        # Clean up the runner if session creation or model execution fails too.
+        await runner.close()
 
 app = FastAPI(title="GarageAI Agents", version="1.0.0")
 
