@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import postgres from "postgres";
-import { randomUUID } from "node:crypto";
 
 const COLLECTION_KEYS = [
   "vehicles",
@@ -276,6 +275,9 @@ async function main() {
       console.log(JSON.stringify(summary, null, 2));
       process.exitCode = 2;
       return;
+    }
+    if (bundle.ownerlessGaragePresent) {
+      console.warn("Warning: ownerless legacy garage data was detected and will not be imported automatically.");
     }
     if (!apply) {
       console.log("DRY RUN ONLY — no rows were written.");
