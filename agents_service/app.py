@@ -19,6 +19,8 @@ load_dotenv()
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
+MAX_AGENTS_PER_REQUEST = 3
+
 AGENT_BRIEFS = {
     "architect": "Review GarageAI architecture. Identify risks, dependencies, and an implementation plan. Do not edit files.",
     "developer": "Act as a senior TypeScript and Python developer. Propose a minimal maintainable patch with exact file changes. Do not edit files.",
@@ -228,10 +230,10 @@ async def run_agents(
         )
     if request.agents is not None and (
         not request.agents
-        or len(request.agents) > len(AGENT_BRIEFS)
+        or len(request.agents) > MAX_AGENTS_PER_REQUEST
         or len(set(request.agents)) != len(request.agents)
     ):
-        raise HTTPException(400, "Agent list must be non-empty and contain no duplicates.")
+        raise HTTPException(400, f"Agent list must contain 1-{MAX_AGENTS_PER_REQUEST} unique agents.")
     selected = request.agents if request.agents is not None else list(AGENT_BRIEFS)
     unknown = sorted(set(selected) - set(AGENT_BRIEFS))
     if unknown:
