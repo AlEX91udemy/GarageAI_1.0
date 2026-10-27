@@ -70,6 +70,16 @@ Do not run a migration against production data until the tool and its tests exis
 - Add PostgreSQL-backed integration tests for tenant isolation, concurrent writes, unique usernames, session lifecycle, transaction rollback, restart/multi-process behavior, JSON import and backup/restore.
 - Keep `assertProductionStorageSafe` fail-closed until the configured PostgreSQL adapter is actually active and validated. An environment variable alone must not be treated as proof that a database is connected.
 
+## Real Cloud SQL smoke test
+
+After schema migration and import verification, but before routing real traffic, run the smoke test against the intended Cloud SQL database:
+
+```bash
+DATABASE_URL="$DATABASE_URL" npx tsx scripts/smoke-postgres.ts
+```
+
+If TLS is required for the selected connection path, also set `DATABASE_SSL=true`. The script creates temporary smoke-test users and records, checks tenant isolation, revision conflict handling, and session rotation/revocation, then deletes its test users. Run it only against the intended database and verify the logs show a pass before opening the production gate.
+
 ## Cloud Run rollout checklist
 
 - [ ] Create Cloud SQL PostgreSQL in the selected region and enable automated backups / point-in-time recovery.
