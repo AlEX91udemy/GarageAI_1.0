@@ -27,7 +27,7 @@ export interface PostgresPersistenceOptions {
   runMigrations?: boolean;
 }
 
-const MIGRATION_FILES = ["001_initial_postgres.sql"] as const;
+const MIGRATION_FILES = ["001_initial_postgres.sql", "002_email_auth_challenges.sql"] as const;
 
 /**
  * PostgreSQL repository primitives for the Cloud Run persistence cutover.
