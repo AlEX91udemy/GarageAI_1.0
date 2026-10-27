@@ -21,6 +21,14 @@ python -m uvicorn agents_service.app:app --host 0.0.0.0 --port 8080
 
 Ключ `GEMINI_API_KEY` берётся из `.env` в корне проекта. Для Vertex AI настройте Application Default Credentials и `GOOGLE_GENAI_USE_VERTEXAI=1`.
 
+**Защита API:** `POST /agents/run` требует секрет `AGENTS_API_TOKEN`. Если переменная не задана, запуск платных агентов отключён (503); при отсутствии/неверном заголовке `X-Agents-Token` возвращается 401. Не встраивайте токен во frontend или публичный репозиторий. Для Cloud Run храните его в Secret Manager и передавайте только от доверенного backend-сервиса. Ограничьте ingress/IAM: токен — дополнительная защита, а не замена IAM.
+
+Локально создайте токен и задайте его в текущем PowerShell-сеансе:
+
+```powershell
+$env:AGENTS_API_TOKEN = python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
 Проверка:
 
 ```powershell
@@ -31,7 +39,8 @@ Invoke-RestMethod http://127.0.0.1:8080/health
 
 ```powershell
 $body = @{ task = 'Проверь готовность GarageAI к выпуску новой функции диагностики' } | ConvertTo-Json
-Invoke-RestMethod http://127.0.0.1:8080/agents/run -Method Post -ContentType 'application/json' -Body $body
+$headers = @{ 'X-Agents-Token' = $env:AGENTS_API_TOKEN }
+Invoke-RestMethod http://127.0.0.1:8080/agents/run -Method Post -Headers $headers -ContentType 'application/json' -Body $body
 ```
 
 Можно выбрать отдельных агентов: `architect`, `developer`, `qa`, `ops`.
