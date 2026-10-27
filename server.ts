@@ -79,7 +79,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
   const model = value?.trim();
