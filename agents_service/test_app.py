@@ -7,7 +7,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from agents_service.app import AgentRequest, run_agents, _agent_request_windows
+from agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
 
 
 def make_request(client_ip: str = "127.0.0.1") -> Request:
@@ -26,6 +26,14 @@ def make_request(client_ip: str = "127.0.0.1") -> Request:
 class AgentEndpointAuthTests(unittest.TestCase):
     def setUp(self):
         _agent_request_windows.clear()
+
+    def test_snapshot_contains_source_but_excludes_runtime_data(self):
+        snapshot = _repo_snapshot()
+        self.assertIn("--- FILE: server.ts ---", snapshot)
+        self.assertIn("import express from", snapshot)
+        self.assertNotIn("--- FILE: data/garage_store.json ---", snapshot)
+        self.assertNotIn("package-lock.json", snapshot)
+        self.assertLessEqual(len(snapshot), 46000)
 
     def test_disabled_when_api_token_is_not_configured(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": ""}, clear=False):
