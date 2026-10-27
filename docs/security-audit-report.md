@@ -27,11 +27,11 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Risk: real or user-associated vehicle/maintenance information may be exposed in a public repository and retained in Git history.
 - Action on this branch: remove the runtime data file from the current tree; `.gitignore` already excludes it. This does **not** remove historical copies. Before deploying the PR, preserve any legitimate production data outside Git and confirm the runtime uses persistent storage or a managed database. If any record belongs to a real user, assess notification/privacy obligations. Purge repository history separately if required; coordinate any force-push with collaborators.
 
-### HIGH — Agent API may be callable without application-level authentication
+### HIGH — Agent API authentication and quota protection
 - Location: `agents_service/app.py`, `POST /agents/run`.
-- Evidence: the handler validates requested agent names and provider configuration, but does not itself authenticate callers or rate-limit requests.
-- Risk: if the service has public ingress, a caller may trigger paid model calls and consume quota.
-- Required action: confirm Cloud Run ingress and IAM. If any untrusted callers can reach the endpoint, require service-to-service authentication or add an application token and rate limiting before exposing it publicly. Add integration tests for unauthenticated calls and abuse limits.
+- Initial evidence: the endpoint accepted requests without application-level authentication, which could allow paid model calls if publicly reachable.
+- Remediation on this branch: POST now fails closed with 503 if `AGENTS_API_TOKEN` is not configured and returns 401 unless the `X-Agents-Token` header matches using constant-time comparison. README documents local setup and recommends Cloud Run IAM/Secret Manager.
+- Remaining risk: this does not implement rate limiting and does not replace Cloud Run ingress/IAM. Configure the token as a secret in deployment and restrict the service to trusted callers before production. Add automated tests for missing/invalid tokens and throttling.
 
 ### HIGH — Tenant isolation needs route-level integration tests
 - Location: `server.ts` and protected CRUD routes.
@@ -48,6 +48,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 ## Next verification
 
 - Re-run `pip-audit -r agents_service/requirements.txt` after the version constraint.
+- Run a Python import/syntax check and add automated tests for missing/invalid `X-Agents-Token`.
 - Keep npm and Python dependency audits blocking.
 - Add tests for agent authentication and tenant isolation.
 - Confirm no live data is required from the tracked JSON file before merging.
