@@ -59,6 +59,7 @@ import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
+import { safeHttpErrorResponse } from "./server/httpErrorResponse";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -2733,6 +2734,17 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Keep malformed JSON, oversized payloads and unexpected middleware failures
+  // in a stable JSON format; never send parser internals or raw payload fragments.
+  app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next(error);
+    const safe = safeHttpErrorResponse(error);
+    if (safe.status >= 500) {
+      console.error("Unhandled HTTP middleware error");
+    }
+    return res.status(safe.status).json({ error: safe.message });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Garage AI Server running on http://0.0.0.0:${PORT}`);
