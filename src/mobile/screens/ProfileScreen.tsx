@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, restoreSession } from "../../api";
+import { login, register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -56,6 +56,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
   const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
   const [authUsername, setAuthUsername] = React.useState("");
+  const [authEmail, setAuthEmail] = React.useState("");
+  const [authCode, setAuthCode] = React.useState("");
+  const [emailCodeRequested, setEmailCodeRequested] = React.useState(false);
+  const [authNotice, setAuthNotice] = React.useState<string | null>(null);
   const [authPassword, setAuthPassword] = React.useState("");
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authBusy, setAuthBusy] = React.useState(false);
@@ -79,13 +83,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setAuthBusy(true);
     setAuthError(null);
     try {
+      if (authMode === "login" && !emailCodeRequested) {
+        const message = await requestEmailLoginCode(authEmail.trim(), authPassword);
+        setEmailCodeRequested(true);
+        setAuthNotice(message);
+        setAuthPassword("");
+        return;
+      }
       const session = authMode === "login"
-        ? await login(authUsername.trim(), authPassword)
-        : await register(authUsername.trim(), authPassword);
+        ? await verifyEmailLoginCode(authEmail.trim(), authCode.trim())
+        : await register(authUsername.trim(), authPassword, authEmail.trim());
       setIsAuthenticated(true);
       setSessionUsername(session.username);
       setAuthMode(null);
       setAuthPassword("");
+      setAuthCode("");
+      setEmailCodeRequested(false);
+      setAuthNotice(null);
       onAuthSuccess?.();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Ошибка авторизации");
@@ -143,7 +157,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                  onClick={() => { setAuthMode("login"); setAuthError(null); setAuthNotice(null); setEmailCodeRequested(false); setAuthCode(""); }}
                   className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
                 >
                   <LogIn className="mr-1 inline h-4 w-4" />
@@ -151,7 +165,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                  onClick={() => { setAuthMode("register"); setAuthError(null); setAuthNotice(null); setEmailCodeRequested(false); setAuthCode(""); }}
                   className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
                 >
                   <UserPlus className="mr-1 inline h-4 w-4" />
@@ -168,28 +182,63 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     Отмена
                   </button>
                 </div>
+                {authMode === "register" && (
+                  <input
+                    value={authUsername}
+                    onChange={(event) => setAuthUsername(event.target.value)}
+                    placeholder="Логин (3–32 символа)"
+                    autoComplete="username"
+                    required
+                    maxLength={32}
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                  />
+                )}
                 <input
-                  value={authUsername}
-                  onChange={(event) => setAuthUsername(event.target.value)}
-                  placeholder="Логин"
-                  autoComplete="username"
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="Gmail / электронная почта"
+                  autoComplete="email"
                   required
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                  maxLength={254}
+                  disabled={authMode === "login" && emailCodeRequested}
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong disabled:opacity-70"
                 />
-                <input
-                  type="password"
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  placeholder="Пароль"
-                  autoComplete={authMode === "login" ? "current-password" : "new-password"}
-                  minLength={8}
-                  required
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />
+                {!emailCodeRequested && (
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                    placeholder="Пароль"
+                    autoComplete={authMode === "login" ? "current-password" : "new-password"}
+                    minLength={8}
+                    required
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                  />
+                )}
+                {emailCodeRequested && (
+                  <input
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={authCode}
+                    onChange={(event) => setAuthCode(event.target.value.replace(/\\D/g, "").slice(0, 8))}
+                    placeholder="Код из письма (8 цифр)"
+                    minLength={8}
+                    maxLength={8}
+                    required
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                  />
+                )}
+                {authNotice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{authNotice}</p>}
                 {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
-                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "login" ? "Войти" : "Создать аккаунт"}
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? "Создать аккаунт" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
                 </button>
+                {emailCodeRequested && (
+                  <button type="button" onClick={() => { setEmailCodeRequested(false); setAuthCode(""); setAuthNotice(null); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                    Вернуться к вводу пароля
+                  </button>
+                )}
               </form>
             )}
           </div>
