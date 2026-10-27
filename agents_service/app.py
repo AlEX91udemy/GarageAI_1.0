@@ -210,9 +210,10 @@ async def run_agents(
         raise HTTPException(401, "Invalid or missing agent API token.")
     # Node forwards the authenticated internal user ID after validating the
     # session/allowlist. Fall back to the network peer for direct trusted callers.
+    trusted_caller = x_agents_caller if isinstance(x_agents_caller, str) else None
     caller_key = (
-        f"user:{x_agents_caller}"
-        if x_agents_caller and re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", x_agents_caller)
+        f"user:{trusted_caller}"
+        if trusted_caller and re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", trusted_caller)
         else f"ip:{http_request.client.host if http_request.client else 'unknown'}"
     )
     allowed, retry_after = _allow_agent_request(caller_key)
