@@ -95,7 +95,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       }
       const session = authMode === "login"
         ? useLegacyLogin ? await login(authUsername.trim(), authPassword) : await verifyEmailLoginCode(authEmail.trim(), authCode.trim())
-        : await register(authUsername.trim(), authPassword, authEmail.trim());
+        : emailCodeRequested ? await verifyEmailLoginCode(authEmail.trim(), authCode.trim()) : await register(authUsername.trim(), authPassword, authEmail.trim());
+      if (!session) {
+        setEmailCodeRequested(true);
+        setAuthNotice("Аккаунт создан. Код отправлен на почту; введите его для завершения регистрации.");
+        setAuthPassword("");
+        return;
+      }
       setIsAuthenticated(true);
       setSessionUsername(session.username);
       setSessionEmail(session.email ?? null);
@@ -206,7 +212,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     autoComplete="email"
                     required
                     maxLength={254}
-                    disabled={authMode === "login" && emailCodeRequested}
+                    disabled={emailCodeRequested}
                     className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong disabled:opacity-70"
                   />
                 )}
@@ -238,9 +244,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {authNotice && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{authNotice}</p>}
                 {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
-                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? "Создать аккаунт" : useLegacyLogin ? "Войти" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "register" ? emailCodeRequested ? "Подтвердить код" : "Создать аккаунт" : useLegacyLogin ? "Войти" : emailCodeRequested ? "Подтвердить код" : "Получить код на почту"}
                 </button>
-                {emailCodeRequested && (
+                {authMode === "login" && emailCodeRequested && (
                   <button type="button" onClick={() => { setEmailCodeRequested(false); setAuthCode(""); setAuthNotice(null); setAuthError(null); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
                     Вернуться к вводу пароля
                   </button>
