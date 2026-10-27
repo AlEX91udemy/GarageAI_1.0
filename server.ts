@@ -2150,6 +2150,24 @@ function requireAgentServiceAccess(req: express.Request, res: express.Response, 
   if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
     return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
   }
+
+  const session = getSession(req);
+  const user = session ? store.getUserById(session.userId) : undefined;
+  if (!user) {
+    return res.status(401).json({ error: "Требуется вход в аккаунт" });
+  }
+
+  const allowlist = (process.env.AGENTS_ALLOWED_USERNAMES || "")
+    .split(",")
+    .map((username) => username.trim().toLowerCase())
+    .filter(Boolean);
+  if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
+    return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
+  }
+  if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
+    return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
+  }
+
   return enforceAiRateLimit(req, res, next);
 }
 
