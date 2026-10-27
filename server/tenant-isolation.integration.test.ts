@@ -180,4 +180,134 @@ describe("HTTP tenant isolation", () => {
     expect(aliceServices.status).toBe(200);
     expect(await aliceServices.json()).toEqual([expect.objectContaining({ id: aliceService.id, title: "Private service record" })]);
   });
+
+  it("isolates all garage collections and rejects cross-user restore references", async () => {
+    const owner = await register("resource-owner");
+    const other = await register("resource-other");
+
+    const vehicleResponse = await request(owner, "/api/vehicles", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "resource-owner-car", make: "Honda", model: "PrivateResourceTest", year: 2024, currentMileage: 1000 }),
+    });
+    expect(vehicleResponse.status).toBe(201);
+
+    const reminder = await request(owner, "/api/reminders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "owner-reminder", vehicleId: "resource-owner-car", kind: "osago", startDate: "2026-10-01", durationMonths: 12, price: 12000, notes: "Private reminder test" }),
+    });
+    expect(reminder.status).toBe(201);
+
+    const fuel = await request(owner, "/api/fuel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "owner-fuel", vehicleId: "resource-owner-car", date: "2026-10-02", mileage: 1000, liters: 30, pricePerLiter: 60, totalCost: 1800, station: "Private station test" }),
+    });
+    expect(fuel.status).toBe(201);
+
+    const part = await request(owner, "/api/inventory", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "owner-part", vehicleId: "resource-owner-car", name: "Private brake pads", partNumber: "OWNER-TEST-001", quantity: 2 }),
+    });
+    expect(part.status).toBe(201);
+
+    const task = await request(owner, "/api/to-fix", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "owner-task", vehicleId: "resource-owner-car", title: "Private repair task" }),
+    });
+    expect(task.status).toBe(201);
+
+    const schedule = await request(owner, "/api/oem-schedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vehicleId: "resource-owner-car", items: [{ id: "owner-oem", title: "Private service interval", intervalKm: 10000 }] }),
+    });
+    expect(schedule.status).toBe(201);
+
+    const tuning = await request(owner, "/api/tuning", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "owner-tuning", vehicleId: "resource-owner-car", title: "Private tuning project" }),
+    });
+    expect(tuning.status).toBe(201);
+
+    const otherDataResponse = await request(other, "/api/data");
+    expect(otherDataResponse.status).toBe(200);
+    const otherData = await otherDataResponse.json() as Record<string, unknown[]>;
+    for (const key of ["vehicles", "reminders", "serviceRecords", "fuelRecords", "oemSchedules", "garageParts", "toFixTasks", "tuningStages"]) {
+      expect(otherData[key], `other user should not see ${key}`).toEqual([]);
+    }
+
+    expect(await (await request(other, "/api/reminders")).json()).toEqual([]);
+    expect(await (await request(other, "/api/fuel")).json()).toEqual([]);
+    expect(await (await request(other, "/api/inventory")).json()).toEqual([]);
+    expect(await (await request(other, "/api/to-fix")).json()).toEqual([]);
+    expect(await (await request(other, "/api/oem-schedule")).json()).toEqual([]);
+    expect(await (await request(other, "/api/tuning")).json()).toEqual([]);
+
+    expect((await request(other, "/api/reminders/owner-reminder", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "osago", vehicleId: "resource-owner-car", startDate: "2026-10-01" }) })).status).toBe(404);
+    expect((await request(other, "/api/reminders/owner-reminder", { method: "DELETE" })).status).toBe(404);
+    expect((await request(other, "/api/fuel/owner-fuel", { method: "DELETE" })).status).toBe(404);
+    expect((await request(other, "/api/inventory/owner-part", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Hijacked part" }) })).status).toBe(404);
+    expect((await request(other, "/api/inventory/owner-part", { method: "DELETE" })).status).toBe(404);
+    expect((await request(other, "/api/inventory/owner-part/install", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(404);
+    expect((await request(other, "/api/to-fix/owner-task", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Hijacked task" }) })).status).toBe(404);
+    expect((await request(other, "/api/to-fix/owner-task/complete", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(404);
+    expect((await request(other, "/api/to-fix/owner-task", { method: "DELETE" })).status).toBe(404);
+    expect((await request(other, "/api/oem-schedule/owner-oem", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Hijacked schedule" }) })).status).toBe(404);
+    expect((await request(other, "/api/tuning/owner-tuning", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Hijacked tuning" }) })).status).toBe(404);
+    expect((await request(other, "/api/tuning/owner-tuning", { method: "DELETE" })).status).toBe(404);
+    expect((await request(other, "/api/stats/resource-owner-car")).status).toBe(404);
+
+    const exportedOther = await request(other, "/api/backup/export");
+    expect(exportedOther.status).toBe(200);
+    const otherExport = await exportedOther.text();
+    for (const privateValue of ["PrivateResourceTest", "Private reminder test", "Private station test", "Private brake pads", "Private repair task", "Private service interval", "Private tuning project"]) {
+      expect(otherExport).not.toContain(privateValue);
+    }
+
+    const invalidRestore = await request(other, "/api/backup/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vehicles: [], serviceRecords: [{ id: "stolen-service", vehicleId: "resource-owner-car" }] }),
+    });
+    expect(invalidRestore.status).toBe(400);
+
+    const ownerDataResponse = await request(owner, "/api/data");
+    expect(ownerDataResponse.status).toBe(200);
+    const ownerData = await ownerDataResponse.json() as Record<string, Array<{ id?: string; title?: string; name?: string }>>;
+    expect(ownerData.vehicles).toEqual([expect.objectContaining({ id: "resource-owner-car", model: "PrivateResourceTest" })]);
+    expect(ownerData.reminders).toEqual([expect.objectContaining({ id: "owner-reminder" })]);
+    expect(ownerData.fuelRecords).toEqual([expect.objectContaining({ id: "owner-fuel" })]);
+    expect(ownerData.garageParts).toEqual([expect.objectContaining({ id: "owner-part" })]);
+    expect(ownerData.toFixTasks).toEqual([expect.objectContaining({ id: "owner-task" })]);
+    expect(ownerData.oemSchedules).toEqual([expect.objectContaining({ id: "owner-oem" })]);
+    expect(ownerData.tuningStages).toEqual([expect.objectContaining({ id: "owner-tuning" })]);
+  });
+
+  it("does not drop records when one user creates vehicles concurrently", async () => {
+    const owner = await register("concurrent-owner");
+    const makeVehicleRequest = (model: string) => request(owner, "/api/vehicles", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ make: "Toyota", model, year: 2023, currentMileage: 5000 }),
+    });
+
+    const [first, second] = await Promise.all([
+      makeVehicleRequest("ConcurrentCarA"),
+      makeVehicleRequest("ConcurrentCarB"),
+    ]);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+
+    const listResponse = await request(owner, "/api/vehicles");
+    expect(listResponse.status).toBe(200);
+    const vehicles = await listResponse.json() as Array<{ model: string }>;
+    expect(vehicles.map((item) => item.model)).toEqual(expect.arrayContaining(["ConcurrentCarA", "ConcurrentCarB"]));
+    expect(vehicles).toHaveLength(2);
+  });
+
 });
