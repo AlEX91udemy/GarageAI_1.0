@@ -1972,7 +1972,8 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const clientId = req.ip || "unknown";
+  const userId = requestContext.getStore()?.userId;
+  const clientId = userId ? `user:${userId}` : `ip:${req.ip || "unknown"}`;
   const now = Date.now();
   const current = aiRequestWindows.get(clientId);
   const window = !current || now - current.startedAt >= AI_RATE_WINDOW_MS
