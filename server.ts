@@ -2196,7 +2196,7 @@ app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
     if (
       !Array.isArray(body.agents) ||
       body.agents.length === 0 ||
-      body.agents.length > ALLOWED_AGENT_NAMES.size ||
+      body.agents.length > MAX_AGENTS_PER_RUN ||
       body.agents.some((agent) => typeof agent !== "string" || !ALLOWED_AGENT_NAMES.has(agent)) ||
       new Set(body.agents).size !== body.agents.length
     ) {
