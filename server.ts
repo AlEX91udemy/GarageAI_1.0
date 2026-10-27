@@ -649,10 +649,18 @@ app.use("/api", (req, res, next) => {
 });
 
 // 1. Health and Meta Check
-app.get("/api/health", (_req, res) => {
+app.get("/api/health", async (_req, res) => {
   const garage = requestContext.getStore()?.garage;
+  if (store instanceof PostgresPersistence) {
+    try {
+      await store.healthCheck();
+    } catch {
+      return res.status(503).json({ status: "degraded", storageProvider: "postgresql", timestamp: new Date().toISOString() });
+    }
+  }
   res.json({
     status: "ok",
+    storageProvider: store instanceof PostgresPersistence ? "postgresql" : "local-json",
     // Keep the legacy field for older clients, but expose explicit provider
     // state so Vertex AI/ADC is not misreported as a missing API key.
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
