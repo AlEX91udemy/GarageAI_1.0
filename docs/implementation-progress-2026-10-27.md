@@ -39,7 +39,7 @@
 
 ## Результаты проверок
 
-Последний полностью завершённый CI run с миграцией на Google GenAI SDK: [40467357010](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467357010). CI для дополнительного явного pin `opentelemetry-api>=1.45.1,<2` выполняется: [40467458312](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467458312).
+Последний полностью завершённый CI run с миграцией на Google GenAI SDK и явным pin `opentelemetry-api>=1.45.1,<2`: [40467458312](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467458312). Все три jobs завершились успешно.
 - TypeScript check — passed.
 - **116 тестов в 19 файлах — passed** (Node/Vitest), включая storage safety gate, AI provider health, private-agent UI/API и проверку per-user quota.
 - Production build — passed.
@@ -63,7 +63,7 @@
 
 ## Рекомендуемый порядок продолжения
 
-1. Дождаться завершения CI run 40467458312 для явного pin OpenTelemetry; в run 40467357010 уже прошли Python tests/audit, а TypeScript, unit tests и production build.
+1. Повторно проверить CI после последних изменений документации; кодовый CI run 40467458312 прошёл полностью.
 2. Повторно проверить полный CI после последнего commit с явным pin `opentelemetry-api>=1.45.1,<2`.
 3. Завершить интеграционные тесты гостевого режима и полного набора сценариев импорта/восстановления.
 4. Спроектировать миграцию JSON-хранилища в managed database и проверить backup/restore.
