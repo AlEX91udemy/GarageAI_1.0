@@ -46,6 +46,16 @@ VALUES (repeat('a', 64), 'ci-user-a', 'ci-only-csrf', 1000, 2000);
 
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'garageai_rate_limits') THEN
+    RAISE EXCEPTION 'shared rate-limit table missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'garageai_rate_limits_count_nonnegative'
+      AND conrelid = 'garageai_rate_limits'::regclass
+  ) THEN
+    RAISE EXCEPTION 'rate-limit counter constraint missing';
+  END IF;
   IF (SELECT count(*) FROM garageai_schema_migrations WHERE version = 1) <> 1 THEN
     RAISE EXCEPTION 'migration ledger must contain exactly one row for version 1';
   END IF;
