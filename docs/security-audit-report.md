@@ -41,6 +41,12 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Location: `server/store.ts`.
 - The in-process write queue and atomic file replacement do not coordinate separate instances. Keep one instance with persistent disk only as a temporary arrangement, or migrate to a transactional database before scaling horizontally.
 
+### HIGH — Agent review context previously contained only file names
+- Location: `agents_service/app.py`, `_repo_snapshot()`.
+- Finding: the agents received a list of repository paths, not source contents, so code-review tasks could not reliably inspect implementation details.
+- Remediation on this branch: provide a bounded snapshot of source/config/test contents (maximum 40 files and 45,000 characters), prioritize implementation files, skip runtime data/lockfiles/virtual environments, and redact lines that resemble secret assignments. A test checks that source is included and runtime data is excluded.
+- Remaining risk: heuristic redaction is not a substitute for secret scanning; the snapshot is intentionally bounded and may omit files outside the limit.
+
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - Defaults are not guaranteed to be available in every provider/project. Configure model IDs explicitly and run a non-secret smoke test against the selected provider.
@@ -48,7 +54,9 @@ The unit-test log contains connection-refused messages for an optional localhost
 ## Next verification
 
 - Resolve the `opentelemetry-api 1.44.0` vulnerability without breaking `google-adk==2.13.0` dependency resolution; keep Python audit blocking until resolved.
-- Run Python import/syntax and agent endpoint tests; verify rate-limit behavior under the actual Cloud Run proxy configuration.
+- Re-run CI after the latest changes; the prior run exposed a test/signature mismatch that was corrected afterward.
+- Verify rate-limit behavior under the actual Cloud Run proxy configuration.
+- Resolve the upstream OpenTelemetry version cap without forcing an incompatible dependency set.
 - Keep npm and Python dependency audits blocking.
 - Add tests for agent authentication and tenant isolation.
 - Confirm no live data is required from the tracked JSON file before merging.
