@@ -4,15 +4,15 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 ## Production blockers
 
-1. `server/store.ts` stores user data in JSON files on the container filesystem. Cloud Run's writable filesystem is ephemeral and not shared between instances. **Do not serve real user data until persistence is migrated to a managed transactional database** and backup/restore tests pass.
+1. PostgreSQL persistence is wired behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. A dry-run/transactional JSON importer and disposable-PostgreSQL CI tests are in the branch, but **real-data import/cutover and Cloud SQL smoke tests have not been performed**. Do not serve real user data until ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
 2. **Resolved in the current branch:** the agent service no longer depends on `google-adk==2.13.0`; it uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. The latest completed Python audit installed 1.45.1 and reported no known vulnerabilities. Re-run CI after the explicit minimum pin, and keep the agent service private regardless.
 3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
 ## Production startup safety gate
 
-The Node server now refuses to start when `NODE_ENV=production` and only the local JSON garage/session store is configured. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
+The Node server refuses to start in production unless `DATABASE_URL` is configured and `GARAGE_POSTGRES_READY=true` explicitly records that migration/import and restore checks have passed. PostgreSQL schema migrations are verified on startup but are not executed by the runtime service by default. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
 
-Before production deployment, implement and verify a durable database-backed garage store plus shared session persistence, including migration, concurrency, backup/restore and restart/scale tests. The current runbook is not a deploy-now checklist while this gate is active.
+Before production deployment, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data and restore a backup. Then enable `GARAGE_POSTGRES_READY=true` on a private canary only, with public traffic disabled, and run auth/session lifecycle, concurrent writes, tenant isolation, restart/scale and model smoke tests. Set the flag on the production service and route traffic only after the canary passes. The current runbook is not a deploy-now checklist while this gate is active.
 
 ## Suggested initial resources
 
@@ -27,6 +27,19 @@ Before production deployment, implement and verify a durable database-backed gar
 
 Enable only Cloud Run, Artifact Registry, Cloud Build, Secret Manager, and Vertex AI if using Gemini through Vertex AI. Document AI is optional. Check Billing > Reports and budgets after deployment; do not assume all AI Studio usage is covered by Google Cloud credits.
 
+## Database migration and import
+
+From a controlled migration environment with the intended Cloud SQL connection configured (do not commit credentials):
+
+```bash
+npx tsx scripts/migrate-postgres.ts
+npx tsx scripts/import-legacy-json.ts --source-dir=./data
+# Review the counts/conflicts, verify a backup, then explicitly apply:
+npx tsx scripts/import-legacy-json.ts --source-dir=./data --apply
+```
+
+The importer does not auto-assign ownerless legacy garage data. Stop on any conflict and reconcile ownership manually. Keep `GARAGE_POSTGRES_READY` unset until row-count/data checks, restore validation and production-like smoke tests pass. The web runtime should not have schema-owner privileges; use a separate migration identity.
+
 ## Build the web container
 
 From the repository root, after selecting the intended project:
@@ -38,7 +51,7 @@ gcloud artifacts repositories create garageai --repository-format=docker --locat
 gcloud builds submit --tag "europe-west1-docker.pkg.dev/$PROJECT_ID/garageai/garageai-web:latest" .
 ```
 
-Do not deploy the web service with real user data until database migration and backup/restore tests are complete.
+Do not deploy the web service with real user data until the Cloud SQL schema migration, JSON import, and backup/restore tests are complete. Configure `DATABASE_URL` through Secret Manager or the approved Cloud SQL connection path. Keep `GARAGE_POSTGRES_READY` unset until cutover validation is complete.
 
 ## Build the private agent container
 

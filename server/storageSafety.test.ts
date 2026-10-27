@@ -13,6 +13,20 @@ describe("production storage safety", () => {
     expect(() => assertProductionStorageSafe({ NODE_ENV: "test" })).not.toThrow();
   });
 
+  it("requires explicit verified PostgreSQL cutover readiness", () => {
+    expect(() => assertProductionStorageSafe({ NODE_ENV: "production", DATABASE_URL: "postgres://configured" })).toThrow(/Production startup blocked/);
+    expect(() => assertProductionStorageSafe({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://configured",
+      GARAGE_POSTGRES_READY: "true",
+    })).not.toThrow();
+    expect(() => assertProductionStorageSafe({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgres://configured",
+      GARAGE_POSTGRES_READY: "false",
+    })).toThrow(/Production startup blocked/);
+  });
+
   it("requires explicit opt-in for a temporary production demo", () => {
     expect(() => assertProductionStorageSafe({
       NODE_ENV: "production",
