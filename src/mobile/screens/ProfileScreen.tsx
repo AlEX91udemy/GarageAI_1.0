@@ -42,7 +42,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   vehicles,
   serviceRecords,
   garageParts,
-  userEmail = "SAMBUR91@gmail.com",
+  userEmail = "",
   onNavigate,
   onOpenBackup,
   onOpenServiceBook,
