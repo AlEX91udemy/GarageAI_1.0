@@ -111,7 +111,6 @@ export class PostgresPersistence {
 
   async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
     this.assertInitialized();
-    const normalizedUsername = username.trim().toLowerCase();
     try {
       return await this.sql.begin(async (tx) => {
         const rows = await tx`
@@ -121,7 +120,7 @@ export class PostgresPersistence {
         `;
         await tx`
           INSERT INTO garageai_garages (user_id, data)
-          VALUES (${id}, ${tx.json(emptyGarage())})
+          VALUES (${id}, ${tx.json(JSON.parse(JSON.stringify(emptyGarage())))})
         `;
         return rows[0] as UserRecord;
       });
