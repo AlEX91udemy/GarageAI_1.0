@@ -58,6 +58,11 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Finding: explicit selections above three agents were rejected, but omitting `agents` selected all five configured agents, bypassing the intended paid-model fan-out limit and potentially multiplying request cost.
 - Remediation on this branch: omitted selections now default to `architect`, `qa`, and `ops`; a regression test verifies the default invokes no more than three agents.
 - Verification: CI must pass before merge. The fix is not yet merged or deployed.
+### HIGH — Agent client followed upstream redirects with credentials attached
+- Location: `server/agentServiceClient.ts`, metadata identity and private agent `fetch()` calls.
+- Finding: the client sent `X-Agents-Token` and, in production, a Cloud Run ID token. Fetch followed redirects by default. A redirect from a misconfigured or compromised upstream could redirect an authenticated request to another origin; custom application headers should never be allowed to follow such a redirect.
+- Remediation on branch `fix/agent-client-redirect-safety`: set `redirect: "error"` for both metadata-server and agent-service requests, and add assertions to the client tests.
+- Verification: CI must pass before merge. No production services or cloud resources were changed.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
