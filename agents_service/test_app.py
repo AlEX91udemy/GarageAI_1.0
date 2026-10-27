@@ -52,13 +52,21 @@ class AgentEndpointAuthTests(unittest.TestCase):
                 'const clientSecret = "sentinel-client-secret-value"\n',
                 encoding="utf-8",
             )
+            config = Path(directory) / "config.yaml"
+            config.write_text(
+                'authToken: "sentinel-mapping-token-value"\n'
+                'clientSecret: "sentinel-mapping-secret-value"\n',
+                encoding="utf-8",
+            )
             with patch("agents_service.app.REPO_ROOT", Path(directory)):
                 snapshot = _repo_snapshot()
 
         self.assertNotIn("sentinel-secret-value", snapshot)
         self.assertNotIn("sentinel-token-value", snapshot)
         self.assertNotIn("sentinel-client-secret-value", snapshot)
-        self.assertGreaterEqual(snapshot.count("[REDACTED]"), 3)
+        self.assertNotIn("sentinel-mapping-token-value", snapshot)
+        self.assertNotIn("sentinel-mapping-secret-value", snapshot)
+        self.assertGreaterEqual(snapshot.count("[REDACTED]"), 5)
     def test_disabled_when_api_token_is_not_configured(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": ""}, clear=False):
             with self.assertRaises(HTTPException) as ctx:
