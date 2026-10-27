@@ -34,6 +34,7 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertIn("--- FILE: server.ts ---", snapshot)
         self.assertIn("import express from", snapshot)
         self.assertIn("function requireAuth", snapshot)
+        self.assertIn("async def run_agents", snapshot)
         self.assertIn("password: string", snapshot)
         included_files = re.findall(r"^--- FILE: (.+) ---$", snapshot, flags=re.MULTILINE)
         self.assertNotIn("data/garage_store.json", included_files)
