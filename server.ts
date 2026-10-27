@@ -53,7 +53,7 @@ import {
   normalizeExtractedVin,
   normalizeRussianPlate,
 } from "./server/documentOcr";
-import { GarageStore, emptyGarage, type GarageData } from "./server/store";
+import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -2025,8 +2025,11 @@ app.post("/api/auth/register", (req, res) => {
     loginAttempts.delete(req.ip || "unknown");
     res.status(201).json({ success: true, session: establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
+    if (error instanceof UserAlreadyExistsError) {
+      return res.status(409).json({ error: error.message });
+    }
     console.error("Registration error:", error);
-    res.status(500).json({ error: "Не удалось создать аккаунт" });
+    return res.status(500).json({ error: "Не удалось создать аккаунт" });
   });
 });
 
