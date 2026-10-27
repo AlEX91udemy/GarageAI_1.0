@@ -43,4 +43,4 @@ $headers = @{ 'X-Agents-Token' = $env:AGENTS_API_TOKEN }
 Invoke-RestMethod http://127.0.0.1:8080/agents/run -Method Post -Headers $headers -ContentType 'application/json' -Body $body
 ```
 
-Можно выбрать отдельных агентов: `architect`, `developer`, `qa`, `ops`.
+Можно выбрать роли: `architect`, `developer`, `qa`, `ops`, `argon_reviewer`.
