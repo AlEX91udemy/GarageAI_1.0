@@ -1,12 +1,12 @@
 # GarageAI Cloud Run deployment runbook
 
-Status: **deployment prepared, not executed**. This document does not claim that any Google Cloud resource has been created.
+Status: **deployment prepared, not executed**. PostgreSQL persistence and the importer are merged, but no Google Cloud resource is claimed to have been created and no real user data has been migrated.
 
 ## Production blockers
 
-1. PostgreSQL persistence is wired behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. A dry-run/transactional JSON importer and disposable-PostgreSQL CI tests are in the branch, but **real-data import/cutover and Cloud SQL smoke tests have not been performed**. Do not serve real user data until ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
+1. PostgreSQL persistence is merged to `main` behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. The dry-run/transactional JSON importer and disposable-PostgreSQL CI tests are merged and passing, but **real-data import/cutover and Cloud SQL smoke tests have not been performed**. Do not serve real user data until ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
 2. **Resolved in the current branch:** the agent service no longer depends on `google-adk==2.13.0`; it uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. The latest completed Python audit installed 1.45.1 and reported no known vulnerabilities. Re-run CI after the explicit minimum pin, and keep the agent service private regardless.
-3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
+3. The Node-to-Python service client is implemented, but actual Cloud Run OIDC/IAM, Secret Manager and live model smoke tests have not been run. Production agent calls must remain disabled until the private Cloud Run service, secrets, IAM and model permissions are verified.
 
 ## Production startup safety gate
 
