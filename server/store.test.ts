@@ -87,4 +87,22 @@ describe("GarageStore tenant isolation and persistence", () => {
 
     expect(store.snapshotForUser("user-a").vehicles).toEqual([{ id: "safe-car" }]);
   });
+
+  it("rejects concurrent duplicate usernames atomically", async () => {
+    const store = makeStore();
+    const results = await Promise.allSettled([
+      store.createUser("Alex", "hash-a", "user-a"),
+      store.createUser("alex", "hash-b", "user-b"),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    expect(rejected?.status).toBe("rejected");
+    if (rejected?.status === "rejected") {
+      expect(rejected.reason).toMatchObject({ name: "UserAlreadyExistsError" });
+    }
+    expect(store.countUsers()).toBe(1);
+    expect(store.getUserByName("ALEX")).toBeDefined();
+  });
+
 });
