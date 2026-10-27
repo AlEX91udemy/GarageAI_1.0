@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from google.genai import types
 from google.adk.agents import LlmAgent
@@ -67,6 +67,27 @@ async def _run_agent(agent: LlmAgent, name: str, prompt: str) -> str:
     return "\n".join(chunks).strip() or "Агент не вернул текстовый ответ."
 
 app = FastAPI(title="GarageAI Agents", version="1.0.0")
+
+# Per-instance backstop. Cloud Run IAM/ingress remains the primary boundary;
+# use a shared limiter if this service is scaled horizontally.
+_AGENT_RATE_WINDOW_SECONDS = 60
+_AGENT_RATE_LIMIT = 5
+_agent_request_windows: dict[str, tuple[float, int]] = {}
+
+
+def _allow_agent_request(client_ip: str, now: float | None = None) -> tuple[bool, int]:
+    import time
+
+    current_time = time.monotonic() if now is None else now
+    window = _agent_request_windows.get(client_ip)
+    if window is None or current_time - window[0] >= _AGENT_RATE_WINDOW_SECONDS:
+        _agent_request_windows[client_ip] = (current_time, 1)
+        return True, 0
+    if window[1] >= _AGENT_RATE_LIMIT:
+        retry_after = max(1, int(_AGENT_RATE_WINDOW_SECONDS - (current_time - window[0])))
+        return False, retry_after
+    _agent_request_windows[client_ip] = (window[0], window[1] + 1)
+    return True, 0
 
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
