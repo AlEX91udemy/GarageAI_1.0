@@ -2012,19 +2012,33 @@ async function requireAuth(req: express.Request, res: express.Response, next: ex
   }
 }
 
-function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+async function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
   const userId = requestContext.getStore()?.userId;
   const clientId = userId ? `user:${userId}` : `ip:${req.ip || "unknown"}`;
   const now = Date.now();
+
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("ai", clientId, AI_RATE_LIMIT, AI_RATE_WINDOW_MS, now);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        return res.status(429).json({ error: "Слишком много AI-запросов. Повторите попытку позже." });
+      }
+      return next();
+    } catch (error) {
+      console.error("AI rate-limit storage failed:", error instanceof Error ? error.message : "unknown error");
+      return res.status(503).json({ error: "AI-сервис временно недоступен." });
+    }
+  }
+
   const current = aiRequestWindows.get(clientId);
   const window = !current || now - current.startedAt >= AI_RATE_WINDOW_MS
     ? { count: 0, startedAt: now }
     : current;
-
   window.count += 1;
   aiRequestWindows.set(clientId, window);
   if (window.count > AI_RATE_LIMIT) {
-    res.setHeader("Retry-After", Math.ceil((window.startedAt + AI_RATE_WINDOW_MS - now) / 1000));
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((window.startedAt + AI_RATE_WINDOW_MS - now) / 1000)));
     return res.status(429).json({ error: "Слишком много AI-запросов. Повторите попытку позже." });
   }
   return next();
@@ -2048,12 +2062,29 @@ function requireGeminiAccess(req: express.Request, res: express.Response, next: 
 // Authentication API: register / login / logout / session
 // ---------------------------------------------------------------------------
 
-function rateLimitedLogin(req: express.Request, res: express.Response): boolean {
+async function rateLimitedLogin(req: express.Request, res: express.Response): Promise<boolean> {
   const clientId = req.ip || "unknown";
   const now = Date.now();
+
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("login", clientId, LOGIN_LIMIT, LOGIN_WINDOW_MS, now);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        res.status(429).json({ error: "Слишком много попыток входа. Повторите позже." });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Login rate-limit storage failed:", error instanceof Error ? error.message : "unknown error");
+      res.status(503).json({ error: "Сервис входа временно недоступен." });
+      return true;
+    }
+  }
+
   const window = loginAttempts.get(clientId);
   if (window && now - window.startedAt < LOGIN_WINDOW_MS && window.count >= LOGIN_LIMIT) {
-    res.setHeader("Retry-After", Math.ceil((window.startedAt + LOGIN_WINDOW_MS - now) / 1000));
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((window.startedAt + LOGIN_WINDOW_MS - now) / 1000)));
     res.status(429).json({ error: "Слишком много попыток входа. Повторите позже." });
     return true;
   }
@@ -2061,6 +2092,18 @@ function rateLimitedLogin(req: express.Request, res: express.Response): boolean 
   current.count += 1;
   loginAttempts.set(clientId, current);
   return false;
+}
+
+async function clearLoginAttempts(clientId: string): Promise<void> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      await store.resetRateLimit("login", clientId);
+    } catch (error) {
+      console.error("Login rate-limit reset failed:", error instanceof Error ? error.message : "unknown error");
+    }
+    return;
+  }
+  loginAttempts.delete(clientId);
 }
 
 async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
@@ -2076,7 +2119,7 @@ async function establishSession(req: express.Request, res: express.Response, use
 }
 
 app.post("/api/auth/register", async (req, res) => {
-  if (rateLimitedLogin(req, res)) return;
+  if (await rateLimitedLogin(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
   try {
@@ -2090,7 +2133,7 @@ app.post("/api/auth/register", async (req, res) => {
   void (async () => {
     const userId = newId("user");
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
-    loginAttempts.delete(req.ip || "unknown");
+    await clearLoginAttempts(req.ip || "unknown");
     res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
