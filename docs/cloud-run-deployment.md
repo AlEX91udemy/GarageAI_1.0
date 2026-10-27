@@ -63,7 +63,7 @@ This is a template, not a completed deployment. Check model availability and res
 
 ## Connect the web service to the private agent service
 
-The Node API exposes an authenticated `POST /api/agents/run` proxy. It validates the task and allowed agent names, applies the Node-side AI rate limit, and calls `POST /agents/run` on the private Python service. In production it obtains a Google ID token from the Cloud Run metadata server and also sends `X-Agents-Token`; neither token is returned to the browser. A separate `AGENTS_ALLOWED_USERNAMES` allowlist restricts paid agent calls to named project administrators; in production an empty allowlist disables the feature.
+The Node API exposes an authenticated `POST /api/agents/run` proxy. It validates the task and allowed agent names, limits each run to at most three selected agents to bound paid model fan-out, applies per-user Node-side rate limits, and calls `POST /agents/run` on the private Python service. In production it obtains a Google ID token from the Cloud Run metadata server and also sends `X-Agents-Token`; neither token is returned to the browser. A separate `AGENTS_ALLOWED_USERNAMES` allowlist restricts paid agent calls to named project administrators; in production an empty allowlist disables the feature.
 
 Do this only after the JSON store/session persistence blockers are resolved and the Python dependency audit is clean:
 
