@@ -6,7 +6,7 @@
 - Current reviewed code: `main` after PostgreSQL persistence, shared rate limits, HTTP integration coverage and agent fan-out cap were merged.
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest pre-merge verification runs)
+## CI results (latest merged security-hardening commit)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **116 passed across 19 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -19,7 +19,7 @@
 - Python dependency audit: **passed after remediation**. The service no longer depends on `google-adk==2.13.0` (whose OpenTelemetry cap prevented upgrading), uses `google-genai` directly, and explicitly requires `opentelemetry-api>=1.45.1,<2`. The verified CI environment installed `opentelemetry-api 1.45.1`; `pip-audit` reported `No known vulnerabilities found`.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
-The combined main state has been validated in two adjacent PR runs: [40490128356](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490128356) passed the PostgreSQL-backed HTTP integration test, and [40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417) passed the agent fan-out regression and Python security audit. These ran against separate PR heads before both merges; a fresh full run against the combined `main` state is still required. The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
+The latest full security and quality workflow [40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384) passed on the security-hardening commit before merge: TypeScript check, unit tests, production build, both container builds, catalog audit, PostgreSQL schema/migration/persistence/importer/smoke/HTTP integration checks, production and full npm dependency audits, Python authentication/redaction tests, Python dependency audit, and Gitleaks all passed. The unit-test log has previously shown connection-refused messages for an optional localhost availability endpoint followed by explicit offline fallback; clean up this noise separately so expected fallback is easier to distinguish from real failures.
 
 ## Findings and remediation
 
@@ -61,14 +61,14 @@ The combined main state has been validated in two adjacent PR runs: [40490128356
 ### HIGH — Agent client followed upstream redirects with credentials attached
 - Location: `server/agentServiceClient.ts`, metadata identity and private agent `fetch()` calls.
 - Finding: the client sent `X-Agents-Token` and, in production, a Cloud Run ID token. Fetch followed redirects by default. A redirect from a misconfigured or compromised upstream could redirect an authenticated request to another origin.
-- Remediation on branch `fix/agent-security-hardening`: set `redirect: "error"` for both metadata-server and agent-service requests, with client-test assertions.
-- Verification: CI must pass before merge. No production services or cloud resources were changed.
+- Remediation merged to `main` in [PR #18](https://github.com/AlEX91udemy/GarageAI_1.0/pull/18): set `redirect: "error"` for both metadata-server and agent-service requests, with client-test assertions.
+- Verification: the full CI run [40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384) passed. No production services or cloud resources were changed.
 
 ### MEDIUM — Agent source-snapshot redaction missed generic secret/token variable names
 - Location: `agents_service/app.py`, `_repo_snapshot()`.
 - Finding: the snapshot redaction covered API keys, passwords, and several named credential patterns, but not generic assignments such as `secret`, `authToken`, or `clientSecret`. If accidentally committed, these could be forwarded to a paid model in the source snapshot.
-- Remediation on branch `fix/agent-security-hardening`: extend assignment and mapping-key redaction to generic secret/token/credential names and add sentinel-based regression coverage.
-- Verification: CI must pass before merge. This defense-in-depth does not replace secret scanning or credential rotation.
+- Remediation merged to `main` in [PR #18](https://github.com/AlEX91udemy/GarageAI_1.0/pull/18): extend assignment and mapping-key redaction to generic secret/token/credential names and add sentinel-based regression coverage.
+- Verification: the Python regression tests and full CI run [40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384) passed. This defense-in-depth does not replace secret scanning or credential rotation.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
@@ -85,7 +85,7 @@ The combined main state has been validated in two adjacent PR runs: [40490128356
 - The in-process write queue is only a local optimization; PostgreSQL revision checks and database transactions are the cross-instance concurrency controls.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
 - Runtime garage data is absent from the current tree, but historical Git copies may remain. Determine whether those records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
-- This documentation PR triggers a fresh full CI run against the combined latest `main` state; record its result before release.
+- The full CI run after the security-hardening changes passed before PR #18 was merged. This is code-level CI evidence only; the real Cloud Run/Vertex and live Cloud SQL cutover checks listed above remain outstanding.
 
 ## Release decision
 
