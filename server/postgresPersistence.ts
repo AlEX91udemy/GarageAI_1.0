@@ -70,7 +70,7 @@ export class PostgresPersistence {
       // Production runtime identities should not need DDL privileges. Apply
       // migrations from a controlled one-off job before deploying the revision.
       const rows = await this.sql`
-        SELECT version FROM garageai_schema_migrations WHERE version = 1 LIMIT 1
+        SELECT version FROM garageai_schema_migrations WHERE version = 2 LIMIT 1
       `;
       if (!rows[0]) throw new Error("PostgreSQL schema migration 001 is missing; run the controlled migration job first");
     }
