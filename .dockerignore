@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+dist
+coverage
+.venv
+.venv-adk
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+data
+*.log
+.DS_Store
