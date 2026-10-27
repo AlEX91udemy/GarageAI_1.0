@@ -175,9 +175,9 @@ export class PostgresPersistence {
     };
   }
 
-  async putEmailLoginCode(email: string, userId: string, codeHash: string, expiresAtMs: number, sentAtMs: number): Promise<void> {
+  async putEmailLoginCode(email: string, userId: string, codeHash: string, expiresAtMs: number, sentAtMs: number, cooldownMs: number): Promise<boolean> {
     this.assertInitialized();
-    await this.sql`
+    const rows = await this.sql`
       INSERT INTO garageai_email_login_codes (email_normalized, user_id, code_hash, expires_at_ms, attempts, sent_at_ms)
       VALUES (${email.trim().toLowerCase()}, ${userId}, ${codeHash}, ${expiresAtMs}, 0, ${sentAtMs})
       ON CONFLICT (email_normalized) DO UPDATE SET
@@ -186,7 +186,11 @@ export class PostgresPersistence {
         expires_at_ms = EXCLUDED.expires_at_ms,
         attempts = 0,
         sent_at_ms = EXCLUDED.sent_at_ms
+      WHERE garageai_email_login_codes.sent_at_ms <= ${sentAtMs - cooldownMs}
+         OR garageai_email_login_codes.expires_at_ms <= ${sentAtMs}
+      RETURNING email_normalized
     `;
+    return rows.length > 0;
   }
 
   async deleteEmailLoginCode(email: string): Promise<void> {
