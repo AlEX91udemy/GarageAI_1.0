@@ -1879,6 +1879,9 @@ const rateLimitCleanupTimer = setInterval(() => {
       loginAttempts.delete(key);
     }
   }
+  for (const [email, challenge] of localEmailLoginCodes) {
+    if (challenge.expiresAtMs <= now) localEmailLoginCodes.delete(email);
+  }
   if (store instanceof PostgresPersistence) {
     void Promise.all([
       store.deleteExpiredSessions(now),
@@ -2210,6 +2213,9 @@ app.post("/api/auth/email-code/request", async (req, res) => {
   if (pepper.length < 32) {
     return res.status(503).json({ error: "Email-вход не настроен: требуется EMAIL_CODE_PEPPER." });
   }
+  if (!process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+    return res.status(503).json({ error: "Не настроена отправка писем: задайте RESEND_API_KEY и EMAIL_FROM." });
+  }
 
   const now = Date.now();
   try {
@@ -2232,6 +2238,11 @@ app.post("/api/auth/email-code/request", async (req, res) => {
     await sendEmailLoginCode(email, code);
     return res.status(202).json({ success: true, message: "Код входа отправлен на почту." });
   } catch (error) {
+    if (store instanceof PostgresPersistence) {
+      await store.deleteEmailLoginCode(email).catch(() => undefined);
+    } else {
+      localEmailLoginCodes.delete(email);
+    }
     console.error("Email login code delivery failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось отправить код. Проверьте настройки почтового сервиса." });
   }
@@ -2257,7 +2268,7 @@ app.post("/api/auth/email-code/verify", async (req, res) => {
       const record = localEmailLoginCodes.get(email);
       const now = Date.now();
       if (record && record.expiresAtMs > now && record.attempts < EMAIL_LOGIN_CODE_MAX_ATTEMPTS) {
-        if (record.codeHash === codeHash) {
+        if (crypto.timingSafeEqual(Buffer.from(record.codeHash), Buffer.from(codeHash))) {
           userId = record.userId;
           localEmailLoginCodes.delete(email);
         } else {
