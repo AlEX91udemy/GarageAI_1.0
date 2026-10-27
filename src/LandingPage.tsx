@@ -208,28 +208,28 @@ export function LandingPage() {
               </p>
 
               {/* 3 коротких факта */}
-              <div className="mt-7 grid grid-cols-3 gap-2.5 border-t border-[#E2E8F0] pt-5 dark:border-[#243044]">
-                <div>
+              <div className="mt-7 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
                   <div className="font-mono text-lg font-extrabold text-[#0F172A] dark:text-[#F8FAFC]">
                     OCR + AI
                   </div>
-                  <div className="text-xs text-[#536171] dark:text-[#94A3B8]">
+                  <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
                     Читает работы, цены и артикулы
                   </div>
                 </div>
-                <div>
+                <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
                   <div className="font-mono text-lg font-extrabold text-[#10B981]">
                     1 клик
                   </div>
-                  <div className="text-xs text-[#536171] dark:text-[#94A3B8]">
+                  <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
                     Сохранение в историю авто
                   </div>
                 </div>
-                <div>
+                <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
                   <div className="font-mono text-lg font-extrabold text-[#3B82F6]">
                     PDF
                   </div>
-                  <div className="text-xs text-[#536171] dark:text-[#94A3B8]">
+                  <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
                     Готовая сервисная книжка
                   </div>
                 </div>
