@@ -31,6 +31,8 @@ class AgentEndpointAuthTests(unittest.TestCase):
         snapshot = _repo_snapshot()
         self.assertIn("--- FILE: server.ts ---", snapshot)
         self.assertIn("import express from", snapshot)
+        self.assertIn("function requireAuth", snapshot)
+        self.assertIn("password: string", snapshot)
         included_files = re.findall(r"^--- FILE: (.+) ---$", snapshot, flags=re.MULTILINE)\n        self.assertNotIn("data/garage_store.json", included_files)
         self.assertNotIn("package-lock.json", snapshot)
         self.assertLessEqual(len(snapshot), 46000)
