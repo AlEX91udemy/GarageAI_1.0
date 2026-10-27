@@ -5,7 +5,7 @@
 - Review branch: `audit/security-hardening-2026-10-27`
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest completed run 40467357010; explicit telemetry pin is re-running)
+## CI results (latest completed code run 40467458312)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **116 passed across 19 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -57,8 +57,8 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed run [40467357010](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467357010) passed after migrating from ADK to Google GenAI SDK. The explicit `opentelemetry-api>=1.45.1,<2` pin was then added and is being revalidated in [run 40467458312](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467458312).
-- Remediation: remove the ADK dependency instead of bypassing its version constraints. The current agent runner calls the Google GenAI SDK directly and pins a patched OpenTelemetry minimum. The latest CI run verified the Python audit passed with `opentelemetry-api 1.45.1`; wait for the run including the explicit minimum constraint before treating the whole pipeline as green.
+- Latest completed run [40467458312](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40467458312) passed after migrating from ADK to Google GenAI SDK and adding the explicit `opentelemetry-api>=1.45.1,<2` pin. All three jobs passed: Python syntax/tests/dependency audit, Node typecheck/tests/build and both Docker builds/npm audits, plus Gitleaks.
+- Remediation: remove the ADK dependency instead of bypassing its version constraints. The current agent runner calls the Google GenAI SDK directly and pins a patched OpenTelemetry minimum. The latest code CI run verified the Python audit passed with `opentelemetry-api 1.45.1`; the overall workflow also passed.
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests before production.
 - The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling. A new startup guard now blocks `NODE_ENV=production` by default until that migration is complete; `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
 - The in-process per-user write queue does not coordinate separate application instances.
