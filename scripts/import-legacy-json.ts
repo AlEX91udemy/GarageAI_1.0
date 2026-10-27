@@ -265,7 +265,7 @@ async function main() {
   const apply = args.includes("--apply");
   const sourceArg = args.find((arg) => arg.startsWith("--source-dir="));
   const sourceDir = path.resolve(sourceArg ? sourceArg.slice("--source-dir=".length) : "data");
-  const db = postgres(connectionString, { max: 1, connect_timeout: 10, idle_timeout: 5, prepare: false });
+  const db = postgres(connectionString, { max: 1, connect_timeout: 10, idle_timeout: 5, prepare: false, ssl: process.env.DATABASE_SSL === "true" ? "require" : false });
   try {
     const bundle = await loadBundle(sourceDir);
     const summary = await inspectConflicts(db, bundle);
