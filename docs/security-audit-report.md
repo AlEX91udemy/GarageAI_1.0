@@ -5,7 +5,7 @@
 - Review branch: `audit/security-hardening-2026-10-27`
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest completed run 40465140191)
+## CI results (latest completed run 40465621558)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **116 passed across 19 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -15,7 +15,7 @@
 - Full npm dependency audit: **0 vulnerabilities**.
 - Web and private-agent Docker image builds: passed; the web runtime image now runs as the non-root `node` user with only `/app/data` writable.
 - Gitleaks scan: passed; no leaks detected in the scanned repository history/range.
-- Python dependency audit: **failed**; `opentelemetry-api 1.44.0` is flagged for `CVE-2026-114603`, fixed in `1.45.1`. An attempted direct minimum-version constraint conflicts with the dependency constraints of `google-adk==2.13.0`, so it was reverted rather than leaving an un-installable environment. The Python audit remains a blocking failure until upstream ADK constraints are updated or a tested compatible upgrade path is established. As defense in depth, the private agent container now forces Uvicorn h11 with an 8 KiB incomplete-event limit to constrain malformed/oversized request headers; this does not remove the vulnerable package or satisfy pip-audit.
+- Python dependency audit: **failed**; `opentelemetry-api 1.44.0` is flagged for `CVE-2026-114603`, fixed in `1.45.1`. An attempted direct minimum-version constraint conflicts with the dependency constraints of `google-adk==2.13.0`, so it was reverted rather than leaving an un-installable environment. The Python audit remains a blocking failure until upstream ADK constraints are updated or a tested compatible upgrade path is established. The latest commit after that run also forces Uvicorn h11 with an 8 KiB incomplete-event limit as defense in depth; that specific change still needs a CI rerun. As defense in depth, the private agent container now forces Uvicorn h11 with an 8 KiB incomplete-event limit to constrain malformed/oversized request headers; this does not remove the vulnerable package or satisfy pip-audit.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
 The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
@@ -57,7 +57,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed run before storage guard [40464203621](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40464203621): 113 Node tests across 18 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 11 Python tests passed. The production storage guard and agent web panel are included in the validated Node run. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
+- Latest completed run [40465621558](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40465621558): 116 Node tests across 19 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 11 Python tests passed. The production storage guard and agent web panel are included in the validated Node run. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
 - The latest published Google ADK release `2.13.0` and current upstream `main` still constrain OpenTelemetry API/SDK to `<=1.44`, while the fix is in `1.45.1`. The upstream repository metadata was checked on 2026-10-27; no compatible published ADK release was found. Keep the audit blocking. Do not force incompatible dependencies, patch around resolver constraints, or suppress the vulnerability. Wait for a compatible upstream release or separately plan a migration away from ADK. [Google ADK releases](https://github.com/google/adk-python/releases) and [OpenTelemetry fix](https://github.com/open-telemetry/opentelemetry-python/releases/tag/v1.45.1).
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests after the dependency CVE is resolved.
 - The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling. A new startup guard now blocks `NODE_ENV=production` by default until that migration is complete; `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
