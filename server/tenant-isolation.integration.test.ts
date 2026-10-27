@@ -387,6 +387,13 @@ describe("HTTP tenant isolation", () => {
     });
     expect(emptySelection.status).toBe(400);
 
+    const tooManyAgents = await request(owner, "/api/agents/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "Review this project", agents: ["architect", "developer", "qa", "ops"] }),
+    });
+    expect(tooManyAgents.status).toBe(400);
+
     const unknownAgent = await request(owner, "/api/agents/run", {
       method: "POST",
       headers: { "content-type": "application/json" },
