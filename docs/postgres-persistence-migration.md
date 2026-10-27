@@ -36,6 +36,29 @@ The import tool must be dry-run by default and idempotent. It must:
 7. Verify row counts and per-user canonical data digests before cutover.
 8. Keep source files read-only until the database has passed restart, multi-instance, isolation and backup/restore tests. Never print secrets or full record contents.
 
+## Legacy JSON importer
+
+File: `scripts/import-legacy-json.ts`
+
+The importer is dry-run by default and requires `--apply` for writes. It reads `users.json`, `garage_store.json`, and optional `sessions.json` from `data/` (override with `--source-dir=/path/to/data`). It requires migration 001 to already exist.
+
+Example sequence:
+
+```bash
+# 1. Run schema migration from a controlled environment.
+DATABASE_URL="$DATABASE_URL" npx tsx scripts/migrate-postgres.ts
+
+# 2. Inspect counts/conflicts; this performs no row writes.
+DATABASE_URL="$DATABASE_URL" npx tsx scripts/import-legacy-json.ts --source-dir=./data
+
+# 3. After reviewing a verified backup and a clean dry run, apply transactionally.
+DATABASE_URL="$DATABASE_URL" npx tsx scripts/import-legacy-json.ts --source-dir=./data --apply
+```
+
+The importer refuses conflicting user IDs, normalized usernames, garage contents, or session token hashes and wraps writes in one transaction. It preserves scrypt password hashes and imports only unexpired, non-revoked sessions. Garage/session records whose owner is absent from the imported user list are skipped and counted; ownerless root-level legacy garage data is never assigned automatically. It prints counts only, not account hashes, session tokens, CSRF secrets, VINs, receipts, or garage payloads.
+
+Do not set `GARAGE_POSTGRES_READY=true` until the import has been reviewed, a backup restore has been demonstrated, and application smoke tests pass. If any conflict is reported, stop and reconcile ownership/data manually; do not delete destination records to force an import.
+
 Do not run a migration against production data until the tool and its tests exist and a backup restore has been demonstrated.
 
 ## Required application changes before production
