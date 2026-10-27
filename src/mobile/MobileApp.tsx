@@ -924,7 +924,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         } ${
           themeMode === "dark"
             ? "bg-[#0d131d] text-white"
-            : "bg-[#F4F5F8] text-[#0F172A]"
+            : "bg-white text-[#0F172A]"
         } ${
           !isWeb && deviceFrameMode === "frame"
             ? "sm:flex-none sm:rounded-[44px] sm:border-[8px] sm:border-neutral-800 sm:h-[840px] sm:max-h-[calc(100vh-60px)] sm:min-h-[640px] sm:ring-1 sm:ring-neutral-700"
@@ -937,7 +937,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           className={`w-full pt-3 pb-1 px-7 flex items-center justify-between z-30 pointer-events-none transition-colors ${
             themeMode === "dark"
               ? "bg-[#0d131d] text-slate-300"
-              : "bg-[#F4F5F8] text-slate-700"
+              : "bg-white text-slate-700"
           }`}
         >
           <div className="text-[12px] font-black font-mono tracking-tight">
@@ -962,7 +962,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           className={`flex-1 overflow-y-auto no-scrollbar relative flex flex-col transition-colors ${
             themeMode === "dark"
               ? "bg-[#0d131d] text-white"
-              : "bg-[#F4F5F8] text-[#0F172A]"
+              : "bg-white text-[#0F172A]"
           }`}
         >
           {renderScreen()}
