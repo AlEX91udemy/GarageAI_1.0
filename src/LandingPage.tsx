@@ -638,38 +638,6 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-        {/* =================================================================
-            ФИНАЛЬНЫЙ ПЕРЕХОД В ПРИЛОЖЕНИЕ
-           ================================================================= */}
-        <section className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-10 dark:border-[#243044] dark:bg-[#17202E]">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <motion.div
-              initial={{ opacity: 0, y: 32, scale: 0.98 }}
-              whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ once: false, amount: 0.35 }}
-              transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
-              className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]"
-            >
-              <div>
-                <h2 className="text-xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
-                  Ведите историю своего автомобиля в GarageAI
-                </h2>
-                <p className="mt-1 text-xs sm:text-sm text-[#536171] dark:text-[#94A3B8]">
-                  Добавьте авто, сканируйте заказ-наряды СТО и чеки АЗС и контролируйте расходы и регламент ТО в одном месте.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 shrink-0">
-                <a
-                  href="/app"
-                  className="garage-btn-anim inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#991B1B]"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                  <span>Открыть веб-приложение</span>
-                </a>
-              </div>
-            </motion.div>
-          </div>
-        </section>
       </main>
 
     </div>
