@@ -205,6 +205,9 @@ export async function fetchGarageData(): Promise<FullGarageData> {
 export async function checkBackendHealth(): Promise<{
   status: string;
   hasApiKey: boolean;
+  hasAiConfigured: boolean;
+  hasGeminiConfigured: boolean;
+  vertexAiEnabled: boolean;
   vehiclesCount: number;
   serviceRecordsCount: number;
 }> {
