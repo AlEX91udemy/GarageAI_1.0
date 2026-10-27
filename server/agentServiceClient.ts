@@ -123,6 +123,7 @@ export async function runAgentService(
       identityResponse = await fetchImpl(metadataUrl, {
         headers: { "metadata-flavor": "Google" },
         signal: AbortSignal.timeout(5000),
+        redirect: "error",
       });
     } catch {
       throw new AgentServiceClientError("Could not obtain Cloud Run service identity.", 502);
@@ -144,6 +145,8 @@ export async function runAgentService(
       headers,
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(120000),
+      // Never forward the app token or Cloud Run identity to a redirect target.
+      redirect: "error",
     });
   } catch (error) {
     if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
