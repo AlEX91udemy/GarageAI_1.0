@@ -3,7 +3,7 @@ import { createHmac, randomInt } from "node:crypto";
 export function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
-  return email.length <= 254 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) ? email : null;
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
 }
 
 export function generateEmailCode(): string {
@@ -11,5 +11,5 @@ export function generateEmailCode(): string {
 }
 
 export function hashEmailCode(challengeId: string, code: string, secret: string): string {
-  return createHmac("sha256", secret).update(`${challengeId}:${code}`).digest("hex");
+  return createHmac("sha256", secret).update(\`${challengeId}:${code}\`).digest("hex");
 }
