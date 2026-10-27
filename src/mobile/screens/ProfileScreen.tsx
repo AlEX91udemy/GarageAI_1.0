@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode } from "../../api";
+import { register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
