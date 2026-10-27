@@ -15,6 +15,7 @@ let authSessionActive = false;
 
 export interface AuthSession {
   username: string;
+  email?: string;
   csrfToken: string;
 }
 
