@@ -84,6 +84,8 @@ describe("HTTP tenant isolation", () => {
           GARAGE_SESSIONS_FILE: path.join(tempDir, "sessions.json"),
           GEMINI_API_KEY: "",
           OPENROUTER_API_KEY: "",
+          AGENTS_SERVICE_URL: "https://garageai-agents-test.example",
+          AGENTS_API_TOKEN: "integration-test-token",
           ALLOWED_ORIGINS: baseUrl,
         },
         stdio: ["pipe", "pipe", "pipe"],
@@ -338,31 +340,20 @@ describe("HTTP tenant isolation", () => {
   });
 
   it("validates agent proxy requests before contacting the private service", async () => {
-    const priorUrl = process.env.AGENTS_SERVICE_URL;
-    const priorToken = process.env.AGENTS_API_TOKEN;
-    process.env.AGENTS_SERVICE_URL = "http://127.0.0.1:8081";
-    process.env.AGENTS_API_TOKEN = "integration-test-token";
-    try {
-      const owner = await register("agent-proxy-validation");
-      const shortTask = await request(owner, "/api/agents/run", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "x" }),
-      });
-      expect(shortTask.status).toBe(400);
+    const owner = await register("agent-proxy-validation");
+    const shortTask = await request(owner, "/api/agents/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "x" }),
+    });
+    expect(shortTask.status).toBe(400);
 
-      const unknownAgent = await request(owner, "/api/agents/run", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: "Review this project", agents: ["unknown-agent"] }),
-      });
-      expect(unknownAgent.status).toBe(400);
-    } finally {
-      if (priorUrl === undefined) delete process.env.AGENTS_SERVICE_URL;
-      else process.env.AGENTS_SERVICE_URL = priorUrl;
-      if (priorToken === undefined) delete process.env.AGENTS_API_TOKEN;
-      else process.env.AGENTS_API_TOKEN = priorToken;
-    }
+    const unknownAgent = await request(owner, "/api/agents/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "Review this project", agents: ["unknown-agent"] }),
+    });
+    expect(unknownAgent.status).toBe(400);
   });
 
   it("returns conflict when two registrations race for the same username", async () => {
