@@ -1823,7 +1823,8 @@ function loadSessions(): void {
   }
 }
 
-function persistSessions(): void {
+async function persistSessions(): Promise<void> {
+  if (store instanceof PostgresPersistence) return;
   try {
     fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
     const now = Date.now();
@@ -1854,12 +1855,18 @@ const rateLimitCleanupTimer = setInterval(() => {
       loginAttempts.delete(key);
     }
   }
-  for (const [key, session] of sessions) {
-    if (session.expiresAt <= now || (session.revokedAt && session.revokedAt <= now)) {
-      sessions.delete(key);
+  if (store instanceof PostgresPersistence) {
+    void store.deleteExpiredSessions(now).catch((error) => {
+      console.error("Session cleanup failed:", error instanceof Error ? error.message : "unknown error");
+    });
+  } else {
+    for (const [key, session] of sessions) {
+      if (session.expiresAt <= now || (session.revokedAt && session.revokedAt <= now)) {
+        sessions.delete(key);
+      }
     }
+    void persistSessions();
   }
-  persistSessions();
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 // Не удерживаем процесс живым только ради очистки таймеров
 rateLimitCleanupTimer.unref?.();
@@ -1887,10 +1894,13 @@ function clearSessionCookie(): string {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`;
 }
 
-function getSession(req: express.Request): SessionRecord | null {
+async function getSession(req: express.Request): Promise<SessionRecord | null> {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (!token) return null;
-  const record = sessions.get(hashToken(token));
+  const tokenHash = hashToken(token);
+  const record = store instanceof PostgresPersistence
+    ? await store.getSession(tokenHash)
+    : sessions.get(tokenHash);
   if (!record || record.revokedAt || record.expiresAt <= Date.now()) return null;
   return record;
 }
@@ -2041,10 +2051,14 @@ function rateLimitedLogin(req: express.Request, res: express.Response): boolean 
   return false;
 }
 
-function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
   const { record, token } = createSession(userId);
-  sessions.set(record.tokenHash, record);
-  persistSessions();
+  if (store instanceof PostgresPersistence) {
+    await store.putSession(record);
+  } else {
+    sessions.set(record.tokenHash, record);
+    await persistSessions();
+  }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
   return { username, csrfToken: record.csrfSecret };
 }
