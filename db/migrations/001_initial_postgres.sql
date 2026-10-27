@@ -23,8 +23,12 @@ CREATE TABLE IF NOT EXISTS garageai_garages (
   user_id text PRIMARY KEY REFERENCES garageai_users(id) ON DELETE CASCADE,
   data jsonb NOT NULL,
   updated_at timestamptz NOT NULL DEFAULT now(),
+  revision bigint NOT NULL DEFAULT 0,
+  CONSTRAINT garageai_garages_revision_nonnegative CHECK (revision >= 0),
   CONSTRAINT garageai_garages_data_object CHECK (jsonb_typeof(data) = 'object')
 );
+
+ALTER TABLE garageai_garages ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS garageai_sessions (
   token_hash char(64) PRIMARY KEY,
