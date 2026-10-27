@@ -1860,7 +1860,7 @@ async function persistSessions(): Promise<void> {
   }
 }
 
-loadSessions();
+if (!(store instanceof PostgresPersistence)) loadSessions();
 
 // Периодическая очистка устаревших окон rate-limit, чтобы Map не росла бесконечно
 // при работе сервера под нагрузкой с разных IP.
@@ -1877,8 +1877,11 @@ const rateLimitCleanupTimer = setInterval(() => {
     }
   }
   if (store instanceof PostgresPersistence) {
-    void store.deleteExpiredSessions(now).catch((error) => {
-      console.error("Session cleanup failed:", error instanceof Error ? error.message : "unknown error");
+    void Promise.all([
+      store.deleteExpiredSessions(now),
+      store.deleteOldRateLimits(now),
+    ]).catch((error) => {
+      console.error("PostgreSQL cleanup failed:", error instanceof Error ? error.message : "unknown error");
     });
   } else {
     for (const [key, session] of sessions) {
