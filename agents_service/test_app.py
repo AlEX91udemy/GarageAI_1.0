@@ -78,6 +78,42 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 429)
         self.assertIn("Retry-After", ctx.exception.headers)
 
+    def test_orchestrator_runs_selected_agents_with_source_snapshot(self):
+        calls = []
+
+        async def fake_run_agent(agent, name, prompt):
+            calls.append((name, prompt))
+            return f"{name} result"
+
+        with patch.dict(
+            os.environ,
+            {
+                "AGENTS_API_TOKEN": "expected-secret",
+                "GEMINI_API_KEY": "",
+                "GOOGLE_GENAI_USE_VERTEXAI": "true",
+            },
+            clear=False,
+        ), patch("agents_service.app._build_agents", return_value={
+            "architect": object(),
+            "qa": object(),
+        }), patch("agents_service.app._run_agent", side_effect=fake_run_agent):
+            response = asyncio.run(
+                run_agents(
+                    AgentRequest(task="Audit tenant isolation", agents=["architect", "qa"]),
+                    make_request("192.0.2.2"),
+                    "expected-secret",
+                )
+            )
+
+        self.assertEqual(response.task, "Audit tenant isolation")
+        self.assertEqual(response.results, {
+            "architect": "architect result",
+            "qa": "qa result",
+        })
+        self.assertEqual({name for name, _ in calls}, {"architect", "qa"})
+        self.assertTrue(all("Audit tenant isolation" in prompt for _, prompt in calls))
+        self.assertTrue(all("--- FILE: server.ts ---" in prompt for _, prompt in calls))
+
     def test_valid_token_reaches_provider_configuration_check(self):
         with patch.dict(
             os.environ,
