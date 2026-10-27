@@ -30,6 +30,20 @@ CREATE TABLE IF NOT EXISTS garageai_garages (
 
 ALTER TABLE garageai_garages ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0;
 
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'garageai_garages_revision_nonnegative'
+      AND conrelid = 'garageai_garages'::regclass
+  ) THEN
+    ALTER TABLE garageai_garages
+      ADD CONSTRAINT garageai_garages_revision_nonnegative CHECK (revision >= 0);
+  END IF;
+END
+$;
+
 CREATE TABLE IF NOT EXISTS garageai_sessions (
   token_hash char(64) PRIMARY KEY,
   user_id text NOT NULL REFERENCES garageai_users(id) ON DELETE CASCADE,
