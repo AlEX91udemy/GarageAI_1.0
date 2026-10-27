@@ -23,12 +23,13 @@ describe("private agent service client", () => {
       AGENTS_SERVICE_URL: "http://127.0.0.1:8081",
       AGENTS_API_TOKEN: "local-test-token",
       NODE_ENV: "development",
-    }, { task: "Check the API", agents: ["qa"] }, fetchMock);
+    }, { task: "Check the API", agents: ["qa"] }, fetchMock, "user-123");
 
     expect(response).toEqual({ task: "Check the API", results: { qa: "No blocking defects found." } });
     expect(calls).toHaveLength(1);
     expect(calls[0].url).toBe("http://127.0.0.1:8081/agents/run");
     expect((calls[0].init?.headers as Record<string, string>)["x-agents-token"]).toBe("local-test-token");
+    expect((calls[0].init?.headers as Record<string, string>)["x-agents-caller"]).toBe("user-123");
     expect((calls[0].init?.headers as Record<string, string>).authorization).toBeUndefined();
   });
 
