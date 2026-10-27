@@ -112,7 +112,7 @@ def _repo_snapshot() -> str:
             content = "\n\n[... targeted security-relevant excerpts ...]\n\n".join(excerpts)
         content = secret_assignment.sub(lambda match: (match.group(1) or match.group(3) or "") + "[REDACTED]", content)
         remaining = max_total_chars - total_chars
-        per_file_limit = 10000 if relative == "server.ts" else max_file_chars
+        per_file_limit = 10000 if relative == "server.ts" else 12000 if relative == "agents_service/app.py" else max_file_chars
         content = content[: min(per_file_limit, remaining)]
         if not content.strip():
             continue
