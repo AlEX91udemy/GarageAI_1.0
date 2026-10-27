@@ -33,9 +33,9 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Remediation on this branch: POST now fails closed with 503 if `AGENTS_API_TOKEN` is not configured and returns 401 unless the `X-Agents-Token` header matches using constant-time comparison. README documents local setup and recommends Cloud Run IAM/Secret Manager.
 - Remediation on this branch: also adds a per-instance limit of five authorized requests per minute per client IP and automated tests for missing/invalid tokens and rate limiting. Remaining risk: this limiter is in-memory and can be bypassed across multiple instances; Cloud Run ingress/IAM remains the primary boundary. Configure the token as a secret and restrict the service to trusted callers before production.
 
-### HIGH — Tenant isolation needs route-level integration tests
+### HIGH — Tenant isolation coverage is partial
 - Location: `server.ts` and protected CRUD routes.
-- Static review cannot prove every route scopes reads, writes, backups and deletes to the authenticated user. Add two-user tests across all resource types and guest mode before production sign-off.
+- Added `server/tenant-isolation.integration.test.ts` with two-user checks for vehicle and service-record reads, updates, deletes, and export, plus anonymous denial. Store-level tests cover per-user state, concurrent writes and reload. Coverage remains incomplete for other resource families, import/restore semantics and guest mode; do not treat the current tests as proof of all-route isolation.
 
 ### MEDIUM — JSON persistence is not safe for horizontal scaling
 - Location: `server/store.ts`.
@@ -54,7 +54,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Confirmed CI run 40459339384: TypeScript check passed; **90 tests passed across 16 files**, including the new two-user HTTP integration tests and store tests; production build, catalog audit, both npm audits, and Gitleaks passed. Python syntax and all six agent endpoint/source-snapshot tests passed. The Python dependency audit remains the only failure: `opentelemetry-api 1.44.0` / `CVE-2026-114603`. A follow-up run (40459432568) was queued to validate the added Docker container builds; its result is not yet confirmed.
+- Confirmed CI run 40459339384: TypeScript check passed; **90 tests passed across 16 files**, including the HTTP integration and store tests; production build, catalog audit, both npm audits, and Gitleaks passed. Python syntax and the agent API tests passed. The Python dependency audit fails on `opentelemetry-api 1.44.0` / `CVE-2026-114603`. Follow-up runs were started after adding Docker build jobs and a mocked orchestration test; check the Actions page for their latest result before release.
 - Added `server/store.test.ts` for multi-user store isolation, serialized concurrent writes, persistence reload, and defensive copying.
 - Added `server/tenant-isolation.integration.test.ts` to start the HTTP server with temporary storage and verify anonymous denial plus cross-user vehicle and service-record read/update/delete/export isolation. It does not yet cover every resource family, restore/import semantics, or client-side guest mode. This is intended coverage and must be validated by CI before treating it as passing.
 - Resolve the `opentelemetry-api` finding without breaking `google-adk==2.13.0`; keep Python audit blocking and do not force an incompatible dependency or suppress the finding.
