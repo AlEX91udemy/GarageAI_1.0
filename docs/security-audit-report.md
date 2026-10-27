@@ -55,11 +55,11 @@ The unit-test log contains connection-refused messages for an optional localhost
 ## Next verification
 
 - Resolve the `opentelemetry-api 1.44.0` vulnerability without breaking `google-adk==2.13.0` dependency resolution; keep Python audit blocking until resolved.
-- Re-run CI after the latest changes; the prior run exposed a test/signature mismatch that was corrected afterward.
+- Python syntax validation and all six agent endpoint/source-snapshot tests passed in the latest observed run; the dependency audit remains unresolved.
 - Verify rate-limit behavior under the actual Cloud Run proxy configuration.
 - Resolve the upstream OpenTelemetry version cap without forcing an incompatible dependency set.
 - Keep npm and Python dependency audits blocking.
-- Add tests for agent authentication and tenant isolation.
+- Add route-level integration tests for two-user tenant isolation across CRUD, backup/restore and guest-mode behavior.
 - Confirm no live data is required from the tracked JSON file before merging.
 - Treat historical data exposure as unresolved until Git history and deployment copies are assessed.
 
