@@ -54,6 +54,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
+  const [sessionEmail, setSessionEmail] = React.useState<string | null>(null);
   const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
   const [authUsername, setAuthUsername] = React.useState("");
   const [authEmail, setAuthEmail] = React.useState("");
@@ -69,6 +70,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     restoreSession().then((session) => {
       setIsAuthenticated(Boolean(session));
       setSessionUsername(session?.username ?? null);
+      setSessionEmail(session?.email ?? null);
     });
   }, []);
 
@@ -96,6 +98,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         : await register(authUsername.trim(), authPassword, authEmail.trim());
       setIsAuthenticated(true);
       setSessionUsername(session.username);
+      setSessionEmail(session.email ?? null);
       setAuthMode(null);
       setAuthPassword("");
       setAuthCode("");
