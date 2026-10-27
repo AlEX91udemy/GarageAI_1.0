@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Wrench,
   Fuel,
@@ -23,10 +23,16 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
   carName,
 }) => {
   const sheetRef = useModalFocus(onClose, isOpen);
+  const [showScannerChoices, setShowScannerChoices] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setShowScannerChoices(false);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const actions: Array<{
-    id: QuickActionType;
+    id: QuickActionType | "scanner";
     label: string;
     sublabel: string;
     icon: React.ReactNode;
@@ -34,17 +40,9 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
     border: string;
   }> = [
     {
-      id: "scan_barcode",
-      label: "Сканер деталей / VIN",
-      sublabel: "Камера: штрихкод запчасти, QR или VIN",
-      icon: <ScanBarcode className="w-5 h-5 text-brand-strong" />,
-      bg: "bg-brand-soft",
-      border: "border-brand-soft-strong",
-    },
-    {
-      id: "scan_receipt",
-      label: "Сканировать чек",
-      sublabel: "AI OCR распознавание заказ-наряда",
+      id: "scanner",
+      label: "Сканирование",
+      sublabel: "Выберите: чек или деталь / VIN",
       icon: <ScanLine className="w-5 h-5 text-brand-strong" />,
       bg: "bg-brand-soft",
       border: "border-brand-soft-strong",
@@ -110,12 +108,63 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
           </button>
         </div>
 
-        {/* Grid of actions */}
+        {/* Scanner choice is nested under one action to reduce duplicate scanner buttons. */}
+        {showScannerChoices ? (
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => setShowScannerChoices(false)}
+              className="text-xs font-semibold text-neutral-600 hover:text-neutral-900 px-1 py-1"
+            >
+              ← Назад к действиям
+            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScannerChoices(false);
+                  onClose();
+                  onSelectAction("scan_receipt");
+                }}
+                className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/80 text-left cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-brand-soft border border-brand-soft-strong flex items-center justify-center shrink-0">
+                  <ScanLine className="w-5 h-5 text-brand-strong" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900">Чек / заказ-наряд</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">Распознать расходы и работы</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScannerChoices(false);
+                  onClose();
+                  onSelectAction("scan_barcode");
+                }}
+                className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100 border border-neutral-200/80 text-left cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-brand-soft border border-brand-soft-strong flex items-center justify-center shrink-0">
+                  <ScanBarcode className="w-5 h-5 text-brand-strong" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-neutral-900">Деталь / VIN</div>
+                  <div className="text-[10px] text-neutral-500 mt-0.5">Штрихкод, QR или VIN</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-2.5">
           {actions.map((act) => (
             <button
               key={act.id}
               onClick={() => {
+                if (act.id === "scanner") {
+                  setShowScannerChoices(true);
+                  return;
+                }
                 onClose();
                 onSelectAction(act.id);
               }}
@@ -137,6 +186,7 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
             </button>
           ))}
         </div>
+        )}
       </div>
     </div>
   );
