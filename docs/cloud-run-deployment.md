@@ -39,7 +39,7 @@ Do not deploy the web service with real user data until database migration and b
 Use the repository root as build context so the image contains the source files used by the bounded repository snapshot:
 
 ```bash
-gcloud builds submit --tag "europe-west1-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest" -f agents_service/Dockerfile .
+gcloud builds submit --config=cloudbuild-agents.yaml .
 ```
 
 Before deployment, create a Secret Manager secret named `agents-api-token` and grant the agent runtime service account access. Use the Cloud Run service identity for Vertex AI instead of a long-lived service-account key. Keep the service private:
