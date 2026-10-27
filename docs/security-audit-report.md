@@ -63,6 +63,11 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Finding: the client sent `X-Agents-Token` and, in production, a Cloud Run ID token. Fetch followed redirects by default. A redirect from a misconfigured or compromised upstream could redirect an authenticated request to another origin; custom application headers should never be allowed to follow such a redirect.
 - Remediation on branch `fix/agent-client-redirect-safety`: set `redirect: "error"` for both metadata-server and agent-service requests, and add assertions to the client tests.
 - Verification: CI must pass before merge. No production services or cloud resources were changed.
+### MEDIUM — Agent source-snapshot redaction missed generic secret/token variable names
+- Location: `agents_service/app.py`, `_repo_snapshot()`.
+- Finding: the snapshot redaction covered API keys, passwords, and several named credential patterns, but not generic assignments such as `secret`, `authToken`, or `clientSecret`. If a developer accidentally committed such a value, it could be forwarded to the paid model in the source snapshot.
+- Remediation on this branch: extend assignment and mapping-key redaction to generic secret/token/credential names and add regression coverage with sentinel values.
+- Verification: CI must pass before merge. This defense-in-depth does not replace secret scanning or removing leaked credentials.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
