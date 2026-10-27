@@ -6,7 +6,7 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 1. `server/store.ts` stores user data in JSON files on the container filesystem. Cloud Run's writable filesystem is ephemeral and not shared between instances. **Do not serve real user data until persistence is migrated to a managed transactional database** and backup/restore tests pass.
 2. The Python dependency audit flags `opentelemetry-api` pulled by `google-adk==2.13.0` for CVE-2026-114603. Do not suppress the audit or force an incompatible version. Keep agent deployment private until a compatible upstream dependency set is available and tested.
-3. The Node service does not yet call the separate Python agent service through an authenticated service-to-service client. Deploying the agent service alone does not integrate agents into the user-facing product.
+3. The Node-to-Python service client is now implemented, but actual Cloud Run OIDC/IAM, Secret Manager and model smoke tests have not been run. The web service still has no managed transactional storage/shared session backend, so agent calls remain blocked for production until the persistence blocker is resolved.
 
 ## Suggested initial resources
 
