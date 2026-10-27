@@ -307,7 +307,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={handleScan}
+                    onClick={() => void handleScan()}
                     disabled={isScanning}
                     className="px-5 py-1.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
                   >
