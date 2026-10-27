@@ -413,13 +413,6 @@ export function LandingPage() {
                   От скана документа до полного контроля авто
                 </h2>
               </div>
-              <a
-                href="/app"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#B91C1C] hover:underline dark:text-[#EF3038]"
-              >
-                <span>Перейти в рабочее пространство</span>
-                <ArrowRight className="h-4 w-4" />
-              </a>
             </div>
 
             {/* 5 карточек модулей в едином формате */}
@@ -443,15 +436,9 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs dark:border-[#243044]">
-                  <span className="text-[#536171] dark:text-[#94A3B8]">
-                    Пробег, ТО и расходы
-                  </span>
-                  <span className="font-mono font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
-                    Актуальные данные
-                  </span>
-                </div>
-              </article>
+                
+
+</article>
 
               {/* 2. Сервисная книжка */}
               <article
@@ -475,15 +462,9 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs dark:border-[#243044]">
-                  <span className="text-[#536171] dark:text-[#94A3B8]">
-                    Поиск по OEM-артикулу и работам
-                  </span>
-                  <span className="font-mono font-bold text-[#0F172A] dark:text-[#F8FAFC]">
-                    Полная история обслуживания
-                  </span>
-                </div>
-              </article>
+                
+
+</article>
 
               {/* 3. Учёт топлива и расходов */}
               <article
@@ -507,15 +488,9 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs dark:border-[#243044]">
-                  <span className="text-[#536171] dark:text-[#94A3B8]">
-                    Стоимость километра
-                  </span>
-                  <span className="font-mono font-bold text-[#10B981]">
-                    7.40 ₽ / км
-                  </span>
-                </div>
-              </article>
+                
+
+</article>
 
               {/* 4. AI-механик */}
               <article
@@ -539,15 +514,9 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs dark:border-[#243044]">
-                  <span className="text-[#536171] dark:text-[#94A3B8]">
-                    Чек-лист перед поездкой
-                  </span>
-                  <span className="font-mono font-semibold text-[#F59E0B]">
-                    → В план работ
-                  </span>
-                </div>
-              </article>
+                
+
+</article>
 
               {/* 5. Напоминания и регламент ТО */}
               <article
@@ -571,15 +540,9 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between border-t border-[#E2E8F0] pt-3 text-xs dark:border-[#243044]">
-                  <span className="text-[#536171] dark:text-[#94A3B8]">
-                    Расчёт по пробегу и датам
-                  </span>
-                  <span className="font-mono font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
-                    ТО, ОСАГО и сезонные работы
-                  </span>
-                </div>
-              </article>
+                
+
+</article>
             </div>
           </motion.div>
         </section>
