@@ -105,6 +105,19 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 ### Публикация frontend через Cloudflare
 
+#### Статус на 28.10.2026
+
+- Email-code authentication реализована в ветке `codex/email-code-authentication` и проверена локальными тестами. Для production нужны `RESEND_API_KEY`, `EMAIL_FROM` и отдельный `EMAIL_CODE_SECRET`; секреты не добавляются во frontend или Cloudflare Assets.
+- Cloudflare Worker `garageai-1-0` доступен по адресу `https://garageai-1-0.sambur91.workers.dev/`. После ручной публикации обязательно проверить `/api/health` и авторизацию.
+- Google Cloud Run не считается опубликованным, пока не подтверждены Cloud SQL, миграция/импорт, backup/restore, IAM/OIDC и production smoke tests. Нельзя обходить этот gate через `GARAGE_ALLOW_EPHEMERAL_STORAGE=true`.
+- Целевой Google Cloud project нужно указывать явно. В текущем окружении обнаружены `garageai-512320` и историческая ссылка на `garage-ai-512223`; перед изменением IAM или ресурсов сверяйте проект командой `gcloud config get-value project`.
+
+#### Email-code authentication
+
+Для регистрации можно указать email, после чего пользователь выбирает вход по одноразовому коду в `AuthGate`. API маршруты: `POST /api/auth/email/request` и `POST /api/auth/email/verify` (также поддерживаются варианты с суффиксом `-code`). Код действует 10 минут, имеет ограничение попыток и rate limits по IP/email. Ответ запроса кода не раскрывает наличие аккаунта.
+
+Локальные переменные: `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_CODE_SECRET`. В Cloud Run их следует хранить в Secret Manager. Не логируйте код, ключ Resend или содержимое писем.
+
 Проект подготовлен к схеме «Cloudflare Worker + Assets для frontend и Cloud Run для Node/Express API». Worker проксирует запросы `/api/*` на Cloud Run через переменную `API_ORIGIN`, поэтому HttpOnly-сессии и CSRF остаются same-origin для браузера.
 
 ```powershell
