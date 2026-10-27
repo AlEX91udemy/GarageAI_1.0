@@ -1,6 +1,6 @@
 # PostgreSQL persistence migration plan
 
-Status: PostgreSQL schema, async repository primitives, session persistence selection, revision-checked garage writes, and CI integration tests are implemented on the feature branch. **The legacy JSON importer, end-to-end cutover validation, and real Cloud SQL smoke tests are not complete.** Keep the production readiness gate closed until those are verified.
+Status: PostgreSQL schema, async repository, PostgreSQL-backed sessions, revision-checked garage writes, dry-run-first JSON importer, and PostgreSQL integration tests are merged to `main`. **Real-data import, Cloud SQL deployment, backup/restore validation, and live production smoke tests are still outstanding.** Keep `GARAGE_POSTGRES_READY` unset until those checks pass.
 
 ## Target architecture
 
@@ -26,7 +26,7 @@ The existing JSON layout may contain:
 - `garage_store.json`: per-user garages under `garages`; an old root-level garage can lack a provable owner.
 - `sessions.json`: session hashes and CSRF secrets.
 
-The import tool must be dry-run by default and idempotent. It must:
+The importer in `scripts/import-legacy-json.ts` is dry-run by default and requires `--apply` for writes. CI tests dry-run behavior, import, repeat-import idempotency, and conflicting-account rejection. Before applying it to real data, verify the backup and inspect dry-run counts. It must:
 1. Validate every record and report counts/errors without printing password hashes, session hashes, CSRF secrets, VINs, receipts, or garage payloads.
 2. Import users before garages and sessions, preserving user IDs and password hashes.
 3. Import only garages whose `user_id` exists in the imported user set.
