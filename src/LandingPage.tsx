@@ -647,8 +647,8 @@ export function LandingPage() {
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.25 }}
-              transition={{ duration: 0.45, ease: "easeOut" }}
+              viewport={{ once: true, amount: 0.18 }}
+              transition={{ duration: 0.45, delay: 0.16, ease: "easeOut" }}
               className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]"
             >
               <div>
