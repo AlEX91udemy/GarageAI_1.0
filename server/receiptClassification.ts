@@ -27,7 +27,7 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
     /(аи[- ]?\\d{2}(?:\\s?к\\d)?)/i.test(normalized) ||
     (/(литр(?:а|ов|ы)?|л\\.?\\s*(?:×|x|по|\\d))/i.test(normalized) &&
       /(?:₽\\s*\\/\\s*л|руб(?:\\.|лей)?\\s*(?:за|\\/)?\\s*литр|цена\\s*за\\s*литр|колонка)/i.test(normalized));
-  const repairSignal = /(заказ[- ]?наряд|сто|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту)/i.test(normalized);
+  const repairSignal = /(?:^|[^а-яё])сто(?:$|[^а-яё])|заказ[- ]?наряд|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту/i.test(normalized);
   const partsSignal = /(магазин автозапчастей|автозапчасти|артикул|каталожный номер)/i.test(normalized);
 
   if (strongFuelSignal && !repairSignal) category = "fuel";
