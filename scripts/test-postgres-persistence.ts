@@ -14,6 +14,7 @@ async function main() {
   if (!connectionString) throw new Error("DATABASE_URL is required for PostgreSQL persistence integration tests");
 
   const repository = new PostgresPersistence({ connectionString, maxConnections: 2 });
+  const peerRepository = new PostgresPersistence({ connectionString, maxConnections: 1, runMigrations: false });
   const suffix = randomUUID().replace(/-/g, "").slice(0, 8);
   const userId = `ci-user-${suffix}`;
   const username = `ci-${suffix}`;
@@ -21,6 +22,7 @@ async function main() {
 
   try {
     await repository.initialize();
+    await peerRepository.initialize();
     await repository.healthCheck();
 
     const user = await repository.createUser(username, "test-only-password-hash", userId);
@@ -78,6 +80,19 @@ async function main() {
     }
     assert(staleWriteRejected, "stale snapshots must be rejected instead of overwriting newer data");
 
+    const rateKey = `ci-rate-${suffix}`;
+    const rateNow = Date.now();
+    const firstHit = await repository.consumeRateLimit("integration", rateKey, 2, 60_000, rateNow);
+    const secondHit = await peerRepository.consumeRateLimit("integration", rateKey, 2, 60_000, rateNow + 1);
+    const thirdHit = await repository.consumeRateLimit("integration", rateKey, 2, 60_000, rateNow + 2);
+    assert(firstHit.allowed && firstHit.count === 1, "first shared rate-limit hit should be allowed");
+    assert(secondHit.allowed && secondHit.count === 2, "second database client should share the same counter");
+    assert(!thirdHit.allowed && thirdHit.count === 3, "rate limit must be enforced across independent repository instances");
+    assert(thirdHit.retryAfterMs > 0, "rate limit should report remaining window time");
+    await peerRepository.resetRateLimit("integration", rateKey);
+    const afterReset = await repository.consumeRateLimit("integration", rateKey, 2, 60_000, rateNow + 3);
+    assert(afterReset.allowed && afterReset.count === 1, "reset should clear a shared rate-limit bucket");
+
     const now = Date.now();
     const session = {
       tokenHash: sessionHash,
@@ -98,6 +113,7 @@ async function main() {
 
     console.log("PostgresPersistence integration checks passed.");
   } finally {
+    await peerRepository.close();
     await repository.close();
   }
 }
