@@ -88,8 +88,12 @@ async function main() {
     };
     await repository.putSession(session);
     assert((await repository.getSession(sessionHash))?.userId === userId, "session should be readable by token hash");
-    await repository.revokeSession(sessionHash, now + 1);
-    assert(await repository.getSession(sessionHash) === undefined, "revoked session must not be returned");
+    const rotatedHash = randomUUID().replace(/-/g, "").repeat(2).slice(0, 64);
+    await repository.rotateSession(sessionHash, { ...session, tokenHash: rotatedHash, expiresAt: now + 90_000 }, now + 1);
+    assert(await repository.getSession(sessionHash) === undefined, "previous session token must be revoked during rotation");
+    assert((await repository.getSession(rotatedHash))?.userId === userId, "rotated session should be active");
+    await repository.revokeSession(rotatedHash, now + 2);
+    assert(await repository.getSession(rotatedHash) === undefined, "revoked session must not be returned");
     await repository.deleteExpiredSessions(now + 120_000);
 
     console.log("PostgresPersistence integration checks passed.");
