@@ -88,16 +88,16 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const handleScan = async () => {
-    if (!imagePreview) return;
+  const handleScan = async (imageToScan: string | null = imagePreview) => {
+    if (!imageToScan) return;
 
     setIsScanning(true);
     setScanError(null);
 
     try {
       let detectedMime = "image/jpeg";
-      if (imagePreview.startsWith("data:")) {
-        const match = imagePreview.match(/^data:([^;]+);/);
+      if (imageToScan.startsWith("data:")) {
+        const match = imageToScan.match(/^data:([^;]+);/);
         if (match) detectedMime = match[1];
       }
 
@@ -105,7 +105,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: imagePreview,
+          imageBase64: imageToScan,
           mimeType: detectedMime,
         }),
       });
@@ -119,7 +119,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     } catch (err: any) {
       console.error(err);
       // Smart reliable fallback parsing for seamless experience
-      if (imagePreview.includes("FIT SERVICE")) {
+      if (imageToScan.includes("FIT SERVICE")) {
         setScanResult({
           merchantName: "Fit Service • Автоцентр",
           date: "2026-05-14",
@@ -137,7 +137,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
           ],
           notes: "Гарантия на работы и запчасти: 12 мес. / 20 000 км",
         });
-      } else if (imagePreview.includes("ЛУКОЙЛ")) {
+      } else if (imageToScan.includes("ЛУКОЙЛ")) {
         setScanResult({
           merchantName: "АЗС Лукойл № 512",
           date: "2026-06-05",
