@@ -7,7 +7,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
+import re\n\nfrom agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
 
 
 def make_request(client_ip: str = "127.0.0.1") -> Request:
@@ -31,7 +31,7 @@ class AgentEndpointAuthTests(unittest.TestCase):
         snapshot = _repo_snapshot()
         self.assertIn("--- FILE: server.ts ---", snapshot)
         self.assertIn("import express from", snapshot)
-        self.assertNotIn("--- FILE: data/garage_store.json ---", snapshot)
+        included_files = re.findall(r"^--- FILE: (.+) ---$", snapshot, flags=re.MULTILINE)\n        self.assertNotIn("data/garage_store.json", included_files)
         self.assertNotIn("package-lock.json", snapshot)
         self.assertLessEqual(len(snapshot), 46000)
 
