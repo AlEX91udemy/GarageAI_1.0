@@ -47,11 +47,11 @@ class AgentEndpointAuthTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "review.ts"
             source.write_text(
-                "\\n".join([
+                chr(10).join([
                     'const secret = "sentinel-secret-value"',
                     'const authToken = "sentinel-token-value"',
                     'const clientSecret = "sentinel-client-secret-value"',
-                ]) + "\\n",
+                ]) + chr(10),
                 encoding="utf-8",
             )
             with patch("agents_service.app.REPO_ROOT", Path(directory)):
