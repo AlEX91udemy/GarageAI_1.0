@@ -31,7 +31,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 - Location: `agents_service/app.py`, `POST /agents/run`.
 - Initial evidence: the endpoint accepted requests without application-level authentication, which could allow paid model calls if publicly reachable.
 - Remediation on this branch: POST now fails closed with 503 if `AGENTS_API_TOKEN` is not configured and returns 401 unless the `X-Agents-Token` header matches using constant-time comparison. README documents local setup and recommends Cloud Run IAM/Secret Manager.
-- Remaining risk: this does not implement rate limiting and does not replace Cloud Run ingress/IAM. Configure the token as a secret in deployment and restrict the service to trusted callers before production. Add automated tests for missing/invalid tokens and throttling.
+- Remediation on this branch: also adds a per-instance limit of five authorized requests per minute per client IP and automated tests for missing/invalid tokens and rate limiting. Remaining risk: this limiter is in-memory and can be bypassed across multiple instances; Cloud Run ingress/IAM remains the primary boundary. Configure the token as a secret and restrict the service to trusted callers before production.
 
 ### HIGH — Tenant isolation needs route-level integration tests
 - Location: `server.ts` and protected CRUD routes.
@@ -48,7 +48,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 ## Next verification
 
 - Resolve the `opentelemetry-api 1.44.0` vulnerability without breaking `google-adk==2.13.0` dependency resolution; keep Python audit blocking until resolved.
-- Run a Python import/syntax check and add automated tests for missing/invalid `X-Agents-Token`.
+- Run Python import/syntax and agent endpoint tests; verify rate-limit behavior under the actual Cloud Run proxy configuration.
 - Keep npm and Python dependency audits blocking.
 - Add tests for agent authentication and tenant isolation.
 - Confirm no live data is required from the tracked JSON file before merging.
