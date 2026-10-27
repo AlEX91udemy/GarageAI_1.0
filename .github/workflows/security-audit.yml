@@ -47,6 +47,8 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Validate Cloudflare Worker bundle (dry run)
+        run: npx --yes wrangler@4.152.0 deploy --dry-run
       - name: Build web container
         run: docker build -f Dockerfile -t garageai-web:ci .
       - name: Build private agent container
