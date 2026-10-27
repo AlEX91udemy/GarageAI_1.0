@@ -237,6 +237,7 @@ const store = process.env.DATABASE_URL?.trim()
       connectionString: process.env.DATABASE_URL,
       maxConnections: Number(process.env.DATABASE_POOL_MAX) || 5,
       ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
+      runMigrations: process.env.NODE_ENV !== "production" || process.env.DATABASE_AUTO_MIGRATE === "true",
     })
   : new GarageStore(DB_FILE, () => getInitialDatabase());
 
