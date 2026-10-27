@@ -422,9 +422,10 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
               <input
                 type="checkbox"
                 checked={agentSelection.includes(name)}
+                disabled={!agentSelection.includes(name) && agentSelection.length >= 3}
                 onChange={(event) => {
                   setAgentSelection((current) => event.target.checked
-                    ? [...current, name]
+                    ? current.length < 3 ? [...current, name] : current
                     : current.filter((item) => item !== name));
                   setAgentError("");
                 }}
