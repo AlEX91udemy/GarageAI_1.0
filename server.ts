@@ -53,7 +53,10 @@ import {
   normalizeExtractedVin,
   normalizeRussianPlate,
 } from "./server/documentOcr";
-import { GarageStore, emptyGarage, type GarageData } from "./server/store";
+import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
+import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
+import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -79,7 +82,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
   const model = value?.trim();
@@ -224,6 +227,9 @@ function isSafeAssetUrl(value: unknown): value is string {
   );
 }
 
+// Refuse accidental production deployment while the backend still uses local JSON files.
+assertProductionStorageSafe(process.env);
+
 // In-memory cache synced to disk
 const store = new GarageStore(DB_FILE, () => getInitialDatabase());
 
@@ -238,6 +244,9 @@ interface RequestContext {
 }
 
 const requestContext = new AsyncLocalStorage<RequestContext>();
+
+// Serialize same-user writes so concurrent requests cannot overwrite a newer garage snapshot.
+const pendingUserWrites = new Map<string, Promise<void>>();
 
 function currentContext(): RequestContext {
   const context = requestContext.getStore();
@@ -617,7 +626,12 @@ app.get("/api/health", (_req, res) => {
   const garage = requestContext.getStore()?.garage;
   res.json({
     status: "ok",
+    // Keep the legacy field for older clients, but expose explicit provider
+    // state so Vertex AI/ADC is not misreported as a missing API key.
     hasApiKey: Boolean(process.env.GEMINI_API_KEY),
+    hasAiConfigured: hasAiConfiguration(process.env),
+    hasGeminiConfigured: hasGeminiConfiguration(process.env),
+    vertexAiEnabled: process.env.GOOGLE_GENAI_USE_VERTEXAI === "true",
     authenticated: Boolean(garage),
     vehiclesCount: garage ? dbMemory.vehicles.length : 0,
     serviceRecordsCount: garage ? dbMemory.serviceRecords.length : 0,
@@ -1871,6 +1885,10 @@ function getSession(req: express.Request): SessionRecord | null {
  * GET-запросы не требуют CSRF-токен, изменяющие — требуют.
  */
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  // Backup routes also declare requireAuth explicitly. Reuse the context created
+  // by the global /api middleware rather than acquiring a second lock.
+  if (requestContext.getStore()) return next();
+
   const session = getSession(req);
   if (!session) {
     return res.status(401).json({ error: "Требуется вход в аккаунт" });
@@ -1884,16 +1902,82 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
       return res.status(403).json({ error: "CSRF-токен недействителен" });
     }
   }
-  const garage = store.snapshotForUser(session.userId, true);
-  requestContext.run({ userId: session.userId, garage, session }, () => next());
-}
 
-function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_RECEIPT_API_KEY && !process.env.OPENROUTER_DOCUMENT_API_KEY) {
-    return res.status(503).json({ error: "AI-функции не настроены на сервере." });
+  const userId = session.userId;
+  const runWithSnapshot = () => {
+    const garage = store.snapshotForUser(userId, true);
+    requestContext.run({ userId, garage, session }, next);
+  };
+
+  // Keep independent read requests concurrent. Mutations of stored garage
+  // collections share one per-user queue; this is important because handlers
+  // work on request-local snapshots and otherwise a later stale snapshot could
+  // replace an earlier successful write.
+  const method = req.method.toUpperCase();
+  const pathname = req.originalUrl.split("?")[0];
+  const garageWritePrefixes = [
+    "/api/vehicles",
+    "/api/reminders",
+    "/api/services",
+    "/api/fuel",
+    "/api/inventory",
+    "/api/to-fix",
+    "/api/oem-schedule",
+    "/api/tuning",
+    "/api/backup/import",
+    "/api/backup/reset",
+  ];
+  const isGarageWrite =
+    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+    garageWritePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
+
+  if (!isGarageWrite) {
+    runWithSnapshot();
+    return;
   }
 
-  const clientId = req.ip || "unknown";
+  const previous = pendingUserWrites.get(userId) ?? Promise.resolve();
+  let unlockCurrent!: () => void;
+  const current = new Promise<void>((resolve) => { unlockCurrent = resolve; });
+  const queueEntry = previous.then(() => current);
+  pendingUserWrites.set(userId, queueEntry);
+
+  let releasing = false;
+  const release = () => {
+    if (releasing) return;
+    releasing = true;
+    // Do not let the next write take its snapshot before queued persistence
+    // has finished updating the store's in-memory state.
+    void store.flush().catch((error) => {
+      console.error("Ошибка ожидания записи перед следующим изменением гаража:", error);
+    }).finally(() => {
+      unlockCurrent();
+      if (pendingUserWrites.get(userId) === queueEntry) {
+        pendingUserWrites.delete(userId);
+      }
+    });
+  };
+
+  void previous.then(() => {
+    if (res.destroyed || res.writableEnded) {
+      release();
+      return;
+    }
+    res.once("finish", release);
+    res.once("close", release);
+    runWithSnapshot();
+  }).catch((error) => {
+    unlockCurrent();
+    if (pendingUserWrites.get(userId) === queueEntry) {
+      pendingUserWrites.delete(userId);
+    }
+    next(error);
+  });
+}
+
+function enforceAiRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const userId = requestContext.getStore()?.userId;
+  const clientId = userId ? `user:${userId}` : `ip:${req.ip || "unknown"}`;
   const now = Date.now();
   const current = aiRequestWindows.get(clientId);
   const window = !current || now - current.startedAt >= AI_RATE_WINDOW_MS
@@ -1907,6 +1991,20 @@ function requireAiAccess(req: express.Request, res: express.Response, next: expr
     return res.status(429).json({ error: "Слишком много AI-запросов. Повторите попытку позже." });
   }
   return next();
+}
+
+function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasAiConfiguration(process.env)) {
+    return res.status(503).json({ error: "AI-функции не настроены на сервере." });
+  }
+  return enforceAiRateLimit(req, res, next);
+}
+
+function requireGeminiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasGeminiConfiguration(process.env)) {
+    return res.status(503).json({ error: "Для этой AI-функции требуется GEMINI_API_KEY или настройка Vertex AI." });
+  }
+  return enforceAiRateLimit(req, res, next);
 }
 
 // -------------------------------------------------------------------------
@@ -1949,8 +2047,11 @@ app.post("/api/auth/register", (req, res) => {
     loginAttempts.delete(req.ip || "unknown");
     res.status(201).json({ success: true, session: establishSession(req, res, userId, credentials.username!) });
   })().catch((error) => {
+    if (error instanceof UserAlreadyExistsError) {
+      return res.status(409).json({ error: error.message });
+    }
     console.error("Registration error:", error);
-    res.status(500).json({ error: "Не удалось создать аккаунт" });
+    return res.status(500).json({ error: "Не удалось создать аккаунт" });
   });
 });
 
@@ -2050,8 +2151,83 @@ app.post("/api/backup/reset", requireAuth, (_req, res) => {
 // AI Diagnostic & Gemini Endpoints
 // ---------------------------------------------------------------------------
 
+// Private ADK multi-agent orchestration proxy. Global /api auth and CSRF
+// middleware protect this endpoint; Cloud Run IAM plus X-Agents-Token protect
+// the upstream service.
+const ALLOWED_AGENT_NAMES = new Set(["architect", "developer", "qa", "ops", "argon_reviewer"]);
+const MAX_AGENTS_PER_RUN = 3;
+
+function requireAgentServiceAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!process.env.AGENTS_SERVICE_URL?.trim() || !process.env.AGENTS_API_TOKEN?.trim()) {
+    return res.status(503).json({ error: "AI-агенты не настроены на сервере." });
+  }
+
+  const session = getSession(req);
+  const user = session ? store.getUserById(session.userId) : undefined;
+  if (!user) {
+    return res.status(401).json({ error: "Требуется вход в аккаунт" });
+  }
+
+  const allowlist = (process.env.AGENTS_ALLOWED_USERNAMES || "")
+    .split(",")
+    .map((username) => username.trim().toLowerCase())
+    .filter(Boolean);
+  if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
+    return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
+  }
+  if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
+    return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
+  }
+
+  return enforceAiRateLimit(req, res, next);
+}
+
+app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown>
+    : {};
+  const task = typeof body.task === "string" ? body.task.trim() : "";
+  if (task.length < 3 || task.length > 8000) {
+    return res.status(400).json({ error: "Задача должна содержать от 3 до 8000 символов." });
+  }
+
+  let agents: string[] | undefined;
+  if (body.agents !== undefined) {
+    if (
+      !Array.isArray(body.agents) ||
+      body.agents.length === 0 ||
+      body.agents.length > MAX_AGENTS_PER_RUN ||
+      body.agents.some((agent) => typeof agent !== "string" || !ALLOWED_AGENT_NAMES.has(agent)) ||
+      new Set(body.agents).size !== body.agents.length
+    ) {
+      return res.status(400).json({ error: "Список AI-агентов содержит неизвестные или повторяющиеся значения." });
+    }
+    agents = body.agents as string[];
+  }
+
+  try {
+    const result = await runAgentService(process.env, { task, agents }, fetch, requestContext.getStore()?.userId);
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof AgentServiceClientError) {
+      if (error.statusCode === 429) {
+        if (error.retryAfter) res.setHeader("Retry-After", error.retryAfter);
+        return res.status(429).json({ error: "Слишком много запросов к AI-агентам. Повторите позже." });
+      }
+      if (error.statusCode === 503) {
+        return res.status(503).json({ error: error.message });
+      }
+      if (error.statusCode === 504) {
+        return res.status(504).json({ error: "AI-агенты не успели ответить. Повторите попытку позже." });
+      }
+    }
+    console.error("Agent service request failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(502).json({ error: "AI-агенты временно недоступны." });
+  }
+});
+
 // 1. Diagnostic Assistant
-app.post("/api/ai/diagnose", requireAiAccess, async (req, res) => {
+app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
   try {
     const problemDescription =
       req.body.problemDescription || req.body.symptoms || "";
@@ -2310,7 +2486,7 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
 });
 
 // 3. OEM Factory Schedule Generator
-app.post("/api/ai/oem-schedule", requireAiAccess, async (req, res) => {
+app.post("/api/ai/oem-schedule", requireGeminiAccess, async (req, res) => {
   try {
     const { make, model, year, engine, fuelType } = req.body;
     const ai = getAi();
@@ -2363,7 +2539,7 @@ app.post("/api/ai/oem-schedule", requireAiAccess, async (req, res) => {
 });
 
 // 4. Smart Spare Part Cross-Reference & Advisor
-app.post("/api/ai/part-lookup", requireAiAccess, async (req, res) => {
+app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
   try {
     const { partName, vehicle, partNumber } = req.body;
     const ai = getAi();

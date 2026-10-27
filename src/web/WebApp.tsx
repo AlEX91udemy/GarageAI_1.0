@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { WebSidebar } from "./layouts/WebSidebar";
 import { WebTopBar } from "./layouts/WebTopBar";
+import { runGarageAiAgents, type GarageAiAgentName } from "../api";
 import {
   Vehicle,
   ServiceRecord,
@@ -120,6 +121,12 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
 
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
   const [historyTab, setHistoryTab] = useState<"upcoming" | "history">("upcoming");
+  const [agentTask, setAgentTask] = useState("");
+  const [agentSelection, setAgentSelection] = useState<GarageAiAgentName[]>(["architect", "qa"]);
+  const [agentResults, setAgentResults] = useState<Record<string, string> | null>(null);
+  const [agentError, setAgentError] = useState("");
+  const [agentBusy, setAgentBusy] = useState(false);
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -381,6 +388,87 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
             }
           }}
         />
+      </section>
+
+      <section className={cardClass}>
+        <h2 className="text-base font-bold tracking-tight">GarageAI — мультиагентный помощник</h2>
+        <p className={`mt-1 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          Административная функция. Запрос отправляется на закрытый сервер агентов и может расходовать платные AI-кредиты.
+          Доступ контролируется серверной allowlist; если вы не назначены администратором, сервер отклонит запуск.
+        </p>
+        <label className="block mt-4 text-sm font-semibold" htmlFor="garageai-agent-task">Задача для команды агентов</label>
+        <textarea
+          id="garageai-agent-task"
+          value={agentTask}
+          onChange={(event) => setAgentTask(event.target.value)}
+          maxLength={8000}
+          rows={4}
+          placeholder="Например: проверь готовность проекта к production и перечисли блокирующие дефекты"
+          className={`mt-2 w-full rounded-lg border p-3 text-sm outline-none focus:ring-2 focus:ring-red-500 ${isDark ? "bg-[#0D131D] border-[#243044] text-slate-100" : "bg-white border-slate-200 text-slate-900"}`}
+        />
+        <div className="mt-2 flex justify-between text-xs text-slate-500">
+          <span>Не вставляйте API-ключи, пароли или пользовательские персональные данные.</span>
+          <span>{agentTask.length}/8000</span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {([
+            ["architect", "Архитектор"],
+            ["developer", "Разработчик"],
+            ["qa", "QA / тестирование"],
+            ["ops", "DevOps / эксплуатация"],
+            ["argon_reviewer", "Финальный ревьюер"],
+          ] as Array<[GarageAiAgentName, string]>).map(([name, label]) => (
+            <label key={name} className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${isDark ? "border-[#243044]" : "border-slate-200"}`}>
+              <input
+                type="checkbox"
+                checked={agentSelection.includes(name)}
+                disabled={!agentSelection.includes(name) && agentSelection.length >= 3}
+                onChange={(event) => {
+                  setAgentSelection((current) => event.target.checked
+                    ? current.length < 3 ? [...current, name] : current
+                    : current.filter((item) => item !== name));
+                  setAgentError("");
+                }}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
+        <button
+          type="button"
+          disabled={agentBusy || agentTask.trim().length < 3 || agentTask.trim().length > 8000 || agentSelection.length === 0}
+          onClick={async () => {
+            setAgentBusy(true);
+            setAgentError("");
+            setAgentResults(null);
+            try {
+              const result = await runGarageAiAgents({ task: agentTask.trim(), agents: agentSelection });
+              setAgentResults(result.results);
+            } catch (error) {
+              setAgentError(error instanceof Error ? error.message : "Не удалось запустить AI-агентов.");
+            } finally {
+              setAgentBusy(false);
+            }
+          }}
+          className="mt-4 px-4 py-2 rounded-lg text-sm font-semibold bg-[#B91C1C] text-white hover:bg-[#991B1B] disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          {agentBusy ? "Агенты работают…" : "Запустить выбранных агентов"}
+        </button>
+        {agentError && (
+          <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600">
+            {agentError}
+          </p>
+        )}
+        {agentResults && (
+          <div className="mt-4 space-y-3">
+            {Object.entries(agentResults).map(([name, result]) => (
+              <article key={name} className={`rounded-lg border p-4 ${isDark ? "border-[#243044] bg-[#0D131D]" : "border-slate-200 bg-slate-50"}`}>
+                <h3 className="text-sm font-bold">{name}</h3>
+                <pre className="mt-2 whitespace-pre-wrap break-words text-sm font-sans leading-relaxed">{result}</pre>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       {onSwitchToMobile && (

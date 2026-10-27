@@ -205,6 +205,9 @@ export async function fetchGarageData(): Promise<FullGarageData> {
 export async function checkBackendHealth(): Promise<{
   status: string;
   hasApiKey: boolean;
+  hasAiConfigured: boolean;
+  hasGeminiConfigured: boolean;
+  vertexAiEnabled: boolean;
   vehiclesCount: number;
   serviceRecordsCount: number;
 }> {
@@ -385,6 +388,41 @@ export async function fetchVehicleStats(vehicleId: string): Promise<VehicleStats
   const res = await authenticatedFetch(`/api/stats/${vehicleId}`);
   if (!res.ok) throw new Error("Не удалось загрузить аналитику");
   return res.json();
+}
+
+export type GarageAiAgentName = "architect" | "developer" | "qa" | "ops" | "argon_reviewer";
+
+export interface GarageAiAgentRunResult {
+  task: string;
+  results: Record<string, string>;
+}
+
+export async function runGarageAiAgents(payload: {
+  task: string;
+  agents?: GarageAiAgentName[];
+}): Promise<GarageAiAgentRunResult> {
+  const res = await authenticatedFetch("/api/agents/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Не удалось запустить AI-агентов",
+    );
+  }
+  if (
+    !data ||
+    typeof data.task !== "string" ||
+    !data.results ||
+    typeof data.results !== "object" ||
+    Array.isArray(data.results) ||
+    Object.values(data.results).some((value) => typeof value !== "string")
+  ) {
+    throw new Error("Сервис AI-агентов вернул некорректный ответ");
+  }
+  return data as GarageAiAgentRunResult;
 }
 
 // AI APIs
