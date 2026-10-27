@@ -56,6 +56,7 @@ import {
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
+import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -225,6 +226,9 @@ function isSafeAssetUrl(value: unknown): value is string {
     /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(trimmed)
   );
 }
+
+// Refuse accidental production deployment while the backend still uses local JSON files.
+assertProductionStorageSafe(process.env);
 
 // In-memory cache synced to disk
 const store = new GarageStore(DB_FILE, () => getInitialDatabase());
