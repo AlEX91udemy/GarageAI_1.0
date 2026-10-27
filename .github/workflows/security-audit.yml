@@ -63,6 +63,10 @@ jobs:
           PGDATABASE: garageai_test
           PGPASSWORD: garageai_test_only
         run: bash scripts/test-postgres-schema.sh
+      - name: PostgreSQL persistence adapter integration tests
+        env:
+          DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
+        run: npx tsx scripts/test-postgres-persistence.ts
       - name: Production dependency audit
         run: npm audit --omit=dev
       - name: Full dependency audit
