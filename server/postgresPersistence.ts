@@ -250,6 +250,27 @@ export class PostgresPersistence {
     `;
   }
 
+  async rotateSession(previousTokenHash: string, session: SessionRecord, now = Date.now()): Promise<void> {
+    this.assertInitialized();
+    await this.sql.begin(async (tx) => {
+      const previous = await tx`
+        UPDATE garageai_sessions SET revoked_at_ms = ${now}
+        WHERE token_hash = ${previousTokenHash} AND revoked_at_ms IS NULL
+        RETURNING user_id
+      `;
+      if (!previous[0] || previous[0].user_id !== session.userId) {
+        throw new Error("Session rotation rejected because the previous session is no longer active");
+      }
+      await tx`
+        INSERT INTO garageai_sessions
+          (token_hash, user_id, csrf_secret, created_at_ms, expires_at_ms, revoked_at_ms)
+        VALUES
+          (${session.tokenHash}, ${session.userId}, ${session.csrfSecret},
+           ${session.createdAt}, ${session.expiresAt}, NULL)
+      `;
+    });
+  }
+
   async revokeSession(tokenHash: string, now = Date.now()): Promise<void> {
     this.assertInitialized();
     await this.sql`
