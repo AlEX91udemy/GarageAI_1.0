@@ -17,6 +17,20 @@ jobs:
     name: Node.js tests, typecheck and build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: garageai_test
+          POSTGRES_PASSWORD: garageai_test_only
+          POSTGRES_DB: garageai_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U garageai_test -d garageai_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +53,28 @@ jobs:
         run: docker build -f agents_service/Dockerfile -t garageai-agents:ci .
       - name: Catalog audit
         run: npm run catalog:audit
+      - name: PostgreSQL schema contract audit
+        run: node scripts/audit-postgres-schema.mjs
+      - name: PostgreSQL migration integration tests
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: garageai_test
+          PGDATABASE: garageai_test
+          PGPASSWORD: garageai_test_only
+        run: bash scripts/test-postgres-schema.sh
+      - name: PostgreSQL persistence adapter integration tests
+        env:
+          DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
+        run: npx tsx scripts/test-postgres-persistence.ts
+      - name: Legacy JSON importer integration tests
+        env:
+          DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
+        run: npx tsx scripts/test-legacy-import.ts
+      - name: PostgreSQL production-like smoke test
+        env:
+          DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
+        run: npx tsx scripts/smoke-postgres.ts
       - name: Production dependency audit
         run: npm audit --omit=dev
       - name: Full dependency audit
