@@ -2,11 +2,11 @@
 
 - Initial review date: 2026-10-27
 - Repository: `AlEX91udemy/GarageAI_1.0`
-- Initial review branch: `audit/security-hardening-2026-10-27`
+- Latest report update: `docs/security-audit-report.md` on `main` after PR #19.
 - Current reviewed code: `main` after PostgreSQL persistence, shared rate limits, HTTP integration coverage and agent fan-out cap were merged.
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest pre-merge verification runs)
+## CI results (latest combined verification)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **116 passed across 19 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -32,7 +32,7 @@ The PostgreSQL-backed HTTP integration test passed in [run 40490904322](https://
 ### HIGH — Agent API authentication and quota protection
 - Location: `agents_service/app.py`, `server.ts`, `server/agentServiceClient.ts`.
 - Initial evidence: the endpoint accepted requests without application-level authentication, which could allow paid model calls if publicly reachable.
-- Remediation on this branch: Python `POST /agents/run` fails closed with 503 if `AGENTS_API_TOKEN` is missing and returns 401 unless `X-Agents-Token` matches using constant-time comparison. Python and Node both have per-instance rate limits; the Node service forwards the authenticated internal user ID to the private Python service so its quota is also per caller instead of all Cloud Run requests sharing one proxy-IP bucket.
+- Remediation merged to `main`: Python `POST /agents/run` fails closed with 503 if `AGENTS_API_TOKEN` is missing and returns 401 unless `X-Agents-Token` matches using constant-time comparison. Python and Node both have per-instance rate limits; the Node service forwards the authenticated internal user ID to the private Python service so its quota is also per caller instead of all Cloud Run requests sharing one proxy-IP bucket.
 - Remediation merged to `main`: Node `POST /api/agents/run` validates task size and agent names, requires an authenticated session/CSRF, and in production uses fail-closed `AGENTS_ALLOWED_USERNAMES` so only configured admin logins can invoke paid agents. The web settings include an agent console with role selection, task-length guard, loading/error states and result rendering. Node and Python reject more than three selected agents per run to cap model fan-out cost. The service client uses Cloud Run metadata-server ID tokens plus the shared application token; responses are bounded to 250 KB while streaming.
 - Remediation merged to `main`: Node AI and login/registration rate limits use atomic PostgreSQL buckets across instances; identifiers are hashed before storage and stale buckets are cleaned periodically. Local JSON development retains in-memory limits.
 - Remaining risk: real Cloud Run OIDC/IAM/token/Vertex request paths have not been smoke-tested. Configure IAM and both services' tokens through Secret Manager before production.
@@ -91,7 +91,7 @@ The PostgreSQL-backed HTTP integration test passed in [run 40490904322](https://
 - The in-process write queue is only a local optimization; PostgreSQL revision checks and database transactions are the cross-instance concurrency controls.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
 - Runtime garage data is absent from the current tree, but historical Git copies may remain. Determine whether those records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
-- This documentation PR triggers a fresh full CI run against the combined latest `main` state; record its result before release.
+- Full CI run [40491826125](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491826125) passed on the combined changes in PR #19. This remains code-level CI evidence only; real Cloud Run/Vertex, Cloud SQL cutover/restore and Git-history privacy checks remain outstanding.
 
 ## Release decision
 
