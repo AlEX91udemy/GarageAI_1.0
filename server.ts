@@ -2165,7 +2165,7 @@ app.post("/api/auth/login", async (req, res) => {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
   }
-  loginAttempts.delete(req.ip || "unknown");
+  await clearLoginAttempts(req.ip || "unknown");
   try {
     res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
   } catch (error) {
