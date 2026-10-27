@@ -33,7 +33,7 @@ async function main() {
   const tokenHash = randomUUID().replace(/-/g, "").repeat(2).slice(0, 64);
   const sourceDir = await fs.mkdtemp(path.join(os.tmpdir(), "garageai-legacy-import-"));
   const repository = new PostgresPersistence({ connectionString, maxConnections: 1 });
-  const db = postgres(connectionString, { max: 1, prepare: false });
+  const db = postgres(connectionString, { max: 1, prepare: false, ssl: process.env.DATABASE_SSL === "true" ? "require" : false });
 
   try {
     await repository.initialize();
