@@ -75,6 +75,11 @@ jobs:
         env:
           DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
         run: npx tsx scripts/smoke-postgres.ts
+      - name: PostgreSQL-backed HTTP integration test
+        env:
+          DATABASE_URL: postgres://garageai_test:garageai_test_only@127.0.0.1:5432/garageai_test
+          DATABASE_SSL: "false"
+        run: npx tsx scripts/test-postgres-http.ts
       - name: Production dependency audit
         run: npm audit --omit=dev
       - name: Full dependency audit
