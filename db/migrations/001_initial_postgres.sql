@@ -65,11 +65,11 @@ CREATE TABLE IF NOT EXISTS garageai_rate_limits (
   scope text NOT NULL,
   bucket_key text NOT NULL,
   window_started_ms bigint NOT NULL,
-  count integer NOT NULL DEFAULT 0,
+  hit_count integer NOT NULL DEFAULT 0,
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT garageai_rate_limits_scope_nonempty CHECK (length(btrim(scope)) BETWEEN 1 AND 64),
   CONSTRAINT garageai_rate_limits_key_nonempty CHECK (length(btrim(bucket_key)) BETWEEN 1 AND 512),
-  CONSTRAINT garageai_rate_limits_count_nonnegative CHECK (count >= 0),
+  CONSTRAINT garageai_rate_limits_count_nonnegative CHECK (hit_count >= 0),
   PRIMARY KEY (scope, bucket_key)
 );
 
