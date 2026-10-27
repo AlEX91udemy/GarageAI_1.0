@@ -12,6 +12,13 @@ import type { SessionRecord } from "./security";
 
 type Sql = ReturnType<typeof postgres>;
 
+export class ConcurrentGarageUpdateError extends Error {
+  constructor() {
+    super("Garage changed concurrently; reload the latest data before retrying.");
+    this.name = "ConcurrentGarageUpdateError";
+  }
+}
+
 export interface PostgresPersistenceOptions {
   connectionString: string;
   maxConnections?: number;
@@ -131,19 +138,25 @@ export class PostgresPersistence {
   }
 
   async snapshotForUser(userId: string, create = false): Promise<GarageData> {
+    const result = await this.snapshotForUserWithRevision(userId, create);
+    return result.garage;
+  }
+
+  async snapshotForUserWithRevision(userId: string, create = false): Promise<{ garage: GarageData; revision: number }> {
     this.assertInitialized();
     if (create) {
       await this.sql`
         INSERT INTO garageai_garages (user_id, data)
-        SELECT id, ${this.sql.json(JSON.parse(JSON.stringify(emptyGarage())))} FROM garageai_users WHERE id = ${userId}
+        SELECT id, ${this.sql.json(JSON.parse(JSON.stringify(emptyGarage())))}
+        FROM garageai_users WHERE id = ${userId}
         ON CONFLICT (user_id) DO NOTHING
       `;
     }
     const rows = await this.sql`
-      SELECT data FROM garageai_garages WHERE user_id = ${userId} LIMIT 1
+      SELECT data, revision FROM garageai_garages WHERE user_id = ${userId} LIMIT 1
     `;
-    if (!rows[0]) return emptyGarage();
-    return normalizeGarage(rows[0].data);
+    if (!rows[0]) return { garage: emptyGarage(), revision: 0 };
+    return { garage: normalizeGarage(rows[0].data), revision: Number(rows[0].revision) };
   }
 
   async commitGarage(userId: string, snapshot: GarageData): Promise<GarageData> {
@@ -160,6 +173,38 @@ export class PostgresPersistence {
     `;
     if (!rows[0]) throw new Error("Cannot persist garage: owner account does not exist");
     return normalizeGarage(rows[0].data);
+  }
+
+  async commitGarageVersioned(
+    userId: string,
+    snapshot: GarageData,
+    expectedRevision: number,
+  ): Promise<{ garage: GarageData; revision: number }> {
+    this.assertInitialized();
+    const committed = normalizeGarage(cloneGarage(snapshot));
+    committed.lastUpdated = new Date().toISOString();
+    const rows = await this.sql`
+      UPDATE garageai_garages
+      SET data = ${this.sql.json(JSON.parse(JSON.stringify(committed)))},
+          updated_at = now(),
+          revision = revision + 1
+      WHERE user_id = ${userId} AND revision = ${expectedRevision}
+      RETURNING data, revision
+    `;
+    if (!rows[0]) {
+      const owners = await this.sql`SELECT 1 FROM garageai_users WHERE id = ${userId} LIMIT 1`;
+      if (!owners[0]) throw new Error("Cannot persist garage: owner account does not exist");
+      throw new ConcurrentGarageUpdateError();
+    }
+    return { garage: normalizeGarage(rows[0].data), revision: Number(rows[0].revision) };
+  }
+
+  async schedulePersist(userId: string, snapshot: GarageData): Promise<void> {
+    await this.commitGarage(userId, snapshot);
+  }
+
+  async flush(): Promise<void> {
+    // PostgreSQL writes are committed before the method resolves.
   }
 
   async run<T>(userId: string, mutator: (garage: GarageData) => T | Promise<T>): Promise<T> {
