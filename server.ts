@@ -2070,8 +2070,13 @@ app.post("/api/auth/register", async (req, res) => {
   if (rateLimitedLogin(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
-  if (await store.getUserByName(credentials.username!)) {
-    return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
+  try {
+    if (await store.getUserByName(credentials.username!)) {
+      return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
+    }
+  } catch (error) {
+    console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
   void (async () => {
     const userId = newId("user");
@@ -2095,56 +2100,74 @@ app.post("/api/auth/login", async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: "Введите логин и пароль" });
   }
-  const user = await store.getUserByName(username);
+  let user;
+  try {
+    user = await store.getUserByName(username);
+  } catch (error) {
+    console.error("Login lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
+  }
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
   }
   loginAttempts.delete(req.ip || "unknown");
-  res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+  try {
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+  } catch (error) {
+    console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
 });
 
 app.post("/api/auth/logout", async (req, res) => {
-  const session = await getSession(req);
-  if (session) {
-    if (store instanceof PostgresPersistence) await store.revokeSession(session.tokenHash, Date.now());
-    else {
-      session.revokedAt = Date.now();
-      await persistSessions();
+  try {
+    const session = await getSession(req);
+    if (session) {
+      if (store instanceof PostgresPersistence) await store.revokeSession(session.tokenHash, Date.now());
+      else {
+        session.revokedAt = Date.now();
+        await persistSessions();
+      }
     }
+    res.setHeader("Set-Cookie", clearSessionCookie());
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Logout failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось завершить сессию. Повторите попытку." });
   }
-  res.setHeader("Set-Cookie", clearSessionCookie());
-  res.json({ success: true });
 });
 
 app.get("/api/auth/session", async (req, res) => {
-  const session = await getSession(req);
-  if (!session) return res.status(401).json({ error: "Сессия не найдена" });
-  const user = await store.getUserById(session.userId);
-  if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
+  try {
+    const session = await getSession(req);
+    if (!session) return res.status(401).json({ error: "Сессия не найдена" });
+    const user = await store.getUserById(session.userId);
+    if (!user) return res.status(401).json({ error: "Аккаунт не найден" });
 
-  // Скользящее продление сессии при активной работе.
-  let renewedToken: string | null = null;
-  if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
-    session.expiresAt = Date.now() + SESSION_TTL_MS;
-    renewedToken = session.csrfSecret;
-  }
-  if (renewedToken) {
-    const token = crypto.randomBytes(32).toString("base64url");
-    const previousHash = session.tokenHash;
-    const nextHash = hashToken(token);
-    session.tokenHash = nextHash;
-    session.csrfSecret = crypto.randomBytes(24).toString("base64url");
-    if (store instanceof PostgresPersistence) {
-      await store.revokeSession(previousHash, Date.now());
-      await store.putSession(session);
-    } else {
-      sessions.delete(previousHash);
-      sessions.set(nextHash, session);
-      await persistSessions();
+    // Скользящее продление сессии при активной работе.
+    let renewedToken = false;
+    if (session.expiresAt - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+      const token = crypto.randomBytes(32).toString("base64url");
+      const previousHash = session.tokenHash;
+      session.tokenHash = hashToken(token);
+      session.expiresAt = Date.now() + SESSION_TTL_MS;
+      session.csrfSecret = crypto.randomBytes(24).toString("base64url");
+      if (store instanceof PostgresPersistence) {
+        await store.revokeSession(previousHash, Date.now());
+        await store.putSession(session);
+      } else {
+        sessions.delete(previousHash);
+        sessions.set(session.tokenHash, session);
+        await persistSessions();
+      }
+      res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+      renewedToken = true;
     }
-    res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
+    return res.json({ username: user.username, csrfToken: session.csrfSecret, ...(renewedToken ? {} : {}) });
+  } catch (error) {
+    console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });
   }
-  res.json({ username: user.username, csrfToken: session.csrfSecret });
 });
 
 // Backup, Export, and Restore API (только для владельца гаража)
