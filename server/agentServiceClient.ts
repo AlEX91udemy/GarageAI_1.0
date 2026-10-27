@@ -70,6 +70,7 @@ export async function runAgentService(
   env: AgentServiceEnvironment,
   payload: AgentServiceRequest,
   fetchImpl: typeof fetch = fetch,
+  callerId?: string,
 ): Promise<AgentServiceResponse> {
   const baseValue = env.AGENTS_SERVICE_URL?.trim();
   const appToken = env.AGENTS_API_TOKEN?.trim();
@@ -97,6 +98,9 @@ export async function runAgentService(
     "content-type": "application/json",
     "x-agents-token": appToken,
   };
+  if (callerId && /^[a-zA-Z0-9_-]{1,128}$/.test(callerId)) {
+    headers["x-agents-caller"] = callerId;
+  }
 
   if (isProduction) {
     const audience = env.AGENTS_SERVICE_AUDIENCE?.trim() || base.origin;
