@@ -2205,7 +2205,7 @@ app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
   }
 
   try {
-    const result = await runAgentService(process.env, { task, agents });
+    const result = await runAgentService(process.env, { task, agents }, fetch, requestContext.getStore()?.userId);
     return res.json(result);
   } catch (error) {
     if (error instanceof AgentServiceClientError) {
