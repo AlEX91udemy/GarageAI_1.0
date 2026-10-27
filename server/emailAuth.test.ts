@@ -15,7 +15,7 @@ describe("email authentication helpers", () => {
   });
 
   it("generates an eight-digit code", () => {
-    expect(generateEmailLoginCode()).toMatch(/^\\d{8}$/);
+    expect(generateEmailLoginCode()).toMatch(/^\d{8}$/);
   });
 
   it("binds the code hash to both email and secret pepper", () => {
