@@ -8,6 +8,8 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 import re
+import tempfile
+from pathlib import Path
 
 from agents_service.app import AgentRequest, run_agents, _agent_request_windows, _repo_snapshot
 
@@ -41,6 +43,22 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertNotIn("package-lock.json", included_files)
         self.assertLessEqual(len(snapshot), 46000)
 
+    def test_snapshot_redacts_generic_secret_and_token_assignments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "review.ts"
+            source.write_text(
+                'const secret = "sentinel-secret-value"\\n'
+                'const authToken = "sentinel-token-value"\\n'
+                'const clientSecret = "sentinel-client-secret-value"\\n',
+                encoding="utf-8",
+            )
+            with patch("agents_service.app.REPO_ROOT", Path(directory)):
+                snapshot = _repo_snapshot()
+
+        self.assertNotIn("sentinel-secret-value", snapshot)
+        self.assertNotIn("sentinel-token-value", snapshot)
+        self.assertNotIn("sentinel-client-secret-value", snapshot)
+        self.assertGreaterEqual(snapshot.count("[REDACTED]"), 3)
     def test_disabled_when_api_token_is_not_configured(self):
         with patch.dict(os.environ, {"AGENTS_API_TOKEN": ""}, clear=False):
             with self.assertRaises(HTTPException) as ctx:
