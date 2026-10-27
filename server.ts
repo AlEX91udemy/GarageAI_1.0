@@ -2022,7 +2022,7 @@ async function enforceAiRateLimit(req: express.Request, res: express.Response, n
 
   if (store instanceof PostgresPersistence) {
     try {
-      const result = await store.consumeRateLimit("ai", clientId, AI_RATE_LIMIT, AI_RATE_WINDOW_MS, now);
+      const result = await store.consumeRateLimit("ai", hashToken(clientId), AI_RATE_LIMIT, AI_RATE_WINDOW_MS, now);
       if (!result.allowed) {
         res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
         return res.status(429).json({ error: "Слишком много AI-запросов. Повторите попытку позже." });
@@ -2071,7 +2071,7 @@ async function rateLimitedLogin(req: express.Request, res: express.Response): Pr
 
   if (store instanceof PostgresPersistence) {
     try {
-      const result = await store.consumeRateLimit("login", clientId, LOGIN_LIMIT, LOGIN_WINDOW_MS, now);
+      const result = await store.consumeRateLimit("login", hashToken(clientId), LOGIN_LIMIT, LOGIN_WINDOW_MS, now);
       if (!result.allowed) {
         res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
         res.status(429).json({ error: "Слишком много попыток входа. Повторите позже." });
@@ -2100,7 +2100,7 @@ async function rateLimitedLogin(req: express.Request, res: express.Response): Pr
 async function clearLoginAttempts(clientId: string): Promise<void> {
   if (store instanceof PostgresPersistence) {
     try {
-      await store.resetRateLimit("login", clientId);
+      await store.resetRateLimit("login", hashToken(clientId));
     } catch (error) {
       console.error("Login rate-limit reset failed:", error instanceof Error ? error.message : "unknown error");
     }
