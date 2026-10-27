@@ -33,6 +33,10 @@ jobs:
         run: npm test
       - name: Production build
         run: npm run build
+      - name: Build web container
+        run: docker build -f Dockerfile -t garageai-web:ci .
+      - name: Build private agent container
+        run: docker build -f agents_service/Dockerfile -t garageai-agents:ci .
       - name: Catalog audit
         run: npm run catalog:audit
       - name: Production dependency audit
