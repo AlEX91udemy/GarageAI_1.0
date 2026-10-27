@@ -279,6 +279,60 @@ export class PostgresPersistence {
     `;
   }
 
+  async consumeRateLimit(
+    scope: string,
+    bucketKey: string,
+    limit: number,
+    windowMs: number,
+    now = Date.now(),
+  ): Promise<{ allowed: boolean; count: number; retryAfterMs: number }> {
+    this.assertInitialized();
+    if (!scope.trim() || scope.length > 64 || !bucketKey.trim() || bucketKey.length > 512) {
+      throw new Error("Invalid rate-limit key");
+    }
+    if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(windowMs) || windowMs < 1) {
+      throw new Error("Invalid rate-limit policy");
+    }
+    const rows = await this.sql`
+      INSERT INTO garageai_rate_limits (scope, bucket_key, window_started_ms, hit_count, updated_at)
+      VALUES (${scope}, ${bucketKey}, ${now}, 1, now())
+      ON CONFLICT (scope, bucket_key) DO UPDATE SET
+        window_started_ms = CASE
+          WHEN garageai_rate_limits.window_started_ms + ${windowMs} <= ${now} THEN ${now}
+          ELSE garageai_rate_limits.window_started_ms
+        END,
+        hit_count = CASE
+          WHEN garageai_rate_limits.window_started_ms + ${windowMs} <= ${now} THEN 1
+          ELSE LEAST(garageai_rate_limits.hit_count + 1, ${limit} + 1)
+        END,
+        updated_at = now()
+      RETURNING window_started_ms, hit_count
+    `;
+    const startedAt = Number(rows[0].window_started_ms);
+    const count = Number(rows[0].hit_count);
+    return {
+      allowed: count <= limit,
+      count,
+      retryAfterMs: Math.max(0, startedAt + windowMs - now),
+    };
+  }
+
+  async resetRateLimit(scope: string, bucketKey: string): Promise<void> {
+    this.assertInitialized();
+    await this.sql`
+      DELETE FROM garageai_rate_limits WHERE scope = ${scope} AND bucket_key = ${bucketKey}
+    `;
+  }
+
+  async deleteOldRateLimits(now = Date.now(), maxAgeMs = 24 * 60 * 60 * 1000): Promise<number> {
+    this.assertInitialized();
+    const cutoff = new Date(now - maxAgeMs);
+    const result = await this.sql`
+      DELETE FROM garageai_rate_limits WHERE updated_at < ${cutoff}
+    `;
+    return result.count;
+  }
+
   async deleteExpiredSessions(now = Date.now()): Promise<number> {
     this.assertInitialized();
     const result = await this.sql`

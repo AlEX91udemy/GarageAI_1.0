@@ -8,6 +8,7 @@ Status: PostgreSQL schema, async repository, PostgreSQL-backed sessions, revisio
 - `garageai_users`: account IDs, normalized unique usernames, existing scrypt password hashes.
 - `garageai_garages`: one JSONB document per user. The current domain model remains JSON-shaped while persistence becomes transactional; this avoids a risky simultaneous domain rewrite.
 - `garageai_sessions`: hashed session token, CSRF secret, owner, expiry and revocation state. Raw session cookies must never be stored.
+- `garageai_rate_limits`: atomic shared counters for AI and login/registration quotas, so limits apply across Cloud Run instances rather than only within one process.
 - Application connections use a bounded pool, TLS/Cloud SQL connector or Cloud SQL Unix socket, least-privilege runtime identity, and Secret Manager for credentials if a password is used.
 - Every garage read/write is scoped by authenticated `user_id`; session and garage changes commit transactionally. No process-local session map or container file is authoritative.
 
