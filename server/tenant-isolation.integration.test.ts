@@ -71,7 +71,7 @@ describe("HTTP tenant isolation", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "garageai-http-isolation-"));
     const port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;
-    child = spawn(
+    const spawned = spawn(
       process.execPath,
       ["node_modules/tsx/dist/cli.mjs", "server.ts"],
       {
@@ -86,11 +86,12 @@ describe("HTTP tenant isolation", () => {
           OPENROUTER_API_KEY: "",
           ALLOWED_ORIGINS: baseUrl,
         },
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
       },
     );
-    child.stdout.on("data", (chunk) => { childOutput += String(chunk); });
-    child.stderr.on("data", (chunk) => { childOutput += String(chunk); });
+    child = spawned;
+    spawned.stdout.on("data", (chunk) => { childOutput += String(chunk); });
+    spawned.stderr.on("data", (chunk) => { childOutput += String(chunk); });
     await waitForServer();
   }, 30_000);
 
