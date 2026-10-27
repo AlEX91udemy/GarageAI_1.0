@@ -215,7 +215,13 @@ async def run_agents(
             detail="Too many agent requests. Retry later.",
             headers={"Retry-After": str(retry_after)},
         )
-    selected = request.agents or list(AGENT_BRIEFS)
+    if request.agents is not None and (
+        not request.agents
+        or len(request.agents) > len(AGENT_BRIEFS)
+        or len(set(request.agents)) != len(request.agents)
+    ):
+        raise HTTPException(400, "Agent list must be non-empty and contain no duplicates.")
+    selected = request.agents if request.agents is not None else list(AGENT_BRIEFS)
     unknown = sorted(set(selected) - set(AGENT_BRIEFS))
     if unknown:
         raise HTTPException(400, f"Unknown agents: {', '.join(unknown)}")
