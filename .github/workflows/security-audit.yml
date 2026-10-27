@@ -39,6 +39,8 @@ jobs:
         run: docker build -f agents_service/Dockerfile -t garageai-agents:ci .
       - name: Catalog audit
         run: npm run catalog:audit
+      - name: PostgreSQL schema contract audit
+        run: node scripts/audit-postgres-schema.mjs
       - name: Production dependency audit
         run: npm audit --omit=dev
       - name: Full dependency audit
