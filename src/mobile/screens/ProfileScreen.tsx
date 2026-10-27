@@ -194,17 +194,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
                   />
                 )}
-                <input
-                  type="email"
-                  value={authEmail}
-                  onChange={(event) => setAuthEmail(event.target.value)}
-                  placeholder="Gmail / электронная почта"
-                  autoComplete="email"
-                  required
-                  maxLength={254}
-                  disabled={authMode === "login" && emailCodeRequested && !useLegacyLogin}
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong disabled:opacity-70"
-                />
+                {(!useLegacyLogin || authMode === "register") && (
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                    placeholder="Gmail / электронная почта"
+                    autoComplete="email"
+                    required
+                    maxLength={254}
+                    disabled={authMode === "login" && emailCodeRequested}
+                    className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong disabled:opacity-70"
+                  />
+                )}
                 {!emailCodeRequested && (
                   <input
                     type="password"
