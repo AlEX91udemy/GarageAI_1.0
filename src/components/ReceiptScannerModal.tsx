@@ -69,25 +69,6 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     },
   ];
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const image = typeof reader.result === "string" ? reader.result : null;
-      if (!image) {
-        setScanError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
-        return;
-      }
-      setImagePreview(image);
-      setScanResult(null);
-      setScanError(null);
-      void handleScan(image);
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleScan = async (imageToScan: string | null = imagePreview) => {
     if (!imageToScan) return;
 
@@ -159,6 +140,26 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     } finally {
       setIsScanning(false);
     }
+  };
+
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const image = typeof reader.result === "string" ? reader.result : null;
+      if (!image) {
+        setScanError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
+        return;
+      }
+      setImagePreview(image);
+      setScanResult(null);
+      setScanError(null);
+      void handleScan(image);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleApplyToService = () => {
