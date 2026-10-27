@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const schemaPath = path.resolve("db/migrations/001_initial_postgres.sql");
-const sql = fs.readFileSync(schemaPath, "utf8");
+const emailSchemaPath = path.resolve("db/migrations/002_email_auth.sql");
+const sql = `${fs.readFileSync(schemaPath, "utf8")}\n${fs.readFileSync(emailSchemaPath, "utf8")}`;
 const required = [
   /CREATE TABLE IF NOT EXISTS garageai_users/i,
   /username_normalized text GENERATED ALWAYS AS \(lower\(btrim\(username\)\)\) STORED/i,
