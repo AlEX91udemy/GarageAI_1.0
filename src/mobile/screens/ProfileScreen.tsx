@@ -183,7 +183,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     Отмена
                   </button>
                 </div>
-                {authMode === "register" && (
+                {(authMode === "register" || (authMode === "login" && useLegacyLogin)) && (
                   <input
                     value={authUsername}
                     onChange={(event) => setAuthUsername(event.target.value)}
@@ -375,3 +375,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     </div>
   );
 };
+                {authMode === "login" && !emailCodeRequested && (
+                  <button type="button" onClick={() => { setUseLegacyLogin((value) => !value); setAuthError(null); setAuthNotice(null); setAuthPassword(""); }} className="w-full text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                    {useLegacyLogin ? "Войти по email с кодом" : "Войти по старому логину"}
+                  </button>
+                )}
