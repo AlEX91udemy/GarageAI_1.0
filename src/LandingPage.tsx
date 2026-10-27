@@ -169,10 +169,10 @@ export function LandingPage() {
               {isDark ? <Sun className="h-4 w-4 text-[#F59E0B]" /> : <Moon className="h-4 w-4" />}
             </button>
             <a
-              href="/app"
+              href="/app?view=mobile"
               className="garage-btn-anim inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#991B1B] whitespace-nowrap"
             >
-              <span>Открыть веб-приложение</span>
+              <span>Открыть мобильное приложение</span>
               <ArrowRight className="h-4 w-4 shrink-0" />
             </a>
           </div>
