@@ -13,6 +13,11 @@ describe("production storage safety", () => {
     expect(() => assertProductionStorageSafe({ NODE_ENV: "test" })).not.toThrow();
   });
 
+  it("allows production only when PostgreSQL is configured or demo override is explicit", () => {
+    expect(() => assertProductionStorageSafe({ NODE_ENV: "production", DATABASE_URL: "postgres://configured" })).not.toThrow();
+    expect(() => assertProductionStorageSafe({ NODE_ENV: "production", DATABASE_URL: "  " })).toThrow(/Production startup blocked/);
+  });
+
   it("requires explicit opt-in for a temporary production demo", () => {
     expect(() => assertProductionStorageSafe({
       NODE_ENV: "production",
