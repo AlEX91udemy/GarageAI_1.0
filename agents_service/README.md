@@ -1,6 +1,6 @@
 # GarageAI agents
 
-Четыре агента Google ADK анализируют репозиторий и возвращают план работы:
+Мультиагентный сервис использует Google GenAI SDK напрямую, без Google ADK runtime. Это позволяет применять исправленную OpenTelemetry API без конфликта ограничений ADK.
 
 - `architect` — архитектура и риски;
 - `developer` — изменения в коде;
@@ -14,7 +14,7 @@
 Из корня репозитория:
 
 ```powershell
-.\.venv-adk\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r agents_service\requirements.txt
 python -m uvicorn agents_service.app:app --host 0.0.0.0 --port 8080
 ```
