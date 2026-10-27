@@ -58,6 +58,17 @@ The combined main state has been validated in two adjacent PR runs: [40490128356
 - Location: `agents_service/app.py`, `run_agents()`.
 - Finding: explicit selections above three agents were rejected, but omitting `agents` selected all five configured agents, bypassing the intended paid-model fan-out limit and potentially multiplying request cost.
 - Remediation merged to `main`: omitted selections now default to `architect`, `qa`, and `ops`; a regression test verifies the default invokes no more than three agents. PR CI passed in [run 40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417). It has not been deployed.
+### HIGH — Agent client followed upstream redirects with credentials attached
+- Location: `server/agentServiceClient.ts`, metadata identity and private agent `fetch()` calls.
+- Finding: the client sent `X-Agents-Token` and, in production, a Cloud Run ID token. Fetch followed redirects by default. A redirect from a misconfigured or compromised upstream could redirect an authenticated request to another origin.
+- Remediation on branch `fix/agent-security-hardening`: set `redirect: "error"` for both metadata-server and agent-service requests, with client-test assertions.
+- Verification: CI must pass before merge. No production services or cloud resources were changed.
+
+### MEDIUM — Agent source-snapshot redaction missed generic secret/token variable names
+- Location: `agents_service/app.py`, `_repo_snapshot()`.
+- Finding: the snapshot redaction covered API keys, passwords, and several named credential patterns, but not generic assignments such as `secret`, `authToken`, or `clientSecret`. If accidentally committed, these could be forwarded to a paid model in the source snapshot.
+- Remediation on branch `fix/agent-security-hardening`: extend assignment and mapping-key redaction to generic secret/token/credential names and add sentinel-based regression coverage.
+- Verification: CI must pass before merge. This defense-in-depth does not replace secret scanning or credential rotation.
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
