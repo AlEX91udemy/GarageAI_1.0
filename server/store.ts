@@ -13,6 +13,13 @@ export interface GarageData {
   lastUpdated: string;
 }
 
+export class UserAlreadyExistsError extends Error {
+  constructor() {
+    super("Пользователь с таким логином уже существует");
+    this.name = "UserAlreadyExistsError";
+  }
+}
+
 export interface UserRecord {
   id: string;
   username: string;
@@ -241,6 +248,10 @@ export class GarageStore {
 
   async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
     const task = this.writeChain.then(() => {
+      const normalizedUsername = username.trim().toLowerCase();
+      if (this.state.users.some((user) => user.username.trim().toLowerCase() === normalizedUsername)) {
+        throw new UserAlreadyExistsError();
+      }
       const created: UserRecord = {
         id,
         username,

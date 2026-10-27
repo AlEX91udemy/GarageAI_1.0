@@ -1,0 +1,83 @@
+name: GarageAI security and quality audit
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: garageai-audit-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  node-checks:
+    name: Node.js tests, typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Build web container
+        run: docker build -f Dockerfile -t garageai-web:ci .
+      - name: Build private agent container
+        run: docker build -f agents_service/Dockerfile -t garageai-agents:ci .
+      - name: Catalog audit
+        run: npm run catalog:audit
+      - name: Production dependency audit
+        run: npm audit --omit=dev
+      - name: Full dependency audit
+        run: npm audit
+
+  python-security:
+    name: Python dependency security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python syntax check
+        run: python -m compileall -q agents_service
+      - name: Install agent dependencies and test runner
+        run: python -m pip install -r agents_service/requirements.txt pytest
+      - name: Agent API authentication tests
+        run: python -m unittest agents_service.test_app -v
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+      - name: Audit agents service dependencies
+        run: pip-audit -r agents_service/requirements.txt
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Ensure PR base branch history is present
+        run: git fetch origin main
+      - name: Scan repository and Git history with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
