@@ -328,7 +328,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   Поддерживаются фото чеков СТО, квитанции, накладные, чеки АЗС
                 </p>
                 <label className="mt-3 inline-block px-4 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-neutral-800 transition">
-                  Выбрать файл
+                  Сканировать чек / открыть камеру
                   <input
                     type="file"
                     accept="image/*"
