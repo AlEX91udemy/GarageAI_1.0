@@ -84,6 +84,10 @@ describe("HTTP tenant isolation", () => {
           GARAGE_SESSIONS_FILE: path.join(tempDir, "sessions.json"),
           GEMINI_API_KEY: "",
           OPENROUTER_API_KEY: "",
+          OPENROUTER_RECEIPT_API_KEY: "",
+          OPENROUTER_DOCUMENT_API_KEY: "",
+          GOOGLE_GENAI_USE_VERTEXAI: "false",
+          GOOGLE_CLOUD_PROJECT: "",
           AGENTS_SERVICE_URL: "https://garageai-agents-test.example",
           AGENTS_API_TOKEN: "integration-test-token",
           AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation",
@@ -113,6 +117,21 @@ describe("HTTP tenant isolation", () => {
       });
     }
     if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it("reports provider readiness without mislabeling Vertex AI as an API key", async () => {
+    const response = await fetch(`${baseUrl}/api/health`);
+    expect(response.status).toBe(200);
+    const health = await response.json() as {
+      hasApiKey: boolean;
+      hasAiConfigured: boolean;
+      hasGeminiConfigured: boolean;
+      vertexAiEnabled: boolean;
+    };
+    expect(health.hasApiKey).toBe(false);
+    expect(health.hasAiConfigured).toBe(false);
+    expect(health.hasGeminiConfigured).toBe(false);
+    expect(health.vertexAiEnabled).toBe(false);
   });
 
   it("rejects anonymous access to private garage routes", async () => {
