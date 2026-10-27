@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import os
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from google.genai import types
 from google.adk.agents import LlmAgent
@@ -83,7 +84,16 @@ async def run_agents_help() -> dict[str, Any]:
     }
 
 @app.post("/agents/run", response_model=AgentResponse)
-async def run_agents(request: AgentRequest) -> AgentResponse:
+async def run_agents(
+    request: AgentRequest,
+    x_agents_token: str | None = Header(default=None, alias="X-Agents-Token"),
+) -> AgentResponse:
+    # Fail closed: never allow paid model calls unless an application token is configured.
+    expected_token = os.getenv("AGENTS_API_TOKEN", "")
+    if not expected_token:
+        raise HTTPException(503, "Agent API is disabled: configure AGENTS_API_TOKEN.")
+    if not x_agents_token or not hmac.compare_digest(x_agents_token, expected_token):
+        raise HTTPException(401, "Invalid or missing agent API token.")
     selected = request.agents or list(AGENT_BRIEFS)
     unknown = sorted(set(selected) - set(AGENT_BRIEFS))
     if unknown:
