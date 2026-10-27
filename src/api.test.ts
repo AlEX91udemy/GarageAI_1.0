@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchGarageData,
   runGarageAiAgents,
+  type GarageAiAgentName,
   getAdminToken,
   setAdminToken,
 } from "./api";
@@ -57,7 +58,7 @@ describe("runGarageAiAgents", () => {
   });
 
   it("sends the requested task and returns agent results", async () => {
-    const payload = { task: "Audit tenant isolation", agents: ["qa"] };
+    const payload: { task: string; agents: GarageAiAgentName[] } = { task: "Audit tenant isolation", agents: ["qa"] };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       task: payload.task,
       results: { qa: "No cross-user leak found." },
