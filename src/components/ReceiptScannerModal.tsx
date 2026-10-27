@@ -35,6 +35,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [sampleFallbackResult, setSampleFallbackResult] = useState<any>(null);
 
   // Ready-made sample checks for instant testing
   const samplePresets = [
@@ -42,6 +43,23 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       title: "Заказ-наряд СТО Fit Service",
       sub: "ТО: Масло Motul, колодки Brembo, фильтр",
       dataUrl: SAMPLE_RECEIPT_IMAGE,
+      fallbackResult: {
+        merchantName: "Fit Service • Автоцентр",
+        date: "2026-05-14",
+        totalAmount: 14900,
+        category: "repair",
+        description: "Замена масла ДВС + фильтр и замена передних колодок",
+        works: [
+          { description: "Замена масла ДВС + фильтр", cost: 1800 },
+          { description: "Замена передних колодок", cost: 2200 },
+        ],
+        parts: [
+          { name: "Моторное масло Motul 8100 X-cess 5W-40 (4.5л)", brand: "Motul", partNumber: "102784", quantity: 1, price: 6200 },
+          { name: "Фильтр масляный", brand: "Mann-Filter", partNumber: "W 67/1", quantity: 1, price: 750 },
+          { name: "Колодки передние тормозные", brand: "Brembo", partNumber: "P 56 062", quantity: 1, price: 3950 },
+        ],
+        notes: "Гарантия на работы и запчасти: 12 мес. / 20 000 км",
+      },
     },
     {
       title: "Чек АЗС Лукойл",
@@ -66,6 +84,17 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
           <text x="190" y="385" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8">ФП: 9812401824 • СПАСИБО ЗА ПОКУПКУ!</text>
         </svg>
       `),
+      fallbackResult: {
+        merchantName: "АЗС Лукойл № 512",
+        date: "2026-06-05",
+        totalAmount: 3313,
+        category: "fuel",
+        description: "Заправка топливом АИ-95-К5 ЭКТО",
+        fuelDetails: { fuelType: "АИ-95", liters: 55.4, pricePerLiter: 59.8 },
+        works: [],
+        parts: [],
+        notes: "Оплачено безналично",
+      },
     },
   ];
 
