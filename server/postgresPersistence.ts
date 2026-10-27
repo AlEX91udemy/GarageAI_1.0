@@ -24,6 +24,7 @@ export interface PostgresPersistenceOptions {
   maxConnections?: number;
   ssl?: "require" | false;
   migrationsDirectory?: string;
+  runMigrations?: boolean;
 }
 
 const MIGRATION_FILES = ["001_initial_postgres.sql"] as const;
@@ -56,16 +57,24 @@ export class PostgresPersistence {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    // Serialize migration setup inside PostgreSQL so concurrent instances do
-    // not race while creating the same schema.
-    await this.sql.begin(async (tx) => {
-      await tx`SELECT pg_advisory_xact_lock(7461726167654149)`;
-      const directory = this.options.migrationsDirectory ?? path.resolve(process.cwd(), "db/migrations");
-      for (const filename of MIGRATION_FILES) {
-        const migration = await fs.readFile(path.join(directory, filename), "utf8");
-        await tx.unsafe(migration);
-      }
-    });
+    if (this.options.runMigrations !== false) {
+      // Serialize migration setup so concurrent local/test instances cannot race.
+      await this.sql.begin(async (tx) => {
+        await tx`SELECT pg_advisory_xact_lock(7461726167654149)`;
+        const directory = this.options.migrationsDirectory ?? path.resolve(process.cwd(), "db/migrations");
+        for (const filename of MIGRATION_FILES) {
+          const migration = await fs.readFile(path.join(directory, filename), "utf8");
+          await tx.unsafe(migration);
+        }
+      });
+    } else {
+      // Production runtime identities should not need DDL privileges. Apply
+      // migrations from a controlled one-off job before deploying the revision.
+      const rows = await this.sql`
+        SELECT version FROM garageai_schema_migrations WHERE version = 1 LIMIT 1
+      `;
+      if (!rows[0]) throw new Error("PostgreSQL schema migration 001 is missing; run the controlled migration job first");
+    }
     this.initialized = true;
   }
 
