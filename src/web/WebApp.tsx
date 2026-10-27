@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { WebSidebar } from "./layouts/WebSidebar";
 import { WebTopBar } from "./layouts/WebTopBar";
-import { runGarageAiAgents, type GarageAiAgentName } from "../api";
+import { runGarageAiAgents, login, register, restoreSession, requestEmailLoginCode, verifyEmailLoginCode, type AuthSession, type GarageAiAgentName } from "../api";
 import {
   Vehicle,
   ServiceRecord,
@@ -78,6 +78,7 @@ export interface WebAppProps {
   onOpenBackup?: () => void;
   onSwitchToMobile?: () => void;
   onLogout?: () => void;
+  onAuthSuccess?: () => void;
 }
 
 const VIEW_TITLES: Record<ActiveView, string> = {
@@ -117,6 +118,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
     onOpenBackup,
     onSwitchToMobile,
     onLogout,
+    onAuthSuccess,
   } = props;
 
   const [activeView, setActiveView] = useState<ActiveView>("dashboard");
@@ -126,6 +128,60 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
   const [agentResults, setAgentResults] = useState<Record<string, string> | null>(null);
   const [agentError, setAgentError] = useState("");
   const [agentBusy, setAgentBusy] = useState(false);
+
+  const [accountSession, setAccountSession] = useState<AuthSession | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register" | null>(null);
+  const [authUsername, setAuthUsername] = useState("");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authCode, setAuthCode] = useState("");
+  const [authCodeRequested, setAuthCodeRequested] = useState(false);
+  const [useLegacyLogin, setUseLegacyLogin] = useState(false);
+  const [authNotice, setAuthNotice] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    restoreSession().then((session) => { if (active) setAccountSession(session); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  const submitAccountAuth = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!authMode) return;
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      if (authMode === "login" && !useLegacyLogin && !authCodeRequested) {
+        setAuthNotice(await requestEmailLoginCode(authEmail.trim(), authPassword));
+        setAuthCodeRequested(true);
+        setAuthPassword("");
+        return;
+      }
+      const session = authMode === "login"
+        ? useLegacyLogin ? await login(authUsername.trim(), authPassword) : await verifyEmailLoginCode(authEmail.trim(), authCode.trim())
+        : authCodeRequested ? await verifyEmailLoginCode(authEmail.trim(), authCode.trim()) : await register(authUsername.trim(), authPassword, authEmail.trim());
+      if (!session) {
+        setAuthCodeRequested(true);
+        setAuthNotice("Аккаунт создан. Введите код из письма для завершения регистрации.");
+        setAuthPassword("");
+        return;
+      }
+      setAccountSession(session);
+      setAuthMode(null);
+      setAuthPassword("");
+      setAuthCode("");
+      setAuthCodeRequested(false);
+      setAuthNotice("");
+      onAuthSuccess?.();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : "Ошибка авторизации");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -232,6 +288,45 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
   /* ------------------------------- Профиль -------------------------------- */
   const renderProfile = () => (
     <div className="space-y-6 max-w-3xl">
+      <section className={cardClass}>
+        <h2 className="text-base font-bold tracking-tight">Аккаунт GarageAI</h2>
+        {accountSession ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">{accountSession.username}</div>
+              {accountSession.email && <div className="text-xs text-slate-500">{accountSession.email}</div>}
+              <div className="mt-1 text-xs text-emerald-600">Вход выполнен</div>
+            </div>
+            <button type="button" onClick={() => { onLogout?.(); setAccountSession(null); }} className={ghostButton}>Выйти</button>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-3">
+            <p className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>Войдите, чтобы синхронизировать гараж с сервером. Для новых аккаунтов доступен вход по email и одноразовому коду.</p>
+            {!authMode ? (
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => { setAuthMode("login"); setAuthError(""); setAuthNotice(""); setAuthCodeRequested(false); setUseLegacyLogin(false); }} className="px-4 py-2 rounded-lg bg-[#B91C1C] text-white text-sm font-semibold">Войти</button>
+                <button type="button" onClick={() => { setAuthMode("register"); setAuthError(""); setAuthNotice(""); setAuthCodeRequested(false); setUseLegacyLogin(false); }} className={ghostButton}>Регистрация</button>
+              </div>
+            ) : (
+              <form onSubmit={submitAccountAuth} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">{authMode === "login" ? "Вход" : "Регистрация"}</span>
+                  <button type="button" onClick={() => setAuthMode(null)} className="text-xs text-slate-500">Отмена</button>
+                </div>
+                {(authMode === "register" || (authMode === "login" && useLegacyLogin)) && <input value={authUsername} onChange={(e) => setAuthUsername(e.target.value)} placeholder="Логин" autoComplete="username" maxLength={32} required className={`w-full rounded-lg border p-2.5 text-sm ${isDark ? "bg-[#0D131D] border-[#243044]" : "bg-white border-slate-200"}`} />}
+                {(!useLegacyLogin || authMode === "register") && <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="Gmail / электронная почта" autoComplete="email" maxLength={254} required disabled={authCodeRequested} className={`w-full rounded-lg border p-2.5 text-sm ${isDark ? "bg-[#0D131D] border-[#243044]" : "bg-white border-slate-200"}`} />}
+                {!authCodeRequested && <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="Пароль" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={8} required className={`w-full rounded-lg border p-2.5 text-sm ${isDark ? "bg-[#0D131D] border-[#243044]" : "bg-white border-slate-200"}`} />}
+                {authCodeRequested && <input inputMode="numeric" autoComplete="one-time-code" value={authCode} onChange={(e) => setAuthCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))} placeholder="Код из письма (8 цифр)" minLength={8} maxLength={8} required className={`w-full rounded-lg border p-2.5 text-sm ${isDark ? "bg-[#0D131D] border-[#243044]" : "bg-white border-slate-200"}`} />}
+                {authNotice && <p className="rounded-lg bg-emerald-500/10 p-2 text-xs text-emerald-600">{authNotice}</p>}
+                {authError && <p role="alert" className="rounded-lg bg-red-500/10 p-2 text-xs text-red-500">{authError}</p>}
+                <button type="submit" disabled={authBusy} className="w-full px-4 py-2.5 rounded-lg bg-[#B91C1C] text-white text-sm font-semibold disabled:opacity-60">{authBusy ? "Подождите…" : authMode === "register" ? authCodeRequested ? "Подтвердить код" : "Создать аккаунт" : useLegacyLogin ? "Войти" : authCodeRequested ? "Подтвердить код" : "Получить код на почту"}</button>
+                {authMode === "login" && !authCodeRequested && <button type="button" onClick={() => { setUseLegacyLogin((value) => !value); setAuthPassword(""); setAuthError(""); setAuthNotice(""); }} className="w-full text-xs text-slate-500">{useLegacyLogin ? "Войти по email с кодом" : "Войти по старому логину"}</button>}
+                {authMode === "login" && authCodeRequested && <button type="button" onClick={() => { setAuthCodeRequested(false); setAuthCode(""); setAuthNotice(""); setAuthError(""); }} className="w-full text-xs text-slate-500">Вернуться к вводу пароля</button>}
+              </form>
+            )}
+          </div>
+        )}
+      </section>
       <section className={cardClass}>
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#B91C1C] to-[#EF3038] flex items-center justify-center font-black text-lg text-white shadow-sm">
