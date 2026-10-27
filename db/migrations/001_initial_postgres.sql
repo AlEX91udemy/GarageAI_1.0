@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS garageai_garages (
 
 ALTER TABLE garageai_garages ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0;
 
-DO $
+DO $migration$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -41,8 +41,8 @@ BEGIN
     ALTER TABLE garageai_garages
       ADD CONSTRAINT garageai_garages_revision_nonnegative CHECK (revision >= 0);
   END IF;
-END
-$;
+END;
+$migration$;
 
 CREATE TABLE IF NOT EXISTS garageai_sessions (
   token_hash char(64) PRIMARY KEY,
