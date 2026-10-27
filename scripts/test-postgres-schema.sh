@@ -44,9 +44,12 @@ BEGIN
     NULL;
   END;
 
+  INSERT INTO garageai_users (id, username, password_hash)
+  VALUES ('ci-user-b', 'GarageAI-CI-B', 'test-only');
+
   BEGIN
     INSERT INTO garageai_garages (user_id, data)
-    VALUES ('ci-user-a', '[]'::jsonb);
+    VALUES ('ci-user-b', '[]'::jsonb);
     RAISE EXCEPTION 'non-object garage JSON unexpectedly accepted';
   EXCEPTION WHEN check_violation THEN
     NULL;
