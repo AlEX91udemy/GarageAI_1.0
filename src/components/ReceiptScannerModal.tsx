@@ -144,8 +144,20 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    // Allow choosing the same file again after an error.
+    input.value = "";
     if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setScanError("Выберите файл изображения (JPG, PNG или WebP).");
+      return;
+    }
+    if (file.size > 9 * 1024 * 1024) {
+      setScanError("Фото слишком большое. Максимальный размер — 9 МБ.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = () => {
