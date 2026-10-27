@@ -2161,8 +2161,7 @@ app.get("/api/auth/session", async (req, res) => {
       session.expiresAt = Date.now() + SESSION_TTL_MS;
       session.csrfSecret = crypto.randomBytes(24).toString("base64url");
       if (store instanceof PostgresPersistence) {
-        await store.revokeSession(previousHash, Date.now());
-        await store.putSession(session);
+        await store.rotateSession(previousHash, session, Date.now());
       } else {
         sessions.delete(previousHash);
         sessions.set(session.tokenHash, session);
