@@ -102,6 +102,9 @@ describe("LandingPage UI & UX Audit Suite", () => {
       "Ведите историю своего автомобиля в GarageAI"
     );
     expect(container.textContent).not.toContain("Мобильная версия");
+    expect(container.textContent).toContain(
+      "умный OCR-сканер документов и цифровая сервисная книжка"
+    );
     const heroSection = container.querySelector("main > section:first-of-type");
     expect(heroSection?.querySelectorAll("a").length).toBe(0);
   });
