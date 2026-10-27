@@ -7,23 +7,35 @@ export interface AiConfigurationEnvironment {
   GOOGLE_CLOUD_PROJECT?: string;
 }
 
-/**
- * The Vertex AI SDK path authenticates through Application Default Credentials
- * and does not require GEMINI_API_KEY. Require a project ID to avoid reporting
- * a usable Vertex configuration when the SDK cannot identify the project.
- */
-export function hasAiConfiguration(env: AiConfigurationEnvironment): boolean {
-  const hasApiKey = [
-    env.GEMINI_API_KEY,
-    env.OPENROUTER_API_KEY,
-    env.OPENROUTER_RECEIPT_API_KEY,
-    env.OPENROUTER_DOCUMENT_API_KEY,
-  ].some((value) => typeof value === "string" && value.trim().length > 0);
-
-  const hasVertexConfiguration =
+function hasVertexConfiguration(env: AiConfigurationEnvironment): boolean {
+  return (
     env.GOOGLE_GENAI_USE_VERTEXAI === "true" &&
     typeof env.GOOGLE_CLOUD_PROJECT === "string" &&
-    env.GOOGLE_CLOUD_PROJECT.trim().length > 0;
+    env.GOOGLE_CLOUD_PROJECT.trim().length > 0
+  );
+}
 
-  return hasApiKey || hasVertexConfiguration;
+function hasNonEmptyKey(value: string | undefined): boolean {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Gemini API-key or Vertex AI/ADC configuration is required by endpoints that
+ * call the Google GenAI SDK directly.
+ */
+export function hasGeminiConfiguration(env: AiConfigurationEnvironment): boolean {
+  return hasNonEmptyKey(env.GEMINI_API_KEY) || hasVertexConfiguration(env);
+}
+
+/**
+ * The application also has OpenRouter-backed OCR endpoints, so this broader
+ * predicate must not be used to gate routes that call the Gemini SDK directly.
+ */
+export function hasAiConfiguration(env: AiConfigurationEnvironment): boolean {
+  return (
+    hasGeminiConfiguration(env) ||
+    hasNonEmptyKey(env.OPENROUTER_API_KEY) ||
+    hasNonEmptyKey(env.OPENROUTER_RECEIPT_API_KEY) ||
+    hasNonEmptyKey(env.OPENROUTER_DOCUMENT_API_KEY)
+  );
 }
