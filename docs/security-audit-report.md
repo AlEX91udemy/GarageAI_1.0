@@ -54,7 +54,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- The last fully observed CI result is historical: Node checks/build and Gitleaks passed, Python syntax and all six agent tests passed, but `pip-audit` failed on `opentelemetry-api 1.44.0` / `CVE-2026-114603`. Later commits added tests and container/deployment files; their CI status has not yet been confirmed.
+- Confirmed CI run 40459339384: TypeScript check passed; **90 tests passed across 16 files**, including the new two-user HTTP integration tests and store tests; production build, catalog audit, both npm audits, and Gitleaks passed. Python syntax and all six agent endpoint/source-snapshot tests passed. The Python dependency audit remains the only failure: `opentelemetry-api 1.44.0` / `CVE-2026-114603`. A follow-up run (40459432568) was queued to validate the added Docker container builds; its result is not yet confirmed.
 - Added `server/store.test.ts` for multi-user store isolation, serialized concurrent writes, persistence reload, and defensive copying.
 - Added `server/tenant-isolation.integration.test.ts` to start the HTTP server with temporary storage and verify anonymous denial plus cross-user vehicle and service-record read/update/delete/export isolation. It does not yet cover every resource family, restore/import semantics, or client-side guest mode. This is intended coverage and must be validated by CI before treating it as passing.
 - Resolve the `opentelemetry-api` finding without breaking `google-adk==2.13.0`; keep Python audit blocking and do not force an incompatible dependency or suppress the finding.
