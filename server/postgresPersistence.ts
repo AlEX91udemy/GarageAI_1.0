@@ -223,7 +223,7 @@ export class PostgresPersistence {
       draft.lastUpdated = new Date().toISOString();
       await tx`
         UPDATE garageai_garages
-        SET data = ${tx.json(JSON.parse(JSON.stringify(normalizeGarage(draft))))}, updated_at = now()
+        SET data = ${tx.json(JSON.parse(JSON.stringify(normalizeGarage(draft))))}, updated_at = now(), revision = revision + 1
         WHERE user_id = ${userId}
       `;
       return result;
