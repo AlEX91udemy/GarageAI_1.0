@@ -16,7 +16,7 @@ from google.adk.runners import InMemoryRunner
 
 load_dotenv()
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
 AGENT_BRIEFS = {
     "architect": "Review GarageAI architecture. Identify risks, dependencies, and an implementation plan. Do not edit files.",
