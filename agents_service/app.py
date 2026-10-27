@@ -85,9 +85,35 @@ def _repo_snapshot() -> str:
             content = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             continue
+        if relative == "server.ts":
+            lines = content.splitlines()
+            markers = [
+                "const PUBLIC_ROUTES",
+                "function requireAuth",
+                "function requireAiAccess",
+                'app.post("/api/auth/register"',
+                'app.post("/api/backup/import"',
+                'app.post("/api/ai/diagnose"',
+            ]
+            excerpts = []
+            used_ranges: list[tuple[int, int]] = []
+            for marker in markers:
+                found = next((i for i, line in enumerate(lines) if marker in line), None)
+                if found is None:
+                    continue
+                start, end = max(0, found - 12), min(len(lines), found + 34)
+                if any(start < old_end and end > old_start for old_start, old_end in used_ranges):
+                    continue
+                used_ranges.append((start, end))
+                excerpts.append(
+                    f"[{relative}:{start + 1}-{end}]\n"
+                    + "\n".join(f"{index + 1}: {lines[index]}" for index in range(start, end))
+                )
+            content = "\n\n[... targeted security-relevant excerpts ...]\n\n".join(excerpts)
         content = secret_assignment.sub(lambda match: (match.group(1) or match.group(3) or "") + "[REDACTED]", content)
         remaining = max_total_chars - total_chars
-        content = content[: min(max_file_chars, remaining)]
+        per_file_limit = 10000 if relative == "server.ts" else max_file_chars
+        content = content[: min(per_file_limit, remaining)]
         if not content.strip():
             continue
         section = f"\n--- FILE: {relative} ---\n{content}"
