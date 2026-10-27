@@ -149,6 +149,9 @@ async function main() {
     const loginCsrf = login.body.session?.csrfToken;
     assert(loginCookie.startsWith("garagehub_session=") && typeof loginCsrf === "string",
       "login after restart did not establish a valid session");
+    const loginBuckets = await db`SELECT count(*)::integer AS count FROM garageai_rate_limits WHERE scope = 'login'`;
+    assert(Number(loginBuckets[0]?.count ?? -1) === 0,
+      "successful login should clear the shared PostgreSQL login rate-limit bucket");
 
     const persisted = await requestJson(baseUrl, "/api/vehicles", { headers: { cookie: loginCookie } });
     assert(persisted.response.status === 200 && Array.isArray(persisted.body) &&
