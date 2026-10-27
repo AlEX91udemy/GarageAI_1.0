@@ -55,6 +55,40 @@ gcloud run deploy garageai-agents \
 
 This is a template, not a completed deployment. Check model availability and resolve the dependency-audit blocker first. Do not make the service public to work around authentication.
 
+## Connect the web service to the private agent service
+
+The Node API exposes an authenticated `POST /api/agents/run` proxy. It validates the task and allowed agent names, applies the Node-side AI rate limit, and calls `POST /agents/run` on the private Python service. In production it obtains a Google ID token from the Cloud Run metadata server and also sends `X-Agents-Token`; neither token is returned to the browser.
+
+Do this only after the JSON store/session persistence blockers are resolved and the Python dependency audit is clean:
+
+1. Get the deployed agent service URL and set the web runtime identity:
+   ```bash
+   export AGENTS_SERVICE_URL="$(gcloud run services describe garageai-agents --region europe-west1 --format='value(status.url)')"
+   export WEB_SERVICE_ACCOUNT="garageai-web-runtime@$PROJECT_ID.iam.gserviceaccount.com"
+   ```
+2. Grant only the web runtime service identity permission to invoke the agent service:
+   ```bash
+   gcloud run services add-iam-policy-binding garageai-agents \
+     --region europe-west1 \
+     --member="serviceAccount:$WEB_SERVICE_ACCOUNT" \
+     --role="roles/run.invoker"
+   ```
+3. Give the web service account Vertex AI access only if the web backend itself uses Vertex AI:
+   ```bash
+   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+     --member="serviceAccount:$WEB_SERVICE_ACCOUNT" \
+     --role="roles/aiplatform.user"
+   ```
+4. On the web service, configure the same Secret Manager secret `agents-api-token` used by the agent service, plus the agent service URL/audience. Keep the service public only if the application’s own login/session controls and production database are ready. Do not disable Cloud Run IAM on the agent service.
+
+Environment settings:
+- `AGENTS_SERVICE_URL`: exact Cloud Run service URL returned by `gcloud run services describe`.
+- `AGENTS_SERVICE_AUDIENCE`: normally the same service URL; use a custom value only when Cloud Run is configured for that audience.
+- `AGENTS_API_TOKEN`: same high-entropy secret in both services, stored in Secret Manager. Never commit or send it to the browser.
+- `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`: only when the web service uses Vertex AI directly.
+
+The proxy is covered by client-level unit tests and route input-validation tests. Real OIDC, IAM policy, Vertex AI and model invocation must still be smoke-tested in the actual project; this runbook does not indicate that cloud setup has been executed.
+
 ## Cloudflare routing
 
 1. Keep DNS for `garageai.site` in Cloudflare.
