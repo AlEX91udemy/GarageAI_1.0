@@ -19,7 +19,7 @@
 - Python dependency audit: **passed after remediation**. The service no longer depends on `google-adk==2.13.0` (whose OpenTelemetry cap prevented upgrading), uses `google-genai` directly, and explicitly requires `opentelemetry-api>=1.45.1,<2`. The verified CI environment installed `opentelemetry-api 1.45.1`; `pip-audit` reported `No known vulnerabilities found`.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
-The combined main state has been validated in two adjacent PR runs: [40490128356](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490128356) passed the PostgreSQL-backed HTTP integration test, and [40490021417](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490021417) passed the agent fan-out regression and Python security audit. These ran against separate PR heads before both merges; a fresh full run against the combined `main` state is still required. The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
+The PostgreSQL-backed HTTP integration test passed in [run 40490904322](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490904322), including login rate-limit reset; the agent redirect and generic-secret redaction checks passed in [run 40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384). Both changes are merged to `main`. This PR triggers a fresh full CI run against the combined current `main` state. The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
 
 ## Findings and remediation
 
@@ -61,14 +61,20 @@ The combined main state has been validated in two adjacent PR runs: [40490128356
 ### HIGH — Agent client followed upstream redirects with credentials attached
 - Location: `server/agentServiceClient.ts`, metadata identity and private agent `fetch()` calls.
 - Finding: the client sent `X-Agents-Token` and, in production, a Cloud Run ID token. Fetch followed redirects by default. A redirect from a misconfigured or compromised upstream could redirect an authenticated request to another origin.
-- Remediation on branch `fix/agent-security-hardening`: set `redirect: "error"` for both metadata-server and agent-service requests, with client-test assertions.
-- Verification: CI must pass before merge. No production services or cloud resources were changed.
+- Remediation merged to `main`: set `redirect: "error"` for both metadata-server and agent-service requests, with client-test assertions.
+- Verification: full PR CI passed in [run 40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384). No production services or cloud resources were changed.
 
 ### MEDIUM — Agent source-snapshot redaction missed generic secret/token variable names
 - Location: `agents_service/app.py`, `_repo_snapshot()`.
 - Finding: the snapshot redaction covered API keys, passwords, and several named credential patterns, but not generic assignments such as `secret`, `authToken`, or `clientSecret`. If accidentally committed, these could be forwarded to a paid model in the source snapshot.
-- Remediation on branch `fix/agent-security-hardening`: extend assignment and mapping-key redaction to generic secret/token/credential names and add sentinel-based regression coverage.
-- Verification: CI must pass before merge. This defense-in-depth does not replace secret scanning or credential rotation.
+- Remediation merged to `main`: extend assignment and mapping-key redaction to generic secret/token/credential names and add sentinel-based regression coverage.
+- Verification: Python dependency/security job passed in [run 40491308384](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40491308384). This defense-in-depth does not replace secret scanning or credential rotation.
+### MEDIUM — Successful login did not reset the shared PostgreSQL rate-limit bucket
+- Location: `server.ts`, authentication API.
+- Finding: after successful credentials, the handler cleared only the local in-memory map while PostgreSQL mode uses the shared `garageai_rate_limits` table.
+- Remediation merged to `main`: call `clearLoginAttempts()` for both local and PostgreSQL storage and assert the login bucket is cleared in the production HTTP integration test.
+- Verification: [run 40490904322](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40490904322) passed. Not deployed to Google Cloud.
+
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
 - The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
