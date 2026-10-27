@@ -170,66 +170,79 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertIn("GEMINI_API_KEY", str(ctx.exception.detail))
 
 
-class AgentRunnerLifecycleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_runner_closes_and_text_chunks_are_joined_with_newlines(self):
+class AgentClientLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_client_closes_and_agent_instruction_is_passed_separately(self):
         from types import SimpleNamespace
 
         from agents_service.app import _run_agent
 
-        class FakeSessionService:
-            async def create_session(self, **_kwargs):
-                return SimpleNamespace(id="session-1")
+        class FakeModels:
+            async def generate_content(self, **kwargs):
+                self.kwargs = kwargs
+                return SimpleNamespace(text="agent answer")
 
-        class FakeRunner:
-            def __init__(self, **_kwargs):
-                self.session_service = FakeSessionService()
+        class FakeAio:
+            def __init__(self):
+                self.models = FakeModels()
                 self.closed = False
 
-            async def run_async(self, **_kwargs):
-                for value in ("first line", "second line"):
-                    yield SimpleNamespace(
-                        content=SimpleNamespace(
-                            parts=[SimpleNamespace(text=value)]
-                        )
+            async def aclose(self):
+                self.closed = True
+
+        class FakeClient:
+            def __init__(self, **_kwargs):
+                self.aio = FakeAio()
+
+        client = FakeClient()
+        with patch("agents_service.app.genai.Client", return_value=client):
+            with patch.dict(os.environ, {"GOOGLE_GENAI_USE_VERTEXAI": "true"}, clear=False):
+                result = await _run_agent(
+                    {"model": "gemini-test", "instruction": "Act as QA."},
+                    "qa",
+                    "Review this repository.",
+                )
+
+        self.assertEqual(result, "agent answer")
+        self.assertTrue(client.aio.closed)
+        self.assertEqual(client.aio.models.kwargs["model"], "gemini-test")
+        self.assertEqual(client.aio.models.kwargs["contents"], "Review this repository.")
+        self.assertEqual(
+            client.aio.models.kwargs["config"].system_instruction,
+            "Act as QA.",
+        )
+
+    async def test_client_closes_when_provider_call_raises(self):
+        from types import SimpleNamespace
+
+        from agents_service.app import _run_agent
+
+        class FakeModels:
+            async def generate_content(self, **_kwargs):
+                raise RuntimeError("simulated provider failure")
+
+        class FakeAio:
+            def __init__(self):
+                self.models = FakeModels()
+                self.closed = False
+
+            async def aclose(self):
+                self.closed = True
+
+        class FakeClient:
+            def __init__(self, **_kwargs):
+                self.aio = FakeAio()
+
+        client = FakeClient()
+        with patch("agents_service.app.genai.Client", return_value=client):
+            with patch.dict(os.environ, {"GOOGLE_GENAI_USE_VERTEXAI": "true"}, clear=False):
+                with self.assertRaisesRegex(RuntimeError, "simulated provider failure"):
+                    await _run_agent(
+                        {"model": "gemini-test", "instruction": "Act as QA."},
+                        "qa",
+                        "Review this repository.",
                     )
 
-            async def close(self):
-                self.closed = True
-
-        runner = FakeRunner()
-        with patch("agents_service.app.InMemoryRunner", return_value=runner):
-            result = await _run_agent(object(), "qa", "test prompt")
-
-        self.assertEqual(result, "first line\nsecond line")
-        self.assertTrue(runner.closed)
-
-    async def test_runner_closes_when_model_execution_raises(self):
-        from types import SimpleNamespace
-
-        from agents_service.app import _run_agent
-
-        class FakeSessionService:
-            async def create_session(self, **_kwargs):
-                return SimpleNamespace(id="session-1")
-
-        class FakeRunner:
-            def __init__(self, **_kwargs):
-                self.session_service = FakeSessionService()
-                self.closed = False
-
-            async def run_async(self, **_kwargs):
-                raise RuntimeError("simulated provider failure")
-                yield  # Make this an async generator.
-
-            async def close(self):
-                self.closed = True
-
-        runner = FakeRunner()
-        with patch("agents_service.app.InMemoryRunner", return_value=runner):
-            with self.assertRaisesRegex(RuntimeError, "simulated provider failure"):
-                await _run_agent(object(), "qa", "test prompt")
-
-        self.assertTrue(runner.closed)
+        self.assertTrue(client.aio.closed)
 
 
 if __name__ == "__main__":
