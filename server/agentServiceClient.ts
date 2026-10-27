@@ -28,7 +28,7 @@ export class AgentServiceClientError extends Error {
 
 async function readBoundedResponseText(response: Response, maximumBytes: number): Promise<string> {
   const headerLength = response.headers.get("content-length");
-  if (headerLength && /^\\d+$/.test(headerLength) && Number(headerLength) > maximumBytes) {
+  if (headerLength && /^\d+$/.test(headerLength) && Number(headerLength) > maximumBytes) {
     throw new Error("Agent response exceeds the size limit.");
   }
   if (!response.body) return "";
