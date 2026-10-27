@@ -12,7 +12,7 @@ Status: **deployment prepared, not executed**. This document does not claim that
 
 The Node server refuses to start in production unless `DATABASE_URL` is configured and `GARAGE_POSTGRES_READY=true` explicitly records that migration/import and restore checks have passed. PostgreSQL schema migrations are verified on startup but are not executed by the runtime service by default. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
 
-Before production deployment, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data, restore a backup, and pass Cloud SQL canary tests for auth/session lifecycle, concurrent writes, tenant isolation and restart/scale. Only then set `GARAGE_POSTGRES_READY=true`. The current runbook is not a deploy-now checklist while this gate is active.
+Before production deployment, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data and restore a backup. Then enable `GARAGE_POSTGRES_READY=true` on a private canary only, with public traffic disabled, and run auth/session lifecycle, concurrent writes, tenant isolation, restart/scale and model smoke tests. Set the flag on the production service and route traffic only after the canary passes. The current runbook is not a deploy-now checklist while this gate is active.
 
 ## Suggested initial resources
 
