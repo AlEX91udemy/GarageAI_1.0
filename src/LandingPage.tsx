@@ -634,7 +634,13 @@ export function LandingPage() {
            ================================================================= */}
         <section className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-10 dark:border-[#243044] dark:bg-[#17202E]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.25 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]"
+            >
               <div>
                 <h2 className="text-xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
                   Ведите историю своего автомобиля в GarageAI
@@ -659,7 +665,7 @@ export function LandingPage() {
                   <span>Мобильная версия</span>
                 </a>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
       </main>
