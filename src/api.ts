@@ -27,12 +27,12 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string): Promise<AuthSession> {
+export async function register(username: string, password: string, email?: string): Promise<AuthSession> {
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(email?.trim() ? { email: email.trim() } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
@@ -50,6 +50,29 @@ export async function login(username: string, password: string): Promise<AuthSes
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  return data.session;
+}
+
+export async function requestEmailCode(email: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/email/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось отправить код");
+}
+
+export async function verifyEmailCode(email: string, code: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/email/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось войти по коду");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
   return data.session;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { LogIn, UserPlus, LogOut, Loader2, ShieldCheck } from "lucide-react";
-import { login, logout, register, restoreSession, type AuthSession } from "../api";
+import { login, logout, register, restoreSession, requestEmailCode, verifyEmailCode, type AuthSession } from "../api";
 
 export const AuthGate: React.FC<
   React.PropsWithChildren<{ onAuthenticated?: () => void }>
@@ -8,6 +8,10 @@ export const AuthGate: React.FC<
   const [session, setSession] = useState<AuthSession | null>(null);
   const [checking, setChecking] = useState(true);
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [emailMode, setEmailMode] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailCode, setEmailCode] = useState("");
+  const [codeRequested, setCodeRequested] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +41,10 @@ export const AuthGate: React.FC<
       setBusy(true);
       setError(null);
       try {
-        const next = mode === "login" ? await login(username, password) : await register(username, password);
+        const next = emailMode
+          ? (codeRequested ? await verifyEmailCode(email, emailCode) : (await requestEmailCode(email), setCodeRequested(true), null))
+          : (mode === "login" ? await login(username, password) : await register(username, password, email));
+        if (!next) return;
         setSession(next);
         onAuthenticated?.();
       } catch (err) {
@@ -91,8 +98,18 @@ export const AuthGate: React.FC<
               <UserPlus className="inline w-4 h-4 mr-1" />Регистрация
             </button>
           </div>
+          <button type="button" className="w-full text-xs text-slate-400 hover:text-white" onClick={() => { setEmailMode((value) => !value); setError(null); setCodeRequested(false); }}>
+            {emailMode ? "Войти по логину и паролю" : "Войти по email-коду"}
+          </button>
 
-          <label className="block text-sm text-slate-300">
+          {emailMode ? <label className="block text-sm text-slate-300">
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />
+            {codeRequested && <input inputMode="numeric" pattern="[0-9]{6}" value={emailCode} onChange={(e) => setEmailCode(e.target.value)} placeholder="Код из письма" className="mt-2 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />}
+          </label> : <>{mode === "register" && <label className="block text-sm text-slate-300">
+            Email для входа по коду (необязательно)
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" />
+          </label>}<label className="block text-sm text-slate-300">
             Логин
             <input
               value={username}
@@ -101,8 +118,8 @@ export const AuthGate: React.FC<
               className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60"
               required
             />
-          </label>
-          <label className="block text-sm text-slate-300">
+          </label></>}
+          {!emailMode && <label className="block text-sm text-slate-300">
             Пароль
             <input
               type="password"
@@ -118,7 +135,7 @@ export const AuthGate: React.FC<
                 Минимум 8 символов
               </span>
             )}
-          </label>
+          </label>}
           {error && (
             <p
               role="alert"
@@ -133,7 +150,7 @@ export const AuthGate: React.FC<
           >
             {busy ? (
               <Loader2 className="mx-auto animate-spin" />
-            ) : mode === "login" ? (
+            ) : emailMode ? (codeRequested ? "Войти" : "Отправить код") : mode === "login" ? (
               "Войти"
             ) : (
               "Создать аккаунт"

@@ -1,4 +1,7 @@
 -- Persistent, single-use email authentication challenges for multi-instance deployments.
+ALTER TABLE garageai_users ADD COLUMN IF NOT EXISTS email text;
+CREATE UNIQUE INDEX IF NOT EXISTS garageai_users_email_normalized_uq
+  ON garageai_users (lower(btrim(email))) WHERE email IS NOT NULL;
 ALTER TABLE garageai_users DROP CONSTRAINT IF EXISTS garageai_users_username_nonempty;
 ALTER TABLE garageai_users
   ADD CONSTRAINT garageai_users_username_nonempty CHECK (length(btrim(username)) BETWEEN 1 AND 254);
