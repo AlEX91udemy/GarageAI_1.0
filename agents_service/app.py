@@ -244,7 +244,8 @@ async def run_agents(
         or len(set(request.agents)) != len(request.agents)
     ):
         raise HTTPException(400, f"Agent list must contain 1-{MAX_AGENTS_PER_REQUEST} unique agents.")
-    selected = request.agents if request.agents is not None else list(AGENT_BRIEFS)
+    # Keep omitted selections within the paid-model fan-out cap.
+    selected = request.agents if request.agents is not None else ["architect", "qa", "ops"]
     unknown = sorted(set(selected) - set(AGENT_BRIEFS))
     if unknown:
         raise HTTPException(400, f"Unknown agents: {', '.join(unknown)}")
