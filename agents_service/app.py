@@ -75,7 +75,8 @@ def _repo_snapshot() -> str:
     total_chars = 0
     max_files, max_file_chars, max_total_chars = 40, 3500, 45000
     secret_assignment = re.compile(
-        r"(?im)^([^\n]*(?:api[_-]?key|access[_-]?token|password|client[_-]?secret|private[_-]?key|authorization)\s*[:=]\s*)([^\n]+)$"
+        r"(?im)^([ \t]*(?:(?:export[ \t]+)?(?:const|let|var)[ \t]+)?[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|PASSWORD|CLIENT[_-]?SECRET|PRIVATE[_-]?KEY|AUTHORIZATION)[A-Z0-9_]*[ \t]*=[ \t]*)([^\n]+)$"
+        r"|^([ \t]*[\"']?(?:api[_-]?key|access[_-]?token|password|client[_-]?secret|private[_-]?key|authorization)[\"']?[ \t]*:[ \t]*)([\"'][^\"']+[\"']|[A-Za-z0-9_./+=-]{16,})[ \t]*$"
     )
     for _, relative, path in candidates:
         if len(sections) >= max_files or total_chars >= max_total_chars:
@@ -84,7 +85,7 @@ def _repo_snapshot() -> str:
             content = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             continue
-        content = secret_assignment.sub(r"\1[REDACTED]", content)
+        content = secret_assignment.sub(lambda match: (match.group(1) or match.group(3) or "") + "[REDACTED]", content)
         remaining = max_total_chars - total_chars
         content = content[: min(max_file_chars, remaining)]
         if not content.strip():
