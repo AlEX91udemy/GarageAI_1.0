@@ -5,7 +5,7 @@
 - Review branch: `audit/security-hardening-2026-10-27`
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest completed run 40463851227)
+## CI results (latest completed run before storage guard: 40464203621)
 
 - TypeScript check (`npm run lint`): passed.
 - Unit tests: **113 passed across 18 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
@@ -38,7 +38,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 ### HIGH — Tenant isolation coverage is expanded but not complete
 - Location: `server.ts`, `server/store.ts`, `server/tenant-isolation.integration.test.ts`.
 - Tests verify cross-user isolation across vehicles, service records, reminders, fuel, inventory, repair tasks, OEM schedules and tuning, including export leakage, mutation denial, invalid cross-user restore references, valid restore, export → reset → import round-trip, per-user reset isolation, atomic rejection of invalid restore, and concurrent requests. Garage writes are queued per user within one Node process; duplicate usernames are atomically rejected with HTTP 409.
-- Latest completed Node job passed 112 tests across 18 files. This does not prove every route/edge case: guest-mode lifecycle, exhaustive malformed-input coverage, and coordination across separate instances remain open.
+- Latest completed Node job passed 113 tests across 18 files. This does not prove every route/edge case: guest-mode lifecycle, exhaustive malformed-input coverage, and coordination across separate instances remain open.
 
 ### MEDIUM — JSON persistence is not safe for horizontal scaling
 - Location: `server/store.ts`.
@@ -57,10 +57,10 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed run [40463851227](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40463851227): 113 Node tests across 18 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 10 Python tests passed. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
+- Latest completed run before storage guard [40464203621](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40464203621): 113 Node tests across 18 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 10 Python tests passed. CI after the new production storage guard is still pending. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
 - The latest published Google ADK release `2.13.0` and current upstream `main` still constrain OpenTelemetry API/SDK to `<=1.44`, while the fix is in `1.45.1`. The upstream repository metadata was checked on 2026-10-27; no compatible published ADK release was found. Keep the audit blocking. Do not force incompatible dependencies, patch around resolver constraints, or suppress the vulnerability. Wait for a compatible upstream release or separately plan a migration away from ADK. [Google ADK releases](https://github.com/google/adk-python/releases) and [OpenTelemetry fix](https://github.com/open-telemetry/opentelemetry-python/releases/tag/v1.45.1).
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests after the dependency CVE is resolved.
-- The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling.
+- The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling. A new startup guard now blocks `NODE_ENV=production` by default until that migration is complete; `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` is only for explicitly approved disposable demos and must never be used for real data.
 - The in-process per-user write queue does not coordinate separate application instances.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
 - Runtime garage data was removed from the current tree, but historical Git copies remain. Determine whether the records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
