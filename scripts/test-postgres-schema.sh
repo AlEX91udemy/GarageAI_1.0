@@ -9,9 +9,29 @@ set -euo pipefail
 
 export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
 
-# The migration must be repeatable and safe to re-apply.
+# The migration must support a pre-existing garage table from before the revision column.
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+psql -v ON_ERROR_STOP=1 <<'SQL'
+ALTER TABLE garageai_garages DROP CONSTRAINT IF EXISTS garageai_garages_revision_nonnegative;
+ALTER TABLE garageai_garages DROP COLUMN IF EXISTS revision;
+SQL
 psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+
+# A second re-apply must be idempotent and retain the revision guard.
+psql -v ON_ERROR_STOP=1 -f db/migrations/001_initial_postgres.sql
+psql -v ON_ERROR_STOP=1 <<'SQL'
+DO $migration$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'garageai_garages_revision_nonnegative'
+      AND conrelid = 'garageai_garages'::regclass
+  ) THEN
+    RAISE EXCEPTION 'revision constraint missing after upgrade';
+  END IF;
+END;
+$migration$;
+SQL
 
 psql -v ON_ERROR_STOP=1 <<'SQL'
 BEGIN;
