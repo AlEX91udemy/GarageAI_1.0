@@ -12,7 +12,6 @@ import {
   Fuel,
   Moon,
   ScanLine,
-  Smartphone,
   Sun,
 } from "lucide-react";
 import {
@@ -645,10 +644,10 @@ export function LandingPage() {
         <section className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-10 dark:border-[#243044] dark:bg-[#17202E]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.18 }}
-              transition={{ duration: 0.45, delay: 0.16, ease: "easeOut" }}
+              initial={{ opacity: 0, y: 32, scale: 0.98 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: false, amount: 0.35 }}
+              transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
               className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]"
             >
               <div>
@@ -666,13 +665,6 @@ export function LandingPage() {
                 >
                   <ArrowRight className="h-4 w-4" />
                   <span>Открыть веб-приложение</span>
-                </a>
-                <a
-                  href="/app?view=mobile"
-                  className="garage-btn-anim inline-flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-2.5 text-sm font-semibold text-[#0F172A] hover:bg-[#F8FAFC] dark:border-[#243044] dark:bg-[#17202E] dark:text-[#F8FAFC] dark:hover:bg-[#1E293B]"
-                >
-                  <Smartphone className="h-4 w-4" />
-                  <span>Мобильная версия</span>
                 </a>
               </div>
             </motion.div>
