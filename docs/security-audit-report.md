@@ -14,7 +14,7 @@
 - npm production dependency audit: **0 vulnerabilities**.
 - Full npm dependency audit: **0 vulnerabilities**.
 - Gitleaks scan of the change range: **no leaks detected**.
-- Python dependency audit: **failed**; `opentelemetry-api 1.44.0` is flagged for `CVE-2026-114603`, fixed in `1.45.1`. A direct minimum-version constraint has been added to `agents_service/requirements.txt`; CI must verify dependency resolution and audit again.
+- Python dependency audit: **failed**; `opentelemetry-api 1.44.0` is flagged for `CVE-2026-114603`, fixed in `1.45.1`. An attempted direct minimum-version constraint conflicts with the dependency constraints of `google-adk==2.13.0`, so it was reverted rather than leaving an un-installable environment. The Python audit remains a blocking failure until upstream ADK constraints are updated or a tested compatible upgrade path is established.
 - Note: dependency audit steps were non-blocking in the first run, so the overall run was green despite the Python finding. They are now configured to fail the workflow on findings.
 
 The unit-test log contains connection-refused messages for an optional localhost availability endpoint, followed by explicit offline fallback; the test suite still passed. This noise should be cleaned up separately so CI logs distinguish expected fallback from real failures.
@@ -47,7 +47,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Re-run `pip-audit -r agents_service/requirements.txt` after the version constraint.
+- Resolve the `opentelemetry-api 1.44.0` vulnerability without breaking `google-adk==2.13.0` dependency resolution; keep Python audit blocking until resolved.
 - Run a Python import/syntax check and add automated tests for missing/invalid `X-Agents-Token`.
 - Keep npm and Python dependency audits blocking.
 - Add tests for agent authentication and tenant isolation.
