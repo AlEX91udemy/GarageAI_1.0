@@ -672,22 +672,6 @@ export function LandingPage() {
         </section>
       </main>
 
-      {/* Подвал */}
-      <footer className="border-t border-[#E2E8F0] bg-[#F4F5F8] py-5 dark:border-[#243044] dark:bg-[#0D131D]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 text-xs text-[#536171] dark:text-[#94A3B8] sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2.5 font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
-            <img
-              src="/assets/aistudio/______-_______-__________-___-________-_________-20261020-2243_1f20d635.png"
-              alt="GarageAI"
-              className="h-6 w-6 rounded-md border border-[#E2E8F0] bg-white object-contain p-0.5 dark:border-[#243044]"
-            />
-            <span>GarageAI — умный OCR-сканер документов и цифровая сервисная книжка</span>
-          </div>
-          <span className="text-[11px] text-[#536171] dark:text-[#94A3B8]">
-            © {new Date().getFullYear()} GarageAI
-          </span>
-        </div>
-      </footer>
     </div>
   );
 }
