@@ -54,6 +54,7 @@ import {
   normalizeRussianPlate,
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { hasAiConfiguration } from "./server/aiConfig";
 import { validateGarageBackup } from "./server/backup";
 import {
   SESSION_RENEW_THRESHOLD_MS,
@@ -1965,7 +1966,7 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 
 function requireAiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY && !process.env.OPENROUTER_RECEIPT_API_KEY && !process.env.OPENROUTER_DOCUMENT_API_KEY) {
+  if (!hasAiConfiguration(process.env)) {
     return res.status(503).json({ error: "AI-функции не настроены на сервере." });
   }
 
