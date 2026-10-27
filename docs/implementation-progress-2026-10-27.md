@@ -39,7 +39,7 @@
 
 Последний полностью завершённый CI run: [40463851227](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40463851227).
 - TypeScript check — passed.
-- **113 тестов в 18 файлах — passed** (Node/Vitest), включая изоляцию данных, restore/registration race, клиент приватного agent service и frontend API helper.
+- **113 тестов в 18 файлах — passed** (Node/Vitest) в последнем завершённом run; свежие storage guard тесты ожидают нового CI.
 - Production build — passed.
 - Сборки web и private-agent Docker — passed.
 - Catalog audit — passed.
