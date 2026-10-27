@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: garageai-audit-${{ github.ref }}
-  cancel-in-progress: true
+  group: garageai-audit-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   node-checks:
