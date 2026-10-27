@@ -5,10 +5,10 @@
 - Review branch: `audit/security-hardening-2026-10-27`
 - Status: **active remediation; not a penetration-test attestation**.
 
-## CI results (latest completed run 40462928012)
+## CI results (latest completed run 40463231392)
 
 - TypeScript check (`npm run lint`): passed.
-- Unit tests: **111 passed across 18 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
+- Unit tests: **112 passed across 18 test files**, including expanded tenant-isolation, concurrent mutation, and concurrent registration tests.
 - Production build: passed.
 - Catalog audit: passed.
 - npm production dependency audit: **0 vulnerabilities**.
@@ -37,8 +37,8 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ### HIGH — Tenant isolation coverage is expanded but not complete
 - Location: `server.ts`, `server/store.ts`, `server/tenant-isolation.integration.test.ts`.
-- Tests verify cross-user isolation across vehicles, service records, reminders, fuel, inventory, repair tasks, OEM schedules and tuning, including export leakage, mutation denial, invalid cross-user restore references, valid restore, atomic rejection of invalid restore, and concurrent requests. Garage writes are queued per user within one Node process; duplicate usernames are atomically rejected with HTTP 409.
-- Latest completed Node job passed 111 tests across 18 files. This does not prove every route/edge case: guest-mode lifecycle, exhaustive malformed-input coverage, and coordination across separate instances remain open.
+- Tests verify cross-user isolation across vehicles, service records, reminders, fuel, inventory, repair tasks, OEM schedules and tuning, including export leakage, mutation denial, invalid cross-user restore references, valid restore, export → reset → import round-trip, per-user reset isolation, atomic rejection of invalid restore, and concurrent requests. Garage writes are queued per user within one Node process; duplicate usernames are atomically rejected with HTTP 409.
+- Latest completed Node job passed 112 tests across 18 files. This does not prove every route/edge case: guest-mode lifecycle, exhaustive malformed-input coverage, and coordination across separate instances remain open.
 
 ### MEDIUM — JSON persistence is not safe for horizontal scaling
 - Location: `server/store.ts`.
@@ -57,7 +57,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ## Next verification
 
-- Latest completed run [40462928012](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40462928012): 111 Node tests across 18 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 9 Python tests passed. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
+- Latest completed run [40463231392](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/40463231392): 112 Node tests across 18 files passed; TypeScript, production build, web and private-agent Docker builds, catalog audit, both npm audits and Gitleaks passed. Python syntax and 9 Python tests passed. Overall CI fails only at `pip-audit`, which flags `opentelemetry-api 1.44.0` / `CVE-2026-114603`.
 - Current official Google ADK `2.13.0` limits OpenTelemetry API/SDK to `<=1.44`, while the fix is in `1.45.1`. The upstream release page currently lists `v2.13.0` as latest. Keep the audit blocking; do not force incompatible dependencies or suppress the vulnerability. [Google ADK releases](https://github.com/google/adk-python/releases).
 - The Node-to-agent service client, ID-token retrieval, second application token and production admin allowlist are implemented and unit-tested. Still perform real Cloud Run OIDC/IAM and Vertex AI smoke tests after the dependency CVE is resolved.
 - The web app still stores data and sessions in local JSON files. Cloud Run filesystem is ephemeral and not shared: migrate to managed transactional storage/shared sessions and test backup/restore before serving real user records or scaling.
