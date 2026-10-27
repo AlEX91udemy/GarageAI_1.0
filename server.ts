@@ -2148,7 +2148,7 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  if (rateLimitedLogin(req, res)) return;
+  if (await rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
   const username = asTrimmedString(body.username, 32).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
