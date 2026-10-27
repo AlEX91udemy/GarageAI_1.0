@@ -35,6 +35,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [sampleFallbackResult, setSampleFallbackResult] = useState<any>(null);
 
   // Ready-made sample checks for instant testing
   const samplePresets = [
@@ -42,6 +43,23 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       title: "Заказ-наряд СТО Fit Service",
       sub: "ТО: Масло Motul, колодки Brembo, фильтр",
       dataUrl: SAMPLE_RECEIPT_IMAGE,
+      fallbackResult: {
+        merchantName: "Fit Service • Автоцентр",
+        date: "2026-05-14",
+        totalAmount: 14900,
+        category: "repair",
+        description: "Замена масла ДВС + фильтр и замена передних колодок",
+        works: [
+          { description: "Замена масла ДВС + фильтр", cost: 1800 },
+          { description: "Замена передних колодок", cost: 2200 },
+        ],
+        parts: [
+          { name: "Моторное масло Motul 8100 X-cess 5W-40 (4.5л)", brand: "Motul", partNumber: "102784", quantity: 1, price: 6200 },
+          { name: "Фильтр масляный", brand: "Mann-Filter", partNumber: "W 67/1", quantity: 1, price: 750 },
+          { name: "Колодки передние тормозные", brand: "Brembo", partNumber: "P 56 062", quantity: 1, price: 3950 },
+        ],
+        notes: "Гарантия на работы и запчасти: 12 мес. / 20 000 км",
+      },
     },
     {
       title: "Чек АЗС Лукойл",
@@ -66,32 +84,30 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
           <text x="190" y="385" text-anchor="middle" font-family="monospace" font-size="10" fill="#94a3b8">ФП: 9812401824 • СПАСИБО ЗА ПОКУПКУ!</text>
         </svg>
       `),
+      fallbackResult: {
+        merchantName: "АЗС Лукойл № 512",
+        date: "2026-06-05",
+        totalAmount: 3313,
+        category: "fuel",
+        description: "Заправка топливом АИ-95-К5 ЭКТО",
+        fuelDetails: { fuelType: "АИ-95", liters: 55.4, pricePerLiter: 59.8 },
+        works: [],
+        parts: [],
+        notes: "Оплачено безналично",
+      },
     },
   ];
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-      setScanResult(null);
-      setScanError(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleScan = async () => {
-    if (!imagePreview) return;
+  const handleScan = async (imageToScan: string | null = imagePreview, fallbackResult: any = sampleFallbackResult) => {
+    if (!imageToScan) return;
 
     setIsScanning(true);
     setScanError(null);
 
     try {
       let detectedMime = "image/jpeg";
-      if (imagePreview.startsWith("data:")) {
-        const match = imagePreview.match(/^data:([^;]+);/);
+      if (imageToScan.startsWith("data:")) {
+        const match = imageToScan.match(/^data:([^;]+);/);
         if (match) detectedMime = match[1];
       }
 
@@ -99,7 +115,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: imagePreview,
+          imageBase64: imageToScan,
           mimeType: detectedMime,
         }),
       });
@@ -112,47 +128,55 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setScanResult(data);
     } catch (err: any) {
       console.error(err);
-      // Smart reliable fallback parsing for seamless experience
-      if (imagePreview.includes("FIT SERVICE")) {
-        setScanResult({
-          merchantName: "Fit Service • Автоцентр",
-          date: "2026-05-14",
-          totalAmount: 14900,
-          category: "repair",
-          description: "Замена масла ДВС + фильтр и замена передних колодок",
-          works: [
-            { description: "Замена масла ДВС + фильтр", cost: 1800 },
-            { description: "Замена передних колодок", cost: 2200 },
-          ],
-          parts: [
-            { name: "Моторное масло Motul 8100 X-cess 5W-40 (4.5л)", brand: "Motul", partNumber: "102784", quantity: 1, price: 6200 },
-            { name: "Фильтр масляный", brand: "Mann-Filter", partNumber: "W 67/1", quantity: 1, price: 750 },
-            { name: "Колодки передние тормозные", brand: "Brembo", partNumber: "P 56 062", quantity: 1, price: 3950 },
-          ],
-          notes: "Гарантия на работы и запчасти: 12 мес. / 20 000 км",
-        });
-      } else if (imagePreview.includes("ЛУКОЙЛ")) {
-        setScanResult({
-          merchantName: "АЗС Лукойл № 512",
-          date: "2026-06-05",
-          totalAmount: 3313,
-          category: "fuel",
-          description: "Заправка топливом АИ-95-К5 ЭКТО",
-          fuelDetails: {
-            fuelType: "АИ-95",
-            liters: 55.4,
-            pricePerLiter: 59.8,
-          },
-          works: [],
-          parts: [],
-          notes: "Оплачено безналично",
-        });
+      // Demo presets may use a local fallback when the AI service is unavailable.
+      // Never infer a receipt type by searching inside an encoded image data URL.
+      if (fallbackResult) {
+        setScanResult(fallbackResult);
       } else {
-        setScanError("Не удалось разобрать изображение. Проверьте четкость фото.");
+        setScanError("Не удалось разобрать изображение. Проверьте качество фото и подключение к серверу.");
       }
     } finally {
       setIsScanning(false);
     }
+  };
+
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    // Allow choosing the same file again after an error.
+    input.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setScanError("Выберите файл изображения (JPG, PNG или WebP).");
+      return;
+    }
+    if (file.size > 9 * 1024 * 1024) {
+      setScanError("Фото слишком большое. Максимальный размер — 9 МБ.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = typeof reader.result === "string" ? reader.result : null;
+      if (!image) {
+        setScanError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
+        return;
+      }
+      setImagePreview(image);
+      setSampleFallbackResult(null);
+      setScanResult(null);
+      setScanError(null);
+      void handleScan(image, null);
+    };
+    reader.onerror = () => {
+      setScanError("Не удалось прочитать файл. Попробуйте другое фото.");
+    };
+    reader.onabort = () => {
+      setScanError("Чтение фотографии было прервано. Попробуйте ещё раз.");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleApplyToService = () => {
@@ -258,6 +282,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   type="button"
                   onClick={() => {
                     setImagePreview(preset.dataUrl);
+                    setSampleFallbackResult(preset.fallbackResult);
                     setScanResult(null);
                     setScanError(null);
                   }}
@@ -300,7 +325,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   </label>
                   <button
                     type="button"
-                    onClick={handleScan}
+                    onClick={() => void handleScan()}
                     disabled={isScanning}
                     className="px-5 py-1.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
                   >
@@ -328,7 +353,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   Поддерживаются фото чеков СТО, квитанции, накладные, чеки АЗС
                 </p>
                 <label className="mt-3 inline-block px-4 py-2 bg-neutral-900 text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-neutral-800 transition">
-                  Выбрать файл
+                  Сканировать чек / открыть камеру
                   <input
                     type="file"
                     accept="image/*"
