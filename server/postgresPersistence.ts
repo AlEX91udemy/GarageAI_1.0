@@ -111,7 +111,7 @@ export class PostgresPersistence {
   async getUserById(id: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE id = ${id}
       LIMIT 1
