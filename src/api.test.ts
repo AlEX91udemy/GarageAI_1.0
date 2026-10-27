@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchGarageData,
+  runGarageAiAgents,
+  type GarageAiAgentName,
   getAdminToken,
   setAdminToken,
 } from "./api";
@@ -46,5 +48,47 @@ describe("fetchGarageData", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
 
     await expect(fetchGarageData()).rejects.toThrow("Ошибка загрузки данных с сервера: 503");
+  });
+});
+
+
+describe("runGarageAiAgents", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("sends the requested task and returns agent results", async () => {
+    const payload: { task: string; agents: GarageAiAgentName[] } = { task: "Audit tenant isolation", agents: ["qa"] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      task: payload.task,
+      results: { qa: "No cross-user leak found." },
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(runGarageAiAgents(payload)).resolves.toEqual({
+      task: payload.task,
+      results: { qa: "No cross-user leak found." },
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/agents/run", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify(payload),
+    }));
+  });
+
+  it("surfaces sanitized server errors", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: "AI-агенты не настроены на сервере.",
+    }), { status: 503, headers: { "content-type": "application/json" } })));
+
+    await expect(runGarageAiAgents({ task: "Audit" })).rejects.toThrow("AI-агенты не настроены на сервере.");
+  });
+
+  it("rejects malformed agent response shapes", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      task: "Audit",
+      results: { qa: 123 },
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    await expect(runGarageAiAgents({ task: "Audit" })).rejects.toThrow("Сервис AI-агентов вернул некорректный ответ");
   });
 });
