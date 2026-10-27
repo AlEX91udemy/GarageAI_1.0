@@ -116,6 +116,19 @@ npm run cloudflare:deploy
 
 В `API_ORIGIN` укажите полный HTTPS-адрес развёрнутого Node/Express API Cloud Run. Ключи Gemini, OpenRouter, Document AI и service account не добавляйте в Cloudflare Assets или клиентский код: они должны оставаться переменными окружения API-сервиса.
 
+#### Настройки Cloudflare Workers Builds
+
+Если Worker подключён к GitHub через **Settings → Builds**, задайте:
+
+- **Root directory:** пустое поле (корень репозитория, где лежит `wrangler.jsonc`).
+- **Build command:** `npm run build`.
+- **Deploy command:** `npx --yes wrangler@4.152.0 deploy`.
+- **Worker name:** `garageai-1-0` — должен совпадать с полем `name` в `wrangler.jsonc`.
+
+Не используйте `npm run cloudflare:deploy` как Build command: этот скрипт уже запускает сборку и `wrangler deploy`, после чего Workers Builds отдельно выполняет Deploy command. Для ручной публикации из терминала используйте команды выше из корня репозитория.
+
+Если сборка продолжает падать, откройте **Deployments → View Build History → нужная сборка → Build logs**. Статус проверки в GitHub не содержит текст первичной ошибки, поэтому без этих логов нельзя надёжно определить, падает ли установка зависимостей, команда сборки, проверка Wrangler или авторизация Cloudflare.
+
 Изолированный сценарий `scripts/form-parser-benchmark.mjs` уже подготовлен. Он использует 10 чеков SROIE по умолчанию, сохраняет пары `fieldName -> fieldValue`, confidence и совпадение с эталонными полями в `artifacts/form-parser-benchmark-report.json`. До создания процессора сценарий завершается без сетевого вызова со статусом `not_configured`:
 
 ```powershell
