@@ -1,8 +1,6 @@
 name: GarageAI security and quality audit
 
 on:
-  push:
-    branches: ["main", "audit/**"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
