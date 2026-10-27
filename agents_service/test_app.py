@@ -114,6 +114,24 @@ class AgentEndpointAuthTests(unittest.TestCase):
         self.assertTrue(all("Audit tenant isolation" in prompt for _, prompt in calls))
         self.assertTrue(all("--- FILE: server.ts ---" in prompt for _, prompt in calls))
 
+    def test_rate_limit_uses_trusted_caller_identity_when_provided(self):
+        from agents_service.app import _allow_agent_request
+
+        with patch.dict(os.environ, {"AGENTS_API_TOKEN": "expected-secret"}, clear=False), patch(
+            "agents_service.app._allow_agent_request", return_value=(False, 30)
+        ) as rate_limit:
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(
+                    run_agents(
+                        AgentRequest(task="review project"),
+                        make_request("192.0.2.99"),
+                        "expected-secret",
+                        "user-abc",
+                    )
+                )
+        self.assertEqual(ctx.exception.status_code, 429)
+        rate_limit.assert_called_once_with("user:user-abc")
+
     def test_rejects_empty_or_duplicate_agent_selections(self):
         with patch.dict(
             os.environ,
