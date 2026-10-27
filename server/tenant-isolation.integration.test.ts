@@ -402,4 +402,42 @@ describe("HTTP tenant isolation", () => {
     expect(vehicles).toHaveLength(2);
   });
 
+
+  it("round-trips a valid backup and reset affects only the signed-in user's garage", async () => {
+    const owner = await register("backup-roundtrip-owner");
+    const other = await register("backup-roundtrip-other");
+
+    const created = await request(owner, "/api/vehicles", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: "backup-car", make: "Mazda", model: "BackupRoundTrip", year: 2022, currentMileage: 42000 }),
+    });
+    expect(created.status).toBe(201);
+
+    const exportResponse = await request(owner, "/api/backup/export");
+    expect(exportResponse.status).toBe(200);
+    const backup = await exportResponse.json() as { vehicles: Array<{ id: string; model: string }> };
+    expect(backup.vehicles).toEqual([expect.objectContaining({ id: "backup-car", model: "BackupRoundTrip" })]);
+
+    const resetResponse = await request(owner, "/api/backup/reset", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(resetResponse.status).toBe(200);
+    expect(await (await request(owner, "/api/vehicles")).json()).toEqual([]);
+    expect(await (await request(other, "/api/vehicles")).json()).toEqual([]);
+
+    const importResponse = await request(owner, "/api/backup/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(backup),
+    });
+    expect(importResponse.status).toBe(200);
+    expect(await (await request(owner, "/api/vehicles")).json()).toEqual([
+      expect.objectContaining({ id: "backup-car", model: "BackupRoundTrip" }),
+    ]);
+    expect(await (await request(other, "/api/vehicles")).json()).toEqual([]);
+  });
+
 });
