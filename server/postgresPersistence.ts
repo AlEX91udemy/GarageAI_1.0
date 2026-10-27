@@ -27,7 +27,7 @@ export interface PostgresPersistenceOptions {
   runMigrations?: boolean;
 }
 
-const MIGRATION_FILES = ["001_initial_postgres.sql"] as const;
+const MIGRATION_FILES = ["001_initial_postgres.sql", "002_email_auth.sql"] as const;
 
 /**
  * PostgreSQL repository primitives for the Cloud Run persistence cutover.
@@ -70,9 +70,9 @@ export class PostgresPersistence {
       // Production runtime identities should not need DDL privileges. Apply
       // migrations from a controlled one-off job before deploying the revision.
       const rows = await this.sql`
-        SELECT version FROM garageai_schema_migrations WHERE version = 1 LIMIT 1
+        SELECT version FROM garageai_schema_migrations WHERE version = 2 LIMIT 1
       `;
-      if (!rows[0]) throw new Error("PostgreSQL schema migration 001 is missing; run the controlled migration job first");
+      if (!rows[0]) throw new Error("PostgreSQL schema migration 002 is missing; run the controlled migration job first");
     }
     this.initialized = true;
   }
@@ -89,9 +89,20 @@ export class PostgresPersistence {
   async getUserByName(username: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE username_normalized = ${username.trim().toLowerCase()}
+      LIMIT 1
+    `;
+    return rows[0] as UserRecord | undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<UserRecord | undefined> {
+    this.assertInitialized();
+    const rows = await this.sql`
+      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      FROM garageai_users
+      WHERE lower(btrim(email)) = ${email.trim().toLowerCase()}
       LIMIT 1
     `;
     return rows[0] as UserRecord | undefined;
@@ -124,14 +135,14 @@ export class PostgresPersistence {
     return Number(rows[0]?.count ?? 0);
   }
 
-  async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
+  async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
     this.assertInitialized();
     try {
       return await this.sql.begin(async (tx) => {
         const rows = await tx`
-          INSERT INTO garageai_users (id, username, password_hash)
-          VALUES (${id}, ${username.trim()}, ${passwordHash})
-          RETURNING id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+          INSERT INTO garageai_users (id, username, password_hash, email)
+          VALUES (${id}, ${username.trim()}, ${passwordHash}, ${email?.trim().toLowerCase() || null})
+          RETURNING id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
         `;
         await tx`
           INSERT INTO garageai_garages (user_id, data)
@@ -143,6 +154,64 @@ export class PostgresPersistence {
       if (isUniqueViolation(error)) throw new UserAlreadyExistsError();
       throw error;
     }
+  }
+
+  async getEmailLoginCode(email: string): Promise<{ userId: string; codeHash: string; expiresAtMs: number; attempts: number; sentAtMs: number } | undefined> {
+    this.assertInitialized();
+    const rows = await this.sql`
+      SELECT user_id AS "userId", code_hash AS "codeHash", expires_at_ms AS "expiresAtMs",
+             attempts, sent_at_ms AS "sentAtMs"
+      FROM garageai_email_login_codes
+      WHERE email_normalized = ${email.trim().toLowerCase()}
+      LIMIT 1
+    `;
+    if (!rows[0]) return undefined;
+    return {
+      userId: String(rows[0].userId),
+      codeHash: String(rows[0].codeHash),
+      expiresAtMs: Number(rows[0].expiresAtMs),
+      attempts: Number(rows[0].attempts),
+      sentAtMs: Number(rows[0].sentAtMs),
+    };
+  }
+
+  async putEmailLoginCode(email: string, userId: string, codeHash: string, expiresAtMs: number, sentAtMs: number): Promise<void> {
+    this.assertInitialized();
+    await this.sql`
+      INSERT INTO garageai_email_login_codes (email_normalized, user_id, code_hash, expires_at_ms, attempts, sent_at_ms)
+      VALUES (${email.trim().toLowerCase()}, ${userId}, ${codeHash}, ${expiresAtMs}, 0, ${sentAtMs})
+      ON CONFLICT (email_normalized) DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        code_hash = EXCLUDED.code_hash,
+        expires_at_ms = EXCLUDED.expires_at_ms,
+        attempts = 0,
+        sent_at_ms = EXCLUDED.sent_at_ms
+    `;
+  }
+
+  async consumeEmailLoginCode(email: string, codeHash: string, now: number, maxAttempts: number): Promise<string | null> {
+    this.assertInitialized();
+    return await this.sql.begin(async (tx) => {
+      const rows = await tx`
+        SELECT user_id, code_hash, expires_at_ms, attempts
+        FROM garageai_email_login_codes
+        WHERE email_normalized = ${email.trim().toLowerCase()}
+        FOR UPDATE
+      `;
+      const row = rows[0];
+      if (!row || Number(row.expires_at_ms) <= now || Number(row.attempts) >= maxAttempts) {
+        if (row && (Number(row.expires_at_ms) <= now || Number(row.attempts) >= maxAttempts)) {
+          await tx`DELETE FROM garageai_email_login_codes WHERE email_normalized = ${email.trim().toLowerCase()}`;
+        }
+        return null;
+      }
+      if (String(row.code_hash) !== codeHash) {
+        await tx`UPDATE garageai_email_login_codes SET attempts = attempts + 1 WHERE email_normalized = ${email.trim().toLowerCase()}`;
+        return null;
+      }
+      await tx`DELETE FROM garageai_email_login_codes WHERE email_normalized = ${email.trim().toLowerCase()}`;
+      return String(row.user_id);
+    });
   }
 
   async snapshotForUser(userId: string, create = false): Promise<GarageData> {
