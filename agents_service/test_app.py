@@ -142,7 +142,7 @@ class AgentEndpointAuthTests(unittest.TestCase):
             },
             clear=False,
         ):
-            for index, selection in enumerate(([], ["qa", "qa"])):
+            for index, selection in enumerate(([], ["qa", "qa"], ["architect", "developer", "qa", "ops"])):
                 with self.subTest(selection=selection):
                     with self.assertRaises(HTTPException) as ctx:
                         asyncio.run(
