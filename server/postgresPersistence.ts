@@ -136,7 +136,7 @@ export class PostgresPersistence {
     if (create) {
       await this.sql`
         INSERT INTO garageai_garages (user_id, data)
-        SELECT id, ${this.sql.json(emptyGarage())} FROM garageai_users WHERE id = ${userId}
+        SELECT id, ${this.sql.json(JSON.parse(JSON.stringify(emptyGarage())))} FROM garageai_users WHERE id = ${userId}
         ON CONFLICT (user_id) DO NOTHING
       `;
     }
@@ -153,7 +153,7 @@ export class PostgresPersistence {
     committed.lastUpdated = new Date().toISOString();
     const rows = await this.sql`
       INSERT INTO garageai_garages (user_id, data, updated_at)
-      SELECT id, ${this.sql.json(committed)}, now()
+      SELECT id, ${this.sql.json(JSON.parse(JSON.stringify(committed)))}, now()
       FROM garageai_users WHERE id = ${userId}
       ON CONFLICT (user_id) DO UPDATE
       SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at
@@ -165,7 +165,7 @@ export class PostgresPersistence {
 
   async run<T>(userId: string, mutator: (garage: GarageData) => T | Promise<T>): Promise<T> {
     this.assertInitialized();
-    return this.sql.begin(async (tx) => {
+    return await this.sql.begin(async (tx) => {
       const rows = await tx`
         SELECT g.data
         FROM garageai_garages g
@@ -179,11 +179,11 @@ export class PostgresPersistence {
       draft.lastUpdated = new Date().toISOString();
       await tx`
         UPDATE garageai_garages
-        SET data = ${tx.json(normalizeGarage(draft))}, updated_at = now()
+        SET data = ${tx.json(JSON.parse(JSON.stringify(normalizeGarage(draft))))}, updated_at = now()
         WHERE user_id = ${userId}
       `;
       return result;
-    });
+    }) as T;
   }
 
   async getSession(tokenHash: string): Promise<SessionRecord | undefined> {
