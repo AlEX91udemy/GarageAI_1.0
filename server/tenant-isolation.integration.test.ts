@@ -288,6 +288,55 @@ describe("HTTP tenant isolation", () => {
     expect(ownerData.tuningStages).toEqual([expect.objectContaining({ id: "owner-tuning" })]);
   });
 
+  it("restores a valid backup atomically for only the receiving user", async () => {
+    const receiver = await register("restore-receiver");
+    const unrelated = await register("restore-unrelated");
+    const backup = {
+      vehicles: [{ id: "restore-car", make: "Mazda", model: "RestoreIsolation", year: 2022, currentMileage: 1234 }],
+      reminders: [{ id: "restore-reminder", vehicleId: "restore-car", kind: "osago", startDate: "2026-01-01", durationMonths: 12 }],
+      serviceRecords: [{ id: "restore-service", vehicleId: "restore-car", title: "Restored service", date: "2026-01-01", mileage: 1234, description: "Backup restore test" }],
+      fuelRecords: [],
+      oemSchedules: [],
+      garageParts: [],
+      toFixTasks: [],
+      tuningStages: [],
+    };
+
+    const response = await request(receiver, "/api/backup/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(backup),
+    });
+    expect(response.status).toBe(200);
+
+    const receiverDataResponse = await request(receiver, "/api/data");
+    expect(receiverDataResponse.status).toBe(200);
+    const receiverData = await receiverDataResponse.json() as Record<string, Array<{ id?: string; model?: string; title?: string }>>;
+    expect(receiverData.vehicles).toEqual([expect.objectContaining({ id: "restore-car", model: "RestoreIsolation" })]);
+    expect(receiverData.reminders).toEqual([expect.objectContaining({ id: "restore-reminder" })]);
+    expect(receiverData.serviceRecords).toEqual([expect.objectContaining({ id: "restore-service", title: "Restored service" })]);
+
+    const unrelatedData = await (await request(unrelated, "/api/data")).json() as Record<string, unknown[]>;
+    for (const key of ["vehicles", "reminders", "serviceRecords", "fuelRecords", "oemSchedules", "garageParts", "toFixTasks", "tuningStages"]) {
+      expect(unrelatedData[key], `backup import must not change unrelated user's ${key}`).toEqual([]);
+    }
+
+    const invalid = await request(receiver, "/api/backup/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vehicles: [], serviceRecords: [{ id: "orphan-service", vehicleId: "missing-vehicle" }] }),
+    });
+    expect(invalid.status).toBe(400);
+    const afterInvalidData = await (await request(receiver, "/api/data")).json() as Record<string, Array<{ id?: string }>>;
+    expect(afterInvalidData.vehicles).toEqual([expect.objectContaining({ id: "restore-car" })]);
+    expect(afterInvalidData.serviceRecords).toEqual([expect.objectContaining({ id: "restore-service" })]);
+
+    const exportResponse = await request(receiver, "/api/backup/export");
+    expect(exportResponse.status).toBe(200);
+    const exported = await exportResponse.json() as { vehicles: Array<{ id: string }> };
+    expect(exported.vehicles).toEqual([expect.objectContaining({ id: "restore-car" })]);
+  });
+
   it("returns conflict when two registrations race for the same username", async () => {
     const createAccount = () => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
