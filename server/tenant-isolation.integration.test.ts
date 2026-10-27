@@ -86,6 +86,7 @@ describe("HTTP tenant isolation", () => {
           OPENROUTER_API_KEY: "",
           AGENTS_SERVICE_URL: "https://garageai-agents-test.example",
           AGENTS_API_TOKEN: "integration-test-token",
+          AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation",
           ALLOWED_ORIGINS: baseUrl,
         },
         stdio: ["pipe", "pipe", "pipe"],
@@ -337,6 +338,16 @@ describe("HTTP tenant isolation", () => {
     expect(exportResponse.status).toBe(200);
     const exported = await exportResponse.json() as { vehicles: Array<{ id: string }> };
     expect(exported.vehicles).toEqual([expect.objectContaining({ id: "restore-car" })]);
+  });
+
+  it("blocks paid agent requests from users outside the configured allowlist", async () => {
+    const unlisted = await register("unlisted-agent-user");
+    const response = await request(unlisted, "/api/agents/run", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "Review this project", agents: ["qa"] }),
+    });
+    expect(response.status).toBe(403);
   });
 
   it("validates agent proxy requests before contacting the private service", async () => {
