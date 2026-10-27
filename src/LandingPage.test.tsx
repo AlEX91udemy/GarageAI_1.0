@@ -118,9 +118,15 @@ describe("LandingPage UI & UX Audit Suite", () => {
     expect(workspaceArticles.length).toBe(5);
     expect(container.textContent).toContain("Сводка по авто");
     expect(container.textContent).not.toContain("Dashboard");
+    expect(container.textContent).not.toContain("Перейти в рабочее пространство");
+    expect(container.textContent).not.toContain("Пробег, ТО и расходы");
+    expect(container.textContent).not.toContain("Поиск по OEM-артикулу и работам");
+    expect(container.textContent).not.toContain("Стоимость километра");
+    expect(container.textContent).not.toContain("Чек-лист перед поездкой");
+    expect(container.textContent).not.toContain("Расчёт по пробегу и датам");
     expect(container.textContent).not.toContain("Статус систем: ОК");
-    expect(container.textContent).toContain("Полная история обслуживания");
-    expect(container.textContent).toContain("ТО, ОСАГО и сезонные работы");
+    expect(container.textContent).not.toContain("Полная история обслуживания");
+    expect(container.textContent).not.toContain("ТО, ОСАГО и сезонные работы");
 
     const howItWorksSteps = container.querySelectorAll("#how-it-works .garage-card-anim");
     expect(howItWorksSteps.length).toBe(3);
