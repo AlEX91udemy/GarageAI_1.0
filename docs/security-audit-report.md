@@ -49,7 +49,7 @@ The unit-test log contains connection-refused messages for an optional localhost
 
 ### MEDIUM — Model identifiers may drift
 - Location: `agents_service/app.py`, deployment environment.
-- The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. The fallback default is now `gemini-3.8-flash`.
+- The default was `gemini-2.5-flash`, which this project previously observed as unavailable to new users. Fallback defaults in both `agents_service/app.py` and `server.ts`, plus `.env.example`, now use `gemini-3.8-flash`.
 - `GEMINI_MODEL` or `ARGON_MODEL` environment overrides can still point to unavailable models. Verify the exact configured model IDs against the chosen API/provider and run a non-secret smoke test before deployment.
 
 ## Next verification
