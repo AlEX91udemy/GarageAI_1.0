@@ -286,8 +286,13 @@ async function main() {
       return;
     }
     await applyBundle(db, bundle);
-    console.log("Legacy JSON import completed.");
-    console.log(JSON.stringify(summary, null, 2));
+    const verification = await inspectConflicts(db, bundle);
+    if (verification.conflicts > 0 || verification.usersToInsert > 0 ||
+        verification.garagesToInsert > 0 || verification.sessionsToInsert > 0) {
+      throw new Error("Post-import verification failed; do not enable production readiness");
+    }
+    console.log("Legacy JSON import completed; post-import row/data comparison passed.");
+    console.log(JSON.stringify({ importedBeforeApply: summary, verifiedAfterApply: verification }, null, 2));
   } finally {
     await db.end({ timeout: 5 });
   }
