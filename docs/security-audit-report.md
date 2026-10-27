@@ -74,7 +74,7 @@ The combined main state has been validated in two adjacent PR runs: [40490128356
 - The in-process write queue is only a local optimization; PostgreSQL revision checks and database transactions are the cross-instance concurrency controls.
 - Container builds have passed, and the web container uses a non-root runtime user. No Google Cloud resources have been created and no deployment has been executed.
 - Runtime garage data is absent from the current tree, but historical Git copies may remain. Determine whether those records belong to real users and assess privacy obligations; history rewrite requires separate coordinated handling.
-- A fresh full CI run against the combined latest `main` state is still pending.
+- This documentation PR triggers a fresh full CI run against the combined latest `main` state; record its result before release.
 
 ## Release decision
 
