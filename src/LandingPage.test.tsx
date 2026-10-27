@@ -98,9 +98,10 @@ describe("LandingPage UI & UX Audit Suite", () => {
     expect(container.textContent).toContain(
       "Сфотографируйте заказ-наряд СТО или чек АЗС"
     );
-    expect(container.textContent).toContain(
+    expect(container.textContent).not.toContain(
       "Ведите историю своего автомобиля в GarageAI"
     );
+    expect(container.textContent).not.toContain("Мобильная версия");
     const heroSection = container.querySelector("main > section:first-of-type");
     expect(heroSection?.querySelectorAll("a").length).toBe(0);
   });
