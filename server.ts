@@ -748,7 +748,7 @@ app.put("/api/reminders/:id", async (req, res) => {
   const { value, error } = normalizeReminder({ ...req.body, id: req.params.id });
   if (error) return res.status(400).json({ error });
   dbMemory.reminders[index] = value as ReminderRecord;
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.reminders[index]);
 });
 
@@ -756,7 +756,7 @@ app.delete("/api/reminders/:id", async (req, res) => {
   const len = dbMemory.reminders.length;
   dbMemory.reminders = dbMemory.reminders.filter((item) => item.id !== req.params.id);
   if (dbMemory.reminders.length === len) return res.status(404).json({ error: "Напоминание не найдено" });
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true });
 });
 
@@ -860,7 +860,7 @@ app.post("/api/vehicles", async (req, res) => {
   };
 
   dbMemory.vehicles.push(newVehicle);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newVehicle);
 });
 
@@ -930,7 +930,7 @@ app.put("/api/vehicles/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.vehicles[index]);
 });
 
@@ -948,7 +948,7 @@ app.patch("/api/vehicles/:id/mileage", async (req, res) => {
 
   vehicle.currentMileage = numMileage;
   vehicle.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(vehicle);
 });
 
@@ -970,7 +970,7 @@ app.delete("/api/vehicles/:id", async (req, res) => {
   dbMemory.toFixTasks = dbMemory.toFixTasks.filter((t) => t.vehicleId !== id);
   dbMemory.tuningStages = dbMemory.tuningStages.filter((t) => t.vehicleId !== id);
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Автомобиль и связанные записи удалены" });
 });
 
@@ -1103,7 +1103,7 @@ app.post("/api/services", async (req, res) => {
     });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newRecord);
 });
 
@@ -1154,7 +1154,7 @@ app.put("/api/services/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.serviceRecords[index]);
 });
 
@@ -1167,7 +1167,7 @@ app.delete("/api/services/:id", async (req, res) => {
     return res.status(404).json({ error: "Запись сервиса не найдена" });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Запись сервиса удалена" });
 });
 
@@ -1245,7 +1245,7 @@ app.post("/api/fuel", async (req, res) => {
     car.lastMileageUpdate = new Date().toLocaleDateString("ru-RU");
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newFuel);
 });
 
@@ -1258,7 +1258,7 @@ app.delete("/api/fuel/:id", async (req, res) => {
     return res.status(404).json({ error: "Запись заправки не найдена" });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Запись заправки удалена" });
 });
 
@@ -1306,7 +1306,7 @@ app.post("/api/inventory", async (req, res) => {
   };
 
   dbMemory.garageParts.unshift(newPart);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newPart);
 });
 
@@ -1344,7 +1344,7 @@ app.put("/api/inventory/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.garageParts[index]);
 });
 
@@ -1355,7 +1355,7 @@ app.post("/api/inventory/:id/install", async (req, res) => {
   }
 
   part.status = "installed";
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, part });
 });
 
@@ -1368,7 +1368,7 @@ app.delete("/api/inventory/:id", async (req, res) => {
     return res.status(404).json({ error: "Деталь не найдена" });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Деталь удалена со склада" });
 });
 
@@ -1511,7 +1511,7 @@ app.post("/api/to-fix", async (req, res) => {
   };
 
   dbMemory.toFixTasks.unshift(newTask);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newTask);
 });
 
@@ -1550,7 +1550,7 @@ app.put("/api/to-fix/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.toFixTasks[index]);
 });
 
@@ -1561,7 +1561,7 @@ app.post("/api/to-fix/:id/complete", async (req, res) => {
   }
 
   task.status = "completed";
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, task });
 });
 
@@ -1574,7 +1574,7 @@ app.delete("/api/to-fix/:id", async (req, res) => {
     return res.status(404).json({ error: "Задача не найдена" });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Задача удалена" });
 });
 
@@ -1614,7 +1614,7 @@ app.post("/api/oem-schedule", async (req, res) => {
   }));
 
   dbMemory.oemSchedules.push(...formatted);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(formatted);
 });
 
@@ -1643,7 +1643,7 @@ app.put("/api/oem-schedule/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.oemSchedules[index]);
 });
 
@@ -1681,7 +1681,7 @@ app.post("/api/tuning", async (req, res) => {
   };
 
   dbMemory.tuningStages.push(newStage);
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.status(201).json(newStage);
 });
 
@@ -1713,7 +1713,7 @@ app.put("/api/tuning/:id", async (req, res) => {
     id: req.params.id,
   };
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json(dbMemory.tuningStages[index]);
 });
 
@@ -1726,7 +1726,7 @@ app.delete("/api/tuning/:id", async (req, res) => {
     return res.status(404).json({ error: "Этап не найден" });
   }
 
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Этап тюнинга удален" });
 });
 
@@ -2195,7 +2195,7 @@ app.post("/api/backup/import", requireAuth, async (req, res) => {
     const imported = { ...validateGarageBackup(req.body), lastUpdated: new Date().toISOString() };
     Object.assign(currentContext().garage, imported);
 
-    await saveDatabase();
+    if (!(await saveDatabase())) return;
     res.json({ success: true, message: "Данные успешно импортированы", counts: {
       vehicles: dbMemory.vehicles.length,
       services: dbMemory.serviceRecords.length,
@@ -2207,7 +2207,7 @@ app.post("/api/backup/import", requireAuth, async (req, res) => {
 
 app.post("/api/backup/reset", requireAuth, async (_req, res) => {
   Object.assign(currentContext().garage, emptyGarage());
-  await saveDatabase();
+  if (!(await saveDatabase())) return;
   res.json({ success: true, message: "Данные текущего гаража очищены", data: dbMemory });
 });
 
