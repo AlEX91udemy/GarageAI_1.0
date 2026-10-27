@@ -112,6 +112,7 @@ async def run_agents_help() -> dict[str, Any]:
 @app.post("/agents/run", response_model=AgentResponse)
 async def run_agents(
     request: AgentRequest,
+    http_request: Request,
     x_agents_token: str | None = Header(default=None, alias="X-Agents-Token"),
 ) -> AgentResponse:
     # Fail closed: never allow paid model calls unless an application token is configured.
@@ -120,6 +121,14 @@ async def run_agents(
         raise HTTPException(503, "Agent API is disabled: configure AGENTS_API_TOKEN.")
     if not x_agents_token or not hmac.compare_digest(x_agents_token, expected_token):
         raise HTTPException(401, "Invalid or missing agent API token.")
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    allowed, retry_after = _allow_agent_request(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many agent requests. Retry later.",
+            headers={"Retry-After": str(retry_after)},
+        )
     selected = request.agents or list(AGENT_BRIEFS)
     unknown = sorted(set(selected) - set(AGENT_BRIEFS))
     if unknown:
