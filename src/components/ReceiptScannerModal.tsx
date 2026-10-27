@@ -98,7 +98,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     },
   ];
 
-  const handleScan = async (imageToScan: string | null = imagePreview) => {
+  const handleScan = async (imageToScan: string | null = imagePreview, fallbackResult: any = sampleFallbackResult) => {
     if (!imageToScan) return;
 
     setIsScanning(true);
@@ -128,43 +128,12 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setScanResult(data);
     } catch (err: any) {
       console.error(err);
-      // Smart reliable fallback parsing for seamless experience
-      if (imageToScan.includes("FIT SERVICE")) {
-        setScanResult({
-          merchantName: "Fit Service • Автоцентр",
-          date: "2026-05-14",
-          totalAmount: 14900,
-          category: "repair",
-          description: "Замена масла ДВС + фильтр и замена передних колодок",
-          works: [
-            { description: "Замена масла ДВС + фильтр", cost: 1800 },
-            { description: "Замена передних колодок", cost: 2200 },
-          ],
-          parts: [
-            { name: "Моторное масло Motul 8100 X-cess 5W-40 (4.5л)", brand: "Motul", partNumber: "102784", quantity: 1, price: 6200 },
-            { name: "Фильтр масляный", brand: "Mann-Filter", partNumber: "W 67/1", quantity: 1, price: 750 },
-            { name: "Колодки передние тормозные", brand: "Brembo", partNumber: "P 56 062", quantity: 1, price: 3950 },
-          ],
-          notes: "Гарантия на работы и запчасти: 12 мес. / 20 000 км",
-        });
-      } else if (imageToScan.includes("ЛУКОЙЛ")) {
-        setScanResult({
-          merchantName: "АЗС Лукойл № 512",
-          date: "2026-06-05",
-          totalAmount: 3313,
-          category: "fuel",
-          description: "Заправка топливом АИ-95-К5 ЭКТО",
-          fuelDetails: {
-            fuelType: "АИ-95",
-            liters: 55.4,
-            pricePerLiter: 59.8,
-          },
-          works: [],
-          parts: [],
-          notes: "Оплачено безналично",
-        });
+      // Demo presets may use a local fallback when the AI service is unavailable.
+      // Never infer a receipt type by searching inside an encoded image data URL.
+      if (fallbackResult) {
+        setScanResult(fallbackResult);
       } else {
-        setScanError("Не удалось разобрать изображение. Проверьте четкость фото.");
+        setScanError("Не удалось разобрать изображение. Проверьте качество фото и подключение к серверу.");
       }
     } finally {
       setIsScanning(false);
