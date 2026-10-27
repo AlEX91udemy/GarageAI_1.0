@@ -19,7 +19,7 @@ Before production deployment, run the importer in dry-run mode, review conflicts
 - Region: `europe-west1` (Belgium), subject to model availability and data-residency requirements.
 - Artifact Registry repository: `garageai`.
 - Cloud Run services: `garageai-web` and, when ready, private `garageai-agents`.
-- Store API keys and `AGENTS_API_TOKEN` in Secret Manager, never in source files.
+- Store API keys and `AGENTS_API_TOKEN` in Secret Manager, never in source files. For email login, also store `RESEND_API_KEY` and `EMAIL_CODE_PEPPER` in Secret Manager and set `EMAIL_FROM` to a verified sender address.
 - Use dedicated runtime service accounts with least privilege. For Vertex AI, grant the required Vertex AI role to the service identity.
 - Keep the agents service private. Cloud Run IAM is the primary boundary; the application token is an additional layer.
 
@@ -32,7 +32,7 @@ Enable only Cloud Run, Artifact Registry, Cloud Build, Secret Manager, and Verte
 From a controlled migration environment with the intended Cloud SQL connection configured (do not commit credentials):
 
 ```bash
-npx tsx scripts/migrate-postgres.ts
+npx tsx scripts/migrate-postgres.ts # applies migrations 001 and 002
 npx tsx scripts/import-legacy-json.ts --source-dir=./data
 # Review the counts/conflicts, verify a backup, then explicitly apply:
 npx tsx scripts/import-legacy-json.ts --source-dir=./data --apply
