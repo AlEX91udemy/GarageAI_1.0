@@ -179,7 +179,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 onClick={() => { setEmailMode(true); setAuthMode("login"); setAuthError(null); setEmailCodeRequested(false); }}
                 className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
               >
-                Войти по коду из email
+                Войти по email
               </button>
               </>
             ) : (
