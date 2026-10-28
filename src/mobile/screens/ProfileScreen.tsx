@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
+import { SyncStatus } from "../types";
 import { login, register, restoreSession, requestEmailCode, verifyEmailCode } from "../../api";
 
 interface ProfileScreenProps {
@@ -36,6 +37,7 @@ interface ProfileScreenProps {
   onSwitchToWebView?: () => void;
   onLogout: () => void;
   onAuthSuccess?: () => void;
+  syncStatus?: SyncStatus;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -51,6 +53,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onSwitchToWebView,
   onLogout,
   onAuthSuccess,
+  syncStatus = "loading",
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
@@ -78,6 +81,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     (sum, r) => sum + (r.totalCost || 0),
     0
   );
+  const syncLabel = {
+    loading: "Проверяем синхронизацию",
+    synced: "Синхронизировано",
+    guest: "Локально • аккаунт не подключён",
+    offline: "Офлайн • данные на устройстве",
+    error: "Синхронизация недоступна",
+  }[syncStatus];
+  const syncTone = syncStatus === "synced" ? "text-emerald-600" : syncStatus === "error" ? "text-brand-strong" : "text-amber-600";
 
   const submitAuth = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -139,9 +150,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {sessionEmail || userEmail}
               </div>
             )}
-            <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated ? "bg-emerald-500" : "bg-neutral-400"}`} />
-              <span>{isAuthenticated ? "Garage AI PRO • Синхронизировано" : "Гостевой режим • Аккаунт не подключён"}</span>
+            <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? syncTone : "text-neutral-500"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isAuthenticated && syncStatus === "synced" ? "bg-emerald-500" : "bg-amber-500"}`} />
+              <span>{isAuthenticated ? syncLabel : syncLabel}</span>
             </div>
           </div>
         </div>
@@ -151,7 +162,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <div>
               <h3 className="text-sm font-black text-neutral-900">Синхронизация гаража</h3>
               <p className="mt-1 text-xs text-neutral-500">
-                Войдите или создайте аккаунт, чтобы сохранить данные на сервере.
+                Данные сохранены на этом устройстве. Войдите или создайте аккаунт, чтобы синхронизировать гараж.
               </p>
             </div>
             {!authMode ? (
@@ -159,7 +170,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("login"); setEmailMode(false); setAuthError(null); }}
+                  onClick={() => { setAuthMode("login"); setEmailMode(true); setAuthError(null); setEmailCodeRequested(false); }}
                   className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
                 >
                   <LogIn className="mr-1 inline h-4 w-4" />
@@ -174,13 +185,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   Регистрация
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => { setEmailMode(true); setAuthMode("login"); setAuthError(null); setEmailCodeRequested(false); }}
-                className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
-              >
-                Войти по email
-              </button>
               </>
             ) : (
               <form onSubmit={submitAuth} className="space-y-2.5">

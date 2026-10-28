@@ -101,6 +101,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onClick={() => {
                   setDistanceUnit("km");
                   localStorage.setItem(DISTANCE_UNIT_KEY, "km");
+                  notifyGarageSettingsChanged();
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                     distanceUnit === "km" ? "bg-brand-strong text-white" : inactiveControlClass
@@ -112,6 +113,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onClick={() => {
                   setDistanceUnit("mi");
                   localStorage.setItem(DISTANCE_UNIT_KEY, "mi");
+                  notifyGarageSettingsChanged();
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                     distanceUnit === "mi" ? "bg-brand-strong text-white" : inactiveControlClass
@@ -129,6 +131,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onClick={() => {
                   setVolumeUnit("l");
                   localStorage.setItem(VOLUME_UNIT_KEY, "l");
+                  notifyGarageSettingsChanged();
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                     volumeUnit === "l" ? "bg-brand-strong text-white" : inactiveControlClass
@@ -140,6 +143,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 onClick={() => {
                   setVolumeUnit("gal");
                   localStorage.setItem(VOLUME_UNIT_KEY, "gal");
+                  notifyGarageSettingsChanged();
                 }}
                 className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
                     volumeUnit === "gal" ? "bg-brand-strong text-white" : inactiveControlClass
@@ -243,8 +247,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             {(
               [
                 { id: "dark_racing" as DarkVariant, label: "Dark Racing" },
-                { id: "carbon" as DarkVariant, label: "Carbon Black" },
-                { id: "oled" as DarkVariant, label: "OLED Midnight" },
               ] as { id: DarkVariant; label: string }[]
             ).map((th) => (
               <button
@@ -269,7 +271,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             ))}
           </div>
           <p className={`text-[10px] pt-1 ${mutedClass}`}>
-            Light — белые карточки. Dark Racing — тёмно-синяя схема. Carbon Black — графитовая с оранжевым акцентом. OLED Midnight — почти чёрная с красным акцентом.
+            Light — светлая схема. Dark Racing — тёмно-синяя схема с красным акцентом.
           </p>
         </div>
 

@@ -76,6 +76,7 @@ import { RemindersModal } from "./components/RemindersModal";
 import { DataSyncBackupModal } from "./components/DataSyncBackupModal";
 import { InstallPcModal } from "./components/InstallPcModal";
 import { Smartphone } from "lucide-react";
+import type { SyncStatus } from "./mobile/types";
 
 type ActiveView =
   | "dashboard"
@@ -151,6 +152,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [garageLoaded, setGarageLoaded] = useState(false);
   const [hasGarageAccess, setHasGarageAccess] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("loading");
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
 
   // Active Modals
@@ -179,21 +181,6 @@ export default function App() {
   const [serviceModalInitialData, setServiceModalInitialData] = useState<
     Partial<ServiceRecord> | undefined
   >(undefined);
-
-  const clearLocalGarageCache = () => {
-    for (const key of [
-      "garagehub_vehicles",
-      "garagehub_reminders",
-      "garagehub_service_records",
-      "garagehub_fuel_records",
-      "garagehub_oem_schedules",
-      "garagehub_garage_parts",
-      "garagehub_to_fix_tasks",
-      "garagehub_tuning_stages",
-    ]) {
-      localStorage.removeItem(key);
-    }
-  };
 
   const handleAuthSuccess = async () => {
     // Авторизация из мобильного профиля не должна менять выбранный интерфейс.
@@ -228,6 +215,7 @@ export default function App() {
       setTuningStages(shouldMigrateGuestGarage ? cachedTuning : data.tuningStages || []);
       setActiveVehicleId(loadedVehicles[0]?.id || "empty-garage");
       setIsOnline(true);
+      setSyncStatus("synced");
       setGarageLoaded(true);
       if (shouldMigrateGuestGarage) {
         await Promise.allSettled([
@@ -249,6 +237,7 @@ export default function App() {
         }
       }
     } catch (error) {
+      setSyncStatus("error");
       console.warn("Не удалось загрузить персональный гараж:", error);
     }
   };
@@ -261,6 +250,7 @@ export default function App() {
         if (!active) return;
         setHasGarageAccess(true);
         setIsOnline(true);
+        setSyncStatus("synced");
         const loadedVehicles = data.vehicles || [];
         setVehicles(loadedVehicles);
         setActiveVehicleId((prev) =>
@@ -287,17 +277,26 @@ export default function App() {
         );
         setIsOnline(false);
         setHasGarageAccess(!requiresAuthentication);
+        setSyncStatus(requiresAuthentication ? "guest" : "offline");
         if (requiresAuthentication) {
-          clearLocalGarageCache();
-          setVehicles([]);
-          setReminders([]);
-          setActiveVehicleId("empty-garage");
-          setServiceRecords([]);
-          setFuelRecords([]);
-          setOemSchedules([]);
-          setGarageParts([]);
-          setToFixTasks([]);
-          setTuningStages([]);
+          const readCache = <T,>(key: string): T[] => {
+            try {
+              const value = JSON.parse(localStorage.getItem(key) || "[]");
+              return Array.isArray(value) ? value : [];
+            } catch {
+              return [];
+            }
+          };
+          const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
+          setVehicles(cachedVehicles);
+          setReminders(readCache<ReminderRecord>("garagehub_reminders"));
+          setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
+          setServiceRecords(readCache<ServiceRecord>("garagehub_service_records"));
+          setFuelRecords(readCache<FuelRecord>("garagehub_fuel_records"));
+          setOemSchedules(readCache<OemScheduleItem>("garagehub_oem_schedules"));
+          setGarageParts(readCache<GaragePart>("garagehub_garage_parts"));
+          setToFixTasks(readCache<ToFixTask>("garagehub_to_fix_tasks"));
+          setTuningStages(readCache<TuningStage>("garagehub_tuning_stages"));
           setGarageLoaded(true);
           return;
         }
@@ -331,50 +330,50 @@ export default function App() {
 
   // Save to localStorage as offline fallback
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_vehicles", JSON.stringify(vehicles));
-  }, [vehicles, garageLoaded, hasGarageAccess]);
+  }, [vehicles, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_reminders", JSON.stringify(reminders));
-  }, [reminders, garageLoaded, hasGarageAccess]);
+  }, [reminders, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem(
       "garagehub_service_records",
       JSON.stringify(serviceRecords)
     );
-  }, [serviceRecords, garageLoaded, hasGarageAccess]);
+  }, [serviceRecords, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_fuel_records", JSON.stringify(fuelRecords));
-  }, [fuelRecords, garageLoaded, hasGarageAccess]);
+  }, [fuelRecords, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem(
       "garagehub_oem_schedules",
       JSON.stringify(oemSchedules)
     );
-  }, [oemSchedules, garageLoaded, hasGarageAccess]);
+  }, [oemSchedules, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_garage_parts", JSON.stringify(garageParts));
-  }, [garageParts, garageLoaded, hasGarageAccess]);
+  }, [garageParts, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_to_fix_tasks", JSON.stringify(toFixTasks));
-  }, [toFixTasks, garageLoaded, hasGarageAccess]);
+  }, [toFixTasks, garageLoaded]);
 
   useEffect(() => {
-    if (!garageLoaded || !hasGarageAccess) return;
+    if (!garageLoaded) return;
     localStorage.setItem("garagehub_tuning_stages", JSON.stringify(tuningStages));
-  }, [tuningStages, garageLoaded, hasGarageAccess]);
+  }, [tuningStages, garageLoaded]);
 
   // Current selected vehicle
   const currentVehicle =
@@ -386,6 +385,11 @@ export default function App() {
   const currentRecords = serviceRecords.filter(
     (r) => r.vehicleId === currentVehicle.id
   );
+
+  const handleOpenServiceBook = () => {
+    if (currentVehicle.id === "empty-garage") return;
+    setShowServiceBookModal(true);
+  };
 
   // Handlers
   const handleUpdateMileage = (newMileage: number) => {
@@ -792,7 +796,7 @@ export default function App() {
         />
       )}
 
-      {showServiceBookModal && (
+      {showServiceBookModal && currentVehicle.id !== "empty-garage" && (
         <ServiceBookModal
           vehicle={currentVehicle}
           serviceRecords={serviceRecords}
@@ -957,7 +961,7 @@ export default function App() {
           onOpenAddService={() => setShowAddServiceModal(true)}
           onOpenScanReceipt={() => setShowScanReceiptModal(true)}
           onOpenAiMechanic={() => setShowAiMechanicModal(true)}
-          onOpenServiceBook={() => setShowServiceBookModal(true)}
+          onOpenServiceBook={handleOpenServiceBook}
           onOpenReminders={() => setShowRemindersModal(true)}
           onOpenAddVehicle={() => {
             setVehicleModalMode("add");
@@ -972,16 +976,7 @@ export default function App() {
           onLogout={() => {
             void apiLogout().catch(console.error);
             setHasGarageAccess(false);
-            clearLocalGarageCache();
-            setVehicles([]);
-            setReminders([]);
-            setActiveVehicleId("empty-garage");
-            setServiceRecords([]);
-            setFuelRecords([]);
-            setOemSchedules([]);
-            setGarageParts([]);
-            setToFixTasks([]);
-            setTuningStages([]);
+            setSyncStatus("guest");
           }}
         />
         {renderAppModals()}
@@ -1023,7 +1018,7 @@ export default function App() {
           }}
           onOpenDataBackupModal={() => setShowBackupModal(true)}
           onSwitchToWebView={() => handleSetPlatform("web")}
-          onOpenServiceBookModal={() => setShowServiceBookModal(true)}
+          onOpenServiceBookModal={handleOpenServiceBook}
           onOpenRemindersModal={() => setShowRemindersModal(true)}
           onOpenAiMechanicModal={() => setShowAiMechanicModal(true)}
           onOpenScanReceiptModal={() => setShowScanReceiptModal(true)}
@@ -1033,6 +1028,7 @@ export default function App() {
           }}
           onUpdateVehicleColor={(_vehicleId, color) => handleUpdateVehicleColor(color)}
           onAuthSuccess={handleAuthSuccess}
+          syncStatus={syncStatus}
           onDeleteFuelRecord={(id) => {
             setFuelRecords((prev) => prev.filter((record) => record.id !== id));
             apiDeleteFuelRecord(id).catch(console.error);
@@ -1040,16 +1036,7 @@ export default function App() {
           onLogout={() => {
             void apiLogout().catch(console.error);
             setHasGarageAccess(false);
-            clearLocalGarageCache();
-            setVehicles([]);
-            setReminders([]);
-            setActiveVehicleId("empty-garage");
-            setServiceRecords([]);
-            setFuelRecords([]);
-            setOemSchedules([]);
-            setGarageParts([]);
-            setToFixTasks([]);
-            setTuningStages([]);
+            setSyncStatus("guest");
           }}
         />
 
@@ -1242,7 +1229,7 @@ export default function App() {
 
             {/* Service book official passport */}
             <button
-              onClick={() => setShowServiceBookModal(true)}
+              onClick={handleOpenServiceBook}
               className={`app-nav-utility px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer border ${
                 theme === "light"
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
@@ -1373,7 +1360,7 @@ export default function App() {
               onOpenScanReceipt={() => setShowScanReceiptModal(true)}
               onOpenOemSchedule={() => setActiveView("oem_schedule")}
               onOpenInventoryToFix={() => setActiveView("garage_inventory")}
-              onOpenServiceBook={() => setShowServiceBookModal(true)}
+              onOpenServiceBook={handleOpenServiceBook}
             />
           )}
 

@@ -8,7 +8,7 @@ import {
   GaragePart,
   ReminderRecord,
 } from "../types";
-import { MobileTab, MobileScreenId, QuickActionType } from "./types";
+import { MobileTab, MobileScreenId, QuickActionType, SyncStatus } from "./types";
 import { DarkVariant, ThemeMode, readDarkVariant, saveDarkVariant } from "./theme";
 import { readThemePreference, saveThemePreference, applyThemePreference } from "../themePreference";
 import { MobileBottomBar } from "./navigation/MobileBottomBar";
@@ -45,6 +45,8 @@ import { buildNotifications } from "../notifications";
 import {
   GARAGE_SETTINGS_CHANGE_EVENT,
   readNotificationPreferences,
+  readNotificationReadIds,
+  saveNotificationReadIds,
 } from "./settings";
 
 // Web modals we can trigger if needed or re-use
@@ -81,6 +83,7 @@ interface MobileAppProps {
   onOpenEditVehicleModal?: () => void;
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
   onAuthSuccess?: () => void;
+  syncStatus?: SyncStatus;
   onLogout?: () => void;
   onDeleteFuelRecord?: (id: string) => void;
 }
@@ -116,6 +119,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onOpenEditVehicleModal,
   onUpdateVehicleColor,
   onAuthSuccess,
+  syncStatus = "loading",
   onLogout,
   onDeleteFuelRecord,
 }) => {
@@ -123,6 +127,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
   const [activeTab, setActiveTab] = useState<MobileTab>("home");
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(readNotificationReadIds);
+  useLayoutEffect(() => {
+    saveNotificationReadIds(readNotificationIds);
+  }, [readNotificationIds]);
   const [notificationPreferences, setNotificationPreferences] = useState(readNotificationPreferences);
   useLayoutEffect(() => {
     const refreshNotificationPreferences = () => {
@@ -133,6 +141,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   }, []);
   const generatedNotifications = buildNotifications(currentVehicle, oemSchedules, serviceRecords, toFixTasks, garageParts, reminders)
     .filter((notification) => notification.category === "service" ? notificationPreferences.service : notification.category === "ai" ? notificationPreferences.ai : true);
+  const unreadNotifications = generatedNotifications.filter((notification) => !readNotificationIds.includes(notification.id));
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState<"frame" | "full">("frame");
 
@@ -150,14 +159,6 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       html.classList.toggle("light", wasLight);
     };
   }, [themeMode]);
-
-  const toggleTheme = () => {
-    setThemeMode((prev) => {
-      const next = prev === "dark" ? "light" : "dark";
-      saveThemePreference(next);
-      return next;
-    });
-  };
 
   // Selection states for detail screens
   const [selectedRecord, setSelectedRecord] = useState<ServiceRecord | null>(
@@ -336,23 +337,18 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               navigateTo("profile");
             }}
             onUpdateMileage={onUpdateMileage}
-            unreadNotificationsCount={generatedNotifications.length}
+            unreadNotificationsCount={unreadNotifications.length}
             onOpenAddVehicle={onOpenAddVehicleModal}
             onOpenServiceBook={onOpenServiceBookModal}
             onOpenReminders={onOpenRemindersModal}
             onOpenAiMechanic={() => navigateTo("ai_diagnostics")}
             onOpenScanReceipt={() => navigateTo("scan_receipt")}
-            onOpenScanBarcode={() => {
-              setInitialQuickActionType("service");
-              setCurrentScreen("scan_barcode");
-            }}
             onOpenAddService={() => {
               setPrefilledScanData(null);
               setInitialQuickActionType("service");
               setCurrentScreen("add_event");
             }}
             themeMode={themeMode}
-            onToggleTheme={toggleTheme}
           />
         );
 
@@ -819,6 +815,20 @@ export const MobileApp: React.FC<MobileAppProps> = ({
           <ScanReceiptScreen
             vehicle={currentVehicle}
             onBack={() => setCurrentScreen("service")}
+            onConfirmFuel={(fuel) => {
+              onAddFuelRecord?.({
+                id: `fuel-scan-${Date.now()}`,
+                vehicleId: currentVehicle.id,
+                date: fuel.date || new Date().toISOString().slice(0, 10),
+                mileage: currentVehicle.currentMileage,
+                liters: fuel.liters || 0,
+                pricePerLiter: fuel.pricePerLiter || 0,
+                totalCost: fuel.totalCost || 0,
+                fuelType: fuel.fuelType || "АИ-95",
+                isFullTank: true,
+                station: fuel.station || "АЗС",
+              });
+            }}
             onConfirmRecord={(rec) => {
               onAddServiceRecord?.({
                 id: `srv-scan-${Date.now()}`,
@@ -845,6 +855,9 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onNavigate={(s) => setCurrentScreen(s)}
             themeMode={themeMode}
             notifications={generatedNotifications}
+            readIds={readNotificationIds}
+            onMarkRead={(id) => setReadNotificationIds((prev) => [...new Set([...prev, id])])}
+            onMarkAllRead={() => setReadNotificationIds((prev) => [...new Set([...prev, ...generatedNotifications.map((notification) => notification.id)])])}
           />
         );
 
@@ -865,6 +878,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setCurrentScreen("profile");
             }}
             onAuthSuccess={onAuthSuccess}
+            syncStatus={syncStatus}
           />
         );
 
@@ -978,7 +992,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
         {/* Scrollable Screen Content */}
         <main
-          className={`flex-1 overflow-y-auto no-scrollbar relative flex flex-col transition-colors ${
+          className={`app-main flex-1 overflow-y-auto no-scrollbar relative flex flex-col transition-colors ${
             themeMode === "dark"
               ? "bg-[#0d131d] text-white"
               : "bg-[#F4F5F8] text-[#0F172A]"

@@ -241,10 +241,10 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   { key: "cost_per_km", label: "Стоимость 1 " + distanceUnitLabel(), value: formatGarageCurrency(Number(costPerKm)), icon: <Gauge className="w-3 h-3 text-emerald-600" /> },
                   { key: "fuel_cost_km", label: "Средний расход", value: avgConsumption === "—" ? "—" : formatConsumption(parseFloat(avgConsumption)), icon: <Fuel className="w-3 h-3 text-brand-strong" /> },
                   { key: "service_total", label: "ТО и ремонт", value: formatGarageCurrency(serviceTotal), icon: <Wrench className="w-3 h-3 text-amber-600" /> },
-                  { key: "fuel_total", label: "Всего топливо", value: formatGarageCurrency(fuelTotal), icon: <Droplet className="w-3 h-3 text-brand-strong" /> },
+                  { key: "fuel_total", label: "Расходы на топливо", value: formatGarageCurrency(fuelTotal), icon: <Droplet className="w-3 h-3 text-brand-strong" /> },
                 ].map(({ key, label, value, icon }) => (
-                  <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
-                    <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-neutral-300" : "text-neutral-500"}`}>{icon}{label}</span>
+                  <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-brand-soft border-brand-border shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
+                    <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-brand-hover" : "text-neutral-500"}`}>{icon}{label}</span>
                     <span className="block text-sm font-black font-mono mt-0.5">{value}</span>
                   </button>
                 ))}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   ArrowLeft,
   Bell,
@@ -28,6 +28,9 @@ interface NotificationsScreenProps {
   onNavigate: (screen: MobileScreenId) => void;
   themeMode?: ThemeMode;
   notifications: GeneratedNotification[];
+  readIds?: string[];
+  onMarkRead?: (id: string) => void;
+  onMarkAllRead?: () => void;
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
@@ -35,9 +38,11 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   onNavigate,
   themeMode = "light",
   notifications: generatedNotifications,
+  readIds = [],
+  onMarkRead,
+  onMarkAllRead,
 }) => {
   const isDark = themeMode === "dark";
-  const [readIds, setReadIds] = useState<string[]>([]);
   const notifications: NotificationItem[] = generatedNotifications.map(n => ({ ...n, isRead: readIds.includes(n.id) }));
   /*
     {
@@ -70,7 +75,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   ]); */
 
   const handleMarkAllRead = () => {
-    setReadIds(notifications.map(n => n.id));
+    onMarkAllRead?.();
   };
 
   return (
@@ -122,6 +127,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
           <div
             key={item.id}
             onClick={() => {
+              onMarkRead?.(item.id);
               onNavigate?.(item.targetScreen);
             }}
             className={`p-3.5 rounded-2xl border transition active:scale-[0.99] cursor-pointer flex items-start gap-3 ${

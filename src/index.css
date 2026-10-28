@@ -100,6 +100,18 @@ body {
   color: #f8fafc;
 }
 
+.dark .bg-white\/90 {
+  background-color: rgb(23 32 46 / 0.9) !important;
+}
+.dark .bg-white\/80 {
+  background-color: rgb(23 32 46 / 0.8) !important;
+}
+
+[data-theme-variant="dark_racing"] .bg-white\/90,
+[data-theme-variant="dark_racing"] .bg-white\/80 {
+  background-color: rgb(23 32 46 / 0.9) !important;
+}
+
 .dark .theme-subcard,
 .dark .bg-neutral-50,
 .dark .bg-slate-50,
@@ -388,13 +400,45 @@ body {
 
 /* Theme-aware switches in mobile garage settings. */
 .garage-theme-checkbox {
-  accent-color: #b91c1c;
-  color-scheme: light;
+  appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.garage-theme-checkbox::before {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid white;
+  border-bottom: 2px solid white;
+  transform: rotate(-45deg) scale(0);
+  transform-origin: center;
+  margin: -1px 0 0 1px;
+  transition: transform 120ms ease;
+}
+.garage-theme-checkbox:checked {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 0 0 3px rgb(185 28 28 / 0.14);
+}
+.garage-theme-checkbox:checked::before { transform: rotate(-45deg) scale(0.9); }
+
 .dark .garage-theme-checkbox {
-  accent-color: #f87171;
-  color-scheme: dark;
+  border-color: #475569;
+  background: #0d131d;
+}
+.dark .garage-theme-checkbox:checked {
+  background: #ef3038;
+  border-color: #ef3038;
+  box-shadow: 0 0 0 3px rgb(239 48 56 / 0.2);
 }
 
 [data-theme-variant="carbon"] .garage-theme-checkbox {
@@ -565,6 +609,75 @@ html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35
 .dark .app-main .text-amber-500 { color: #fbbf24; }
 .app-main .text-brand-strong { color: #b91c1c; }
 .dark .app-main .text-brand-strong { color: #f87171; }
+
+/* Project form standard: fields, native selects, suggestions and date controls. */
+:where(.app-main, [role="dialog"]) {
+  --ui-field-bg: #f8fafc;
+  --ui-field-border: #e2e8f0;
+  --ui-field-text: #0f172a;
+  --ui-field-muted: #64748b;
+}
+.dark :where(.app-main, [role="dialog"]) {
+  --ui-field-bg: #0d131d;
+  --ui-field-border: #243044;
+  --ui-field-text: #f8fafc;
+  --ui-field-muted: #94a3b8;
+}
+:where(.app-main, [role="dialog"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  background-color: var(--ui-field-bg) !important;
+  border: 1px solid var(--ui-field-border) !important;
+  border-radius: 1rem !important;
+  color: var(--ui-field-text) !important;
+  outline: none !important;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+:where(.app-main, [role="dialog"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
+  border-color: var(--color-brand) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 16%, transparent) !important;
+}
+:where(.app-main, [role="dialog"]) :where(input, textarea)::placeholder {
+  color: var(--ui-field-muted) !important;
+}
+
+/* Numeric fields use the same clean text treatment on every browser. */
+:where(.app-main, [role="dialog"]) input[type="number"]::-webkit-inner-spin-button,
+:where(.app-main, [role="dialog"]) input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+:where(.app-main, [role="dialog"]) input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
+:where(.app-main, [role="dialog"]) [role="listbox"] {
+  background-color: var(--ui-field-bg) !important;
+  border-color: var(--ui-field-border) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 0.16);
+}
+.dark :where(.app-main, [role="dialog"]) [role="listbox"] {
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.35);
+}
+:where(.app-main, [role="dialog"]) [role="option"] {
+  border-radius: 0.75rem !important;
+  color: var(--ui-field-text) !important;
+}
+.garage-date-trigger {
+  background-color: var(--ui-field-bg) !important;
+  border-color: var(--ui-field-border) !important;
+  color: var(--ui-field-text) !important;
+}
+.garage-date-panel {
+  background-color: var(--ui-field-bg) !important;
+  border-color: var(--ui-field-border) !important;
+  color: var(--ui-field-text);
+}
 [role="dialog"] { overscroll-behavior: contain; }
 [role="dialog"] > div { max-height: calc(100dvh - 32px); border-radius: 18px; }
 [role="dialog"] :where(input, select, textarea) { max-width: 100%; min-width: 0; }
