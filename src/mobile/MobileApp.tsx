@@ -42,6 +42,10 @@ import { ProfileScreen } from "./screens/ProfileScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { PrefilledScanData } from "./types";
 import { buildNotifications } from "../notifications";
+import {
+  GARAGE_SETTINGS_CHANGE_EVENT,
+  readNotificationPreferences,
+} from "./settings";
 
 // Web modals we can trigger if needed or re-use
 import { Smartphone, Monitor, Sparkles, Car } from "lucide-react";
@@ -119,7 +123,16 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   // Navigation state
   const [currentScreen, setCurrentScreen] = useState<MobileScreenId>("home");
   const [activeTab, setActiveTab] = useState<MobileTab>("home");
-  const generatedNotifications = buildNotifications(currentVehicle, oemSchedules, serviceRecords, toFixTasks, garageParts, reminders);
+  const [notificationPreferences, setNotificationPreferences] = useState(readNotificationPreferences);
+  useLayoutEffect(() => {
+    const refreshNotificationPreferences = () => {
+      setNotificationPreferences(readNotificationPreferences());
+    };
+    window.addEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshNotificationPreferences);
+    return () => window.removeEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshNotificationPreferences);
+  }, []);
+  const generatedNotifications = buildNotifications(currentVehicle, oemSchedules, serviceRecords, toFixTasks, garageParts, reminders)
+    .filter((notification) => notification.category === "service" ? notificationPreferences.service : notification.category === "ai" ? notificationPreferences.ai : true);
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [deviceFrameMode, setDeviceFrameMode] = useState<"frame" | "full">("frame");
 
