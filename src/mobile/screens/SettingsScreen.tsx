@@ -169,6 +169,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               ))}
             </div>
           </div>
+          <p className={`text-[10px] pt-1 ${mutedClass}`}>
+            Выбор влияет на пробег, объём топлива и подписи расчётов в приложении.
+          </p>
         </div>
 
         {/* Notifications */}
@@ -214,6 +217,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               className="w-4 h-4 accent-brand-strong rounded cursor-pointer"
             />
           </div>
+          <p className={`text-[10px] pt-1 ${mutedClass}`}>
+            Отключённые категории не показываются в списке уведомлений.
+          </p>
         </div>
 
         {/* Theme */}
@@ -224,6 +230,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => onThemeChange?.("light")}
+              aria-pressed={!isDark}
+              title="Светлый фон и светлые карточки"
               className={`p-2.5 rounded-xl border text-center font-bold text-[11px] transition cursor-pointer ${
                 !isDark
                   ? "bg-brand-strong text-white border-brand shadow-md shadow-brand-strong/30"
@@ -242,6 +250,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <button
                 key={th.id}
                 onClick={() => handleThemeVariant(th.id)}
+                aria-pressed={variantActive(th.id)}
+                title={
+                  th.id === "dark_racing"
+                    ? "Тёмно-синяя тема с красным акцентом"
+                    : th.id === "carbon"
+                      ? "Графитовая тема с оранжевым акцентом"
+                      : "Чёрная OLED тема с красным акцентом"
+                }
                 className={`p-2.5 rounded-xl border text-center font-bold text-[11px] transition cursor-pointer ${
                   variantActive(th.id)
                     ? "bg-brand-strong text-white border-brand shadow-md shadow-brand-strong/30"
@@ -253,7 +269,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             ))}
           </div>
           <p className={`text-[10px] pt-1 ${mutedClass}`}>
-            Светлая тема подходит для работы при дневном освещении. Тёмные варианты доступны отдельно.
+            Светлая — белые карточки. Dark Racing — тёмно-синяя схема. Carbon Black — графитовая с оранжевым акцентом. OLED Midnight — почти чёрная с красным акцентом.
           </p>
         </div>
 
