@@ -44,14 +44,14 @@ it("renders garage parameters in the light theme", () => {
 
   expect(container.textContent).toContain("Параметры Гаража");
   expect(container.querySelector(".bg-white")).not.toBeNull();
-  expect(container.textContent).toContain("Светлая");
+  expect(container.textContent).toContain("Light");
 });
 
 it("switches to light theme and persists garage settings", () => {
   const { onThemeChange } = renderSettings("dark");
   const buttons = Array.from(container.querySelectorAll("button"));
 
-  act(() => buttons.find((button) => button.textContent?.trim() === "Светлая")?.click());
+  act(() => buttons.find((button) => button.textContent?.trim() === "Light")?.click());
   expect(onThemeChange).toHaveBeenCalledWith("light");
 
   act(() => buttons.find((button) => button.textContent?.includes("Мили"))?.click());

@@ -238,7 +238,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   : `${controlClass} ${inactiveControlClass}`
               }`}
             >
-              Светлая
+              Light
             </button>
             {(
               [
@@ -269,7 +269,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             ))}
           </div>
           <p className={`text-[10px] pt-1 ${mutedClass}`}>
-            Светлая — белые карточки. Dark Racing — тёмно-синяя схема. Carbon Black — графитовая с оранжевым акцентом. OLED Midnight — почти чёрная с красным акцентом.
+            Light — белые карточки. Dark Racing — тёмно-синяя схема. Carbon Black — графитовая с оранжевым акцентом. OLED Midnight — почти чёрная с красным акцентом.
           </p>
         </div>
 
