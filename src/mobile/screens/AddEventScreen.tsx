@@ -10,7 +10,6 @@ import {
   Building2,
   Camera,
   ScanBarcode,
-  QrCode,
   Sparkles,
   CheckCircle2,
   Tag,
@@ -21,10 +20,18 @@ import { BarcodeScannerScreen } from "./BarcodeScannerScreen";
 import { CURRENCY_SYMBOLS, formatGarageCurrency, getGarageCurrency } from "../currency";
 import { searchServiceWorks } from "../serviceWorkCatalog";
 import { AUTOMOTIVE_BARCODE_CATALOG } from "../barcodeScannerService";
+import { getDistanceUnit, getVolumeUnit, toDisplayDistance, toKilometers, toDisplayVolume, toLiters, toPricePerLiter, volumeUnitLabel } from "../units";
+import { GARAGE_SETTINGS_CHANGE_EVENT } from "../settings";
+import { DatePicker } from "../components/DatePicker";
 
 const FUEL_TYPES = ["АИ-92", "АИ-95", "АИ-98", "АИ-100", "ДТ", "Газ", "Другое"];
 const PETROL_FUEL_TYPES = ["АИ-92", "АИ-95", "АИ-98", "АИ-100"];
 const DIESEL_FUEL_TYPES = ["ДТ"];
+const DIESEL_SEASONAL_FUEL_TYPES = ["ДТ Лето", "ДТ Межсезонье", "ДТ Зима", "ДТ Арктика"];
+const SUGGESTION_LIST_CLASS = "mt-1 max-h-56 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg";
+const SUGGESTION_OPTION_CLASS = "w-full rounded-xl px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40";
+const SUGGESTION_ACTIVE_CLASS = "bg-brand-soft text-brand-hover";
+const SUGGESTION_IDLE_CLASS = "text-neutral-800 hover:bg-neutral-50";
 const FUEL_STATIONS = [
   "Газпромнефть", "Лукойл", "Роснефть", "Татнефть", "Башнефть",
   "ТРАССА", "Нефтьмагистраль", "ЕКА", "Сургутнефтегаз", "ТНК", "Другое",
@@ -50,7 +57,7 @@ function searchParts(query: string, field: "name" | "brand" | "partNumber") {
 
 function getAvailableFuelTypes(vehicleFuelType?: string) {
   const normalized = (vehicleFuelType || "").toLocaleLowerCase("ru");
-  if (normalized.includes("дизел") || /(^|\s)дт($|\s)/.test(normalized)) return DIESEL_FUEL_TYPES;
+  if (normalized.includes("дизел") || /(^|\s)дт($|\s)/.test(normalized)) return DIESEL_SEASONAL_FUEL_TYPES;
   if (normalized.includes("бензин") || normalized.includes("гибрид") || /аи[- ]?\d{2,3}/.test(normalized)) {
     return PETROL_FUEL_TYPES;
   }
@@ -60,7 +67,8 @@ function getAvailableFuelTypes(vehicleFuelType?: string) {
 function getDefaultFuelType(vehicleFuelType: string | undefined, availableFuelTypes: string[]) {
   const normalized = (vehicleFuelType || "").toLocaleLowerCase("ru");
   const octane = normalized.match(/аи[- ]?(92|95|98|100)/)?.[1];
-  const requestedType = octane ? "АИ-" + octane : normalized.includes("дизел") ? "ДТ" : "АИ-95";
+  const seasonalDiesel = DIESEL_SEASONAL_FUEL_TYPES.find((type) => normalized.includes(type.toLocaleLowerCase("ru")));
+  const requestedType = octane ? "АИ-" + octane : seasonalDiesel || (normalized.includes("дизел") ? "ДТ Лето" : "АИ-95");
   return availableFuelTypes.includes(requestedType) ? requestedType : availableFuelTypes[0];
 }
 
@@ -97,11 +105,13 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   const [title, setTitle] = useState(initialPrefilledData?.title || "");
   const [isWorkSuggestionsOpen, setIsWorkSuggestionsOpen] = useState(false);
   const [activeWorkSuggestion, setActiveWorkSuggestion] = useState(0);
+  const [isCategorySuggestionsOpen, setIsCategorySuggestionsOpen] = useState(false);
+  const [activeCategorySuggestion, setActiveCategorySuggestion] = useState(0);
   const [category, setCategory] = useState<MaintenanceCategory>(
     initialPrefilledData?.category || "ТО и замена жидкостей"
   );
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [mileage, setMileage] = useState(String(vehicle.currentMileage));
+  const [mileage, setMileage] = useState(() => String(Math.round(toDisplayDistance(vehicle.currentMileage))));
   const [cost, setCost] = useState(
     initialPrefilledData?.totalCost ? String(initialPrefilledData.totalCost) : ""
   );
@@ -109,13 +119,21 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     initialPrefilledData?.laborCost ? String(initialPrefilledData.laborCost) : ""
   );
   const [location, setLocation] = useState(
-    initialPrefilledData?.serviceCenter || "Гараж / Автосервис"
+    initialPrefilledData?.serviceCenter || "Автосервис"
   );
   const currencySymbol = CURRENCY_SYMBOLS[getGarageCurrency()];
   const prefilledCenter = initialPrefilledData?.serviceCenter || "";
+  const initialLocationType = prefilledCenter === "Автосервис" || prefilledCenter === "Частный мастер"
+    ? prefilledCenter
+    : prefilledCenter ? "Другое" : "Автосервис";
+  const [locationType, setLocationType] = useState<"Автосервис" | "Частный мастер" | "Другое">(initialLocationType);
   const [customLocation, setCustomLocation] = useState(
-    ["Гараж / Автосервис", "Гараж", "Автосервис", "Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(prefilledCenter) ? "" : prefilledCenter
+    ["Автосервис", "Частный мастер", "Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(prefilledCenter) ? "" : prefilledCenter
   );
+  const [isStationSuggestionsOpen, setIsStationSuggestionsOpen] = useState(false);
+  const [activeStationSuggestion, setActiveStationSuggestion] = useState(0);
+  const [isLocationSuggestionsOpen, setIsLocationSuggestionsOpen] = useState(false);
+  const [activeLocationSuggestion, setActiveLocationSuggestion] = useState(0);
   const [notes, setNotes] = useState(initialPrefilledData?.description || "");
 
   // Part-specific inputs for "Добавить запчасть"
@@ -145,7 +163,9 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     () => getAvailableFuelTypes(vehicle.fuelType),
     [vehicle.fuelType]
   );
-  const [liters, setLiters] = useState("45");
+  const [liters, setLiters] = useState("");
+  const [volumeUnit, setVolumeUnit] = useState(getVolumeUnit);
+  const [distanceUnit, setDistanceUnit] = useState(getDistanceUnit);
   const [fuelCostMode, setFuelCostMode] = useState<"total" | "per_liter">("total");
   const [pricePerLiterInput, setPricePerLiterInput] = useState("");
   const [fuelType, setFuelType] = useState(() => getDefaultFuelType(vehicle.fuelType, availableFuelTypes));
@@ -156,10 +176,44 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     setCustomFuelType("");
   }, [vehicle.id, vehicle.fuelType, availableFuelTypes]);
 
+  useEffect(() => {
+    let previousUnit = getVolumeUnit();
+    let previousDistanceUnit = getDistanceUnit();
+    const refreshVolumeUnit = () => {
+      const nextUnit = getVolumeUnit();
+      if (nextUnit !== previousUnit) {
+        const conversion = nextUnit === "gal" ? 0.264172 : 1 / 0.264172;
+        setLiters((value) => {
+          const amount = Number(value);
+          return Number.isFinite(amount) ? String(amount * conversion) : value;
+        });
+        setPricePerLiterInput((value) => {
+          if (!value.trim()) return value;
+          const price = Number(value);
+          return Number.isFinite(price) ? String(price / conversion) : value;
+        });
+        previousUnit = nextUnit;
+        setVolumeUnit(nextUnit);
+      }
+      const nextDistanceUnit = getDistanceUnit();
+      if (nextDistanceUnit !== previousDistanceUnit) {
+        const conversion = nextDistanceUnit === "mi" ? 0.621371 : 1 / 0.621371;
+        setMileage((value) => {
+          const amount = Number(value);
+          return Number.isFinite(amount) ? String(Math.round(amount * conversion)) : value;
+        });
+        previousDistanceUnit = nextDistanceUnit;
+        setDistanceUnit(nextDistanceUnit);
+      }
+    };
+    window.addEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshVolumeUnit);
+    return () => window.removeEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshVolumeUnit);
+  }, []);
+
   // Problem specific
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const fuelSuggestions = availableFuelTypes.map((type) => ({
-    title: `Заправка ${type}`,
+    title: type,
     category: "Другое" as MaintenanceCategory,
     aliases: ["заправка", type.toLocaleLowerCase("ru")],
   }));
@@ -172,6 +226,8 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     : eventType === "service"
     ? searchServiceWorks(title)
     : [];
+  const stationSuggestions = FUEL_STATIONS.filter((station) => station !== "Другое" && station.toLocaleLowerCase("ru").includes(location.trim().toLocaleLowerCase("ru")));
+  const locationSuggestions = ["Автосервис", "Частный мастер"];
   const partSuggestions = partSuggestionField === "name"
     ? searchParts(partName, "name")
     : partSuggestionField === "brand"
@@ -258,21 +314,26 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   };
 
   const handleSave = () => {
-    const numMileage = parseInt(mileage, 10) || vehicle.currentMileage;
+    const enteredMileage = parseFloat(mileage);
+    const numMileage = Number.isFinite(enteredMileage) && enteredMileage >= 0
+      ? Math.round(toKilometers(enteredMileage))
+      : vehicle.currentMileage;
     const numCost = parseFloat(cost) || 0;
     const enteredPricePerLiter = parseFloat(pricePerLiterInput);
     const numLabor = parseFloat(laborCost) || Math.round(numCost * 0.4);
 
     if (eventType === "fuel") {
       const parsedLiters = parseFloat(liters);
-      const numLiters = Number.isFinite(parsedLiters) && parsedLiters > 0 ? parsedLiters : 0;
+      const enteredVolume = Number.isFinite(parsedLiters) && parsedLiters > 0 ? parsedLiters : 0;
+      const numLiters = toLiters(enteredVolume);
+      const enteredPrice = Number.isFinite(enteredPricePerLiter) && enteredPricePerLiter >= 0 ? enteredPricePerLiter : 0;
       const totalCost = fuelCostMode === "per_liter"
         ? (Number.isFinite(enteredPricePerLiter) && enteredPricePerLiter >= 0
-          ? enteredPricePerLiter * numLiters
+          ? enteredPrice * enteredVolume
           : 0)
         : numCost;
       const calculatedPricePerLiter = fuelCostMode === "per_liter"
-        ? (Number.isFinite(enteredPricePerLiter) && enteredPricePerLiter >= 0 ? enteredPricePerLiter : 0)
+        ? toPricePerLiter(enteredPrice)
         : (numLiters > 0 ? numCost / numLiters : 0);
       onSaveFuel?.({
         vehicleId: vehicle.id,
@@ -325,7 +386,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
           (scannedBadge
             ? `Зафиксировано по ${scannedBadge}`
             : "Работы внесены через мобильный Garage AI"),
-        serviceCenter: location || "Автосервис",
+        serviceCenter: customLocation.trim() || locationType || location || "Автосервис",
       });
     }
 
@@ -363,6 +424,10 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             ? "Добавить деталь"
             : eventType === "service"
             ? "Добавить услугу (ТО)"
+            : eventType === "fuel"
+            ? "Добавить заправку"
+            : eventType === "expense"
+            ? "Добавить расход"
             : "Добавить событие"}
         </span>
 
@@ -395,29 +460,22 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         )}
 
         {/* PROMINENT CAMERA BARCODE / QR SCAN TRIGGER BANNER */}
-        <div className="p-3.5 rounded-3xl bg-gradient-to-r from-neutral-900 to-neutral-800 text-white shadow-md flex items-center justify-between gap-3">
+        <div className="p-3.5 rounded-3xl bg-white border border-neutral-200/90 text-neutral-900 shadow-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-brand-strong/30 border border-brand/40 text-brand-on-dark flex items-center justify-center shrink-0">
-              <ScanBarcode className="w-5 h-5 animate-pulse" />
+            <div className="w-10 h-10 rounded-2xl bg-brand-soft border border-brand-soft-strong text-brand-strong flex items-center justify-center shrink-0">
+              <ScanBarcode className="w-5 h-5" />
             </div>
             <div>
-              <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                <span>Камера-сканер штрихкодов</span>
-                <span className="text-[9px] bg-brand-strong text-white px-1.5 py-0.2 rounded font-mono font-bold">
-                  AI OCR
-                </span>
+              <div className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+                <span>{eventType === "fuel" ? "Чек АЗС" : eventType === "part" ? "Сканировать деталь" : "Сканировать документ"}</span>
               </div>
-              <p className="text-[10px] text-neutral-400 mt-0.5">
-                {eventType === "part"
-                  ? "Сканировать EAN/QR коробки детали для автозаполнения"
-                  : "Сканировать VIN кузова или штрихкод детали для ТО"}
-              </p>
+              <p className="text-[10px] text-neutral-500 mt-0.5">{eventType === "fuel" ? "Сумма, топливо и АЗС" : eventType === "part" ? "EAN/QR для автозаполнения" : "VIN или штрихкод для ТО"}</p>
             </div>
           </div>
 
           <button
             onClick={() => handleOpenScanner(eventType === "part" ? "part" : "service")}
-            className="px-3 py-2 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-strong/30 shrink-0 cursor-pointer active:scale-95 transition"
+            className="px-3 py-2 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shrink-0 cursor-pointer active:scale-95 transition"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>Сканировать</span>
@@ -548,11 +606,11 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             {/* Price & Quantity */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
+                <label className="h-8 flex items-start text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 leading-tight">
                   Цена покупки ({currencySymbol})
                 </label>
                 <div className="relative">
-                  <span className="text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
+                  <span className="text-xs text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
                   <input
                     type="number"
                     placeholder="0"
@@ -598,23 +656,13 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide block">
-                  Название события / Работы
+                  {eventType === "fuel" ? "Вид топлива" : "Выполненные работы"}
                 </label>
-                {eventType === "service" && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenScanner("service")}
-                    className="text-[10px] text-brand-strong hover:text-brand-hover font-bold flex items-center gap-1 cursor-pointer"
-                  >
-                    <QrCode className="w-3 h-3" />
-                    <span>Сканировать VIN/Деталь</span>
-                  </button>
-                )}
               </div>
               <input
                 id="service-work-title"
                 role="combobox"
-                aria-label="Название события / Работы"
+                aria-label={eventType === "fuel" ? "Вид топлива" : "Выполненные работы"}
                 aria-autocomplete="list"
                 aria-expanded={isWorkSuggestionsOpen && workSuggestions.length > 0}
                 aria-controls="service-work-suggestions"
@@ -622,7 +670,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 type="text"
                 placeholder={
                   eventType === "fuel"
-                    ? "Заправка АИ-95"
+                    ? fuelType
                     : eventType === "expense"
                     ? "Мойка, шиномонтаж или парковка"
                     : eventType === "problem"
@@ -652,7 +700,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold"
               />
               {isWorkSuggestionsOpen && workSuggestions.length > 0 && (
-                <div id="service-work-suggestions" role="listbox" aria-label="Варианты видов работ" className="mt-1 max-h-56 overflow-y-auto rounded-2xl border border-neutral-200 bg-white p-1 shadow-lg">
+                <div id="service-work-suggestions" role="listbox" aria-label="Варианты видов работ" className={SUGGESTION_LIST_CLASS}>
                   {workSuggestions.map((work, index) => (
                     <button
                       key={work.title}
@@ -662,10 +710,10 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                       aria-selected={activeWorkSuggestion === index}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => selectWorkSuggestion(work)}
-                      className={`w-full rounded-xl px-3 py-2 text-left transition ${activeWorkSuggestion === index ? "bg-brand-soft text-brand-hover" : "text-neutral-800 hover:bg-neutral-50"}`}
+                      className={`${SUGGESTION_OPTION_CLASS} ${activeWorkSuggestion === index ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}
                     >
                       <span className="block text-xs font-semibold">{work.title}</span>
-                      <span className="mt-0.5 block text-[10px] text-neutral-500">{work.category}</span>
+                      {eventType !== "fuel" && <span className="mt-0.5 block text-[10px] text-neutral-500">{work.category}</span>}
                     </button>
                   ))}
                 </div>
@@ -678,45 +726,35 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
                   Категория работ
                 </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as MaintenanceCategory)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand"
-                >
-                  {MAINTENANCE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
+                <div className="relative">
+                  <button type="button" aria-haspopup="listbox" aria-expanded={isCategorySuggestionsOpen} onClick={() => setIsCategorySuggestionsOpen((open) => !open)} className={`${SUGGESTION_OPTION_CLASS} w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs flex items-center justify-between`}>
+                    <span>{category}</span><span className="text-neutral-400">⌄</span>
+                  </button>
+                  {isCategorySuggestionsOpen && <div role="listbox" aria-label="Категории работ" className={`${SUGGESTION_LIST_CLASS} absolute left-0 right-0 z-30`}>
+                    {MAINTENANCE_CATEGORIES.map((item, index) => <button key={item} type="button" role="option" aria-selected={category === item} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategory(item); setActiveCategorySuggestion(index); setIsCategorySuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${category === item ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">{item}</span></button>)}
+                  </div>}
+                </div>
               </div>
             )}
 
             {/* Date */}
             <div className={eventType === "fuel" ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
-              <div>
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                  Дата
-                </label>
-                <div className="relative">
-                  <Calendar className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-mono"
-                  />
-                </div>
-              </div>
+              <DatePicker value={date} onChange={setDate} />
 
               {eventType !== "fuel" && <div>
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                  Пробег (км)
+                <label className="h-8 flex items-start text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 leading-tight">
+                  Пробег на момент события
                 </label>
                 <div className="relative">
                   <Gauge className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={mileage}
                     onChange={(e) => setMileage(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-mono font-bold"
+                    className="w-full pl-9 pr-12 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-mono font-bold"
                   />
+                  <span className="text-xs text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">{distanceUnit === "mi" ? "ми" : "км"}</span>
                 </div>
               </div>}
             </div>
@@ -724,23 +762,23 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             {/* Cost, volume & location */}
             <div className={eventType === "fuel" ? "grid grid-cols-1 sm:grid-cols-2 gap-3" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
               <div>
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
+                <label className="h-8 flex items-start text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 leading-tight">
                   {eventType === "fuel" && fuelCostMode === "per_liter"
-                    ? "Цена за литр (" + currencySymbol + ")"
+                    ? "Цена за " + volumeUnitLabel() + " (" + currencySymbol + ")"
                     : "Итоговая стоимость (" + currencySymbol + ")"}
                 </label>
                 <div className="relative">
-                  <span className="text-xs text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
+                  <span className="text-xs text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">{currencySymbol}</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*[.,]?[0-9]*"
                     placeholder={eventType === "fuel" && fuelCostMode === "per_liter" ? "0.00" : "0"}
                     value={eventType === "fuel" && fuelCostMode === "per_liter" ? pricePerLiterInput : cost}
                     onChange={(e) => eventType === "fuel" && fuelCostMode === "per_liter"
                       ? setPricePerLiterInput(e.target.value)
                       : setCost(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-mono font-bold text-emerald-600"
+                    className="w-full pl-3 pr-9 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 font-mono font-bold text-emerald-600 transition"
                   />
                 </div>
                 {eventType === "fuel" && (
@@ -757,7 +795,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                       onClick={() => setFuelCostMode("per_liter")}
                       className={`py-1.5 rounded-lg text-[10px] font-bold ${fuelCostMode === "per_liter" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"}`}
                     >
-                      Цена за литр
+                      Цена за {volumeUnit === "gal" ? "галлон" : "литр"}
                     </button>
                   </div>
                 )}
@@ -765,61 +803,65 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
 
               {eventType === "fuel" && fuelCostMode === "per_liter" && (
                 <div>
-                  <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
-                    Объем (л)
+                  <label className="h-8 flex items-start text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 leading-tight">
+                    Объем ({volumeUnitLabel()})
                   </label>
                   <div className="relative">
                     <input
-                      aria-label="Объем заправки в литрах"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
+                      aria-label={"Объем заправки в " + (volumeUnit === "gal" ? "галлонах" : "литрах")}
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9]*[.,]?[0-9]*"
                       value={liters}
                       onChange={(e) => setLiters(e.target.value)}
-                      className="w-full px-3 pr-9 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-mono font-bold"
+                      className="w-full px-3 pr-9 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs outline-none focus:border-brand focus:ring-2 focus:ring-brand/15 font-mono font-bold transition"
                     />
-                    <span className="text-xs text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">л</span>
+                    <span className="text-xs text-neutral-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">{volumeUnitLabel()}</span>
                   </div>
                 </div>
               )}
 
               <div className={eventType === "fuel" ? "sm:col-span-2" : ""}>
-                <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
+                <label className="h-8 flex items-start text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 leading-tight">
                   {eventType === "fuel" ? "АЗС" : "Автосервис / Место"}
                 </label>
-                <div className="relative">
-                  <Building2 className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    value={eventType === "fuel"
-                      ? (FUEL_STATIONS.includes(location) ? location : "Другое")
-                      : (["Гараж / Автосервис", "Гараж", "Автосервис"].includes(location) ? location : "Другое")}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setLocation(value === "Другое" ? (customLocation || "Другое") : value);
-                      if (value !== "Другое") setCustomLocation("");
-                    }}
-                    className="w-full appearance-none pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand"
-                  >
-                    {eventType === "fuel" ? (
-                      <>
-                        {FUEL_STATIONS.map((station) => <option key={station}>{station}</option>)}
-                      </>
-                    ) : (
-                      <>
-                        <option>Гараж / Автосервис</option>
-                        <option>Гараж</option>
-                        <option>Автосервис</option>
-                        <option>Другое</option>
-                      </>
-                    )}
-                  </select>
-                </div>
-                {(location === "Другое" || customLocation) && (
+                {eventType === "fuel" ? (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={isStationSuggestionsOpen}
+                      placeholder="Начните вводить название АЗС"
+                      value={location}
+                      onFocus={() => setIsStationSuggestionsOpen(true)}
+                      onBlur={() => window.setTimeout(() => setIsStationSuggestionsOpen(false), 120)}
+                      onChange={(e) => { setLocation(e.target.value); setCustomLocation(e.target.value); setActiveStationSuggestion(0); setIsStationSuggestionsOpen(true); }}
+                      onKeyDown={(e) => { if (!stationSuggestions.length) return; if (e.key === "ArrowDown") { e.preventDefault(); setActiveStationSuggestion((index) => (index + 1) % stationSuggestions.length); } else if (e.key === "ArrowUp") { e.preventDefault(); setActiveStationSuggestion((index) => (index - 1 + stationSuggestions.length) % stationSuggestions.length); } else if (e.key === "Enter" && isStationSuggestionsOpen) { e.preventDefault(); const station = stationSuggestions[activeStationSuggestion]; setLocation(station); setCustomLocation(station); setIsStationSuggestionsOpen(false); } else if (e.key === "Escape") setIsStationSuggestionsOpen(false); }}
+                      className="w-full px-3 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold"
+                    />
+                    {isStationSuggestionsOpen && stationSuggestions.length > 0 && <div id="fuel-station-suggestions" role="listbox" aria-label="Варианты АЗС" className={SUGGESTION_LIST_CLASS}>
+                      {stationSuggestions.map((station, index) => <button key={station} id={`fuel-station-option-${index}`} type="button" role="option" aria-selected={activeStationSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocation(station); setCustomLocation(station); setIsStationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${activeStationSuggestion === index ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block break-words text-xs font-semibold leading-4">{station}</span></button>)}
+                    </div>}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Building2 className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <button type="button" aria-haspopup="listbox" aria-expanded={isLocationSuggestionsOpen} onClick={() => setIsLocationSuggestionsOpen((open) => !open)} className={`${SUGGESTION_OPTION_CLASS} w-full pl-9 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs flex items-center justify-between`}>
+                      <span>{locationType}</span><span className="text-neutral-400">⌄</span>
+                    </button>
+                    {isLocationSuggestionsOpen && <div role="listbox" aria-label="Варианты места" className={`${SUGGESTION_LIST_CLASS} absolute left-0 right-0 top-full z-30`}>
+                      {locationSuggestions.map((item, index) => <button key={item} type="button" role="option" aria-selected={locationType === item} onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType(item as "Автосервис" | "Частный мастер"); setLocation(item); setCustomLocation(""); setActiveLocationSuggestion(index); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === item ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">{item}</span><span className="mt-0.5 block text-[10px] text-neutral-500">Место обслуживания</span></button>)}
+                      <button type="button" role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType("Другое"); setLocation(customLocation || "Другое"); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === "Другое" ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">Другое</span><span className="mt-0.5 block text-[10px] text-neutral-500">Ввести вручную</span></button>
+                    </div>}
+                  </div>
+                )}
+                {eventType !== "fuel" && (
                   <input
                     type="text"
-                    placeholder={eventType === "fuel" ? "Название АЗС" : "Название автосервиса / места"}
+                    placeholder={locationType === "Частный мастер" ? "Имя частного мастера" : locationType === "Автосервис" ? "Название автосервиса" : "Название места"}
                     value={customLocation}
-                    onChange={(e) => { setCustomLocation(e.target.value); setLocation(e.target.value); }}
+                    onChange={(e) => { setCustomLocation(e.target.value); if (locationType === "Другое") setLocation(e.target.value); }}
                     className="mt-2 w-full px-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand"
                   />
                 )}

@@ -181,12 +181,12 @@ export const ServiceBookModal: React.FC<ServiceBookModalProps> = ({
                   {vehicle.make} {vehicle.model} {vehicle.generation}
                 </h3>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300 mt-1">
-                  <span>VIN: <strong className="text-white font-mono">{vehicle.vin || "JN1TANT31U0018942"}</strong></span>
+                  <span>VIN: <strong className="text-white font-mono">{vehicle.vin || "Не указан"}</strong></span>
                   <span>•</span>
                   {vehicle.licensePlate ? (
                     <LicensePlateBadge plate={vehicle.licensePlate} size="sm" />
                   ) : (
-                    <span>Госномер: <strong className="text-white">М777ММ 197</strong></span>
+                    <span>Госномер: <strong className="text-white">Не указан</strong></span>
                   )}
                   <span>•</span>
                   <span>Год: <strong>{vehicle.year}</strong></span>

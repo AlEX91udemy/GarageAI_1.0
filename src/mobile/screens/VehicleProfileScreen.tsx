@@ -204,7 +204,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
                 isDark ? "text-slate-400" : "text-slate-500"
               }`}
             >
-              {vehicle.year} • {vehicle.licensePlate || "0742УМ"}
+              {vehicle.year} • {vehicle.licensePlate || "Номер не указан"}
             </div>
           </div>
         </div>
@@ -481,19 +481,19 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className={`p-2.5 rounded-xl ${isDark ? "bg-[#0d131d]" : "bg-neutral-50"}`}>
                 <span className="text-slate-400 block text-[10px]">VIN</span>
-                <span className="font-mono font-bold">{vehicle.vin || "JN1TANT31U0000000"}</span>
+                <span className="font-mono font-bold">{vehicle.vin || "Не указан"}</span>
               </div>
               <div className={`p-2.5 rounded-xl ${isDark ? "bg-[#0d131d]" : "bg-neutral-50"}`}>
                 <span className="text-slate-400 block text-[10px]">Привод</span>
-                <span className="font-bold">{vehicle.driveType || "Полный (4WD)"}</span>
+                <span className="font-bold">{vehicle.driveType || "Не указан"}</span>
               </div>
               <div className={`p-2.5 rounded-xl ${isDark ? "bg-[#0d131d]" : "bg-neutral-50"}`}>
                 <span className="text-slate-400 block text-[10px]">Трансмиссия</span>
-                <span className="font-bold">{vehicle.transmission || "Вариатор (CVT)"}</span>
+                <span className="font-bold">{vehicle.transmission || "Не указана"}</span>
               </div>
               <div className={`p-2.5 rounded-xl ${isDark ? "bg-[#0d131d]" : "bg-neutral-50"}`}>
                 <span className="text-slate-400 block text-[10px]">Кузов</span>
-                <span className="font-bold">{vehicle.bodyType || "Внедорожник 5 дв."}</span>
+                <span className="font-bold">{vehicle.bodyType || "Не указан"}</span>
               </div>
             </div>
           </div>
@@ -563,17 +563,17 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
           <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#17202e] border-[#243044]" : "bg-white border-[#E2E8F0] shadow-xs"}`}>
             <div>
               <div className="text-xs font-bold">СТС (Свидетельство о регистрации)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Серия и номер: 77 12 345678</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Данные документа не добавлены</div>
             </div>
-            <span className="text-xs text-emerald-500 font-bold">Активно</span>
+            <span className="text-xs text-slate-400 font-bold">Не указан</span>
           </div>
 
           <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#17202e] border-[#243044]" : "bg-white border-[#E2E8F0] shadow-xs"}`}>
             <div>
               <div className="text-xs font-bold">ОСАГО (Полис страхования)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Действует до 15.11.2026</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Срок действия не указан</div>
             </div>
-            <span className="text-xs text-emerald-500 font-bold">Осталось 68 дн.</span>
+            <span className="text-xs text-slate-400 font-bold">Не указан</span>
           </div>
         </div>
       )}

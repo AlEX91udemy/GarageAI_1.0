@@ -481,6 +481,42 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
   return res.json();
 }
 
+export interface VehicleDocumentOcrResult {
+  make?: string;
+  model?: string;
+  generation?: string;
+  year?: number;
+  licensePlate?: string;
+  vin?: string;
+  engine?: string;
+  engineDisplacementCc?: number;
+  enginePowerKw?: number;
+  enginePowerHp?: number;
+  fuelType?: string;
+  bodyType?: string;
+  maxMassKg?: number;
+  massKg?: number;
+  seats?: number;
+  registrationDate?: string;
+  stsNumber?: string;
+  stsIssueDate?: string;
+  confidence?: Record<string, number>;
+  rawText?: string;
+}
+
+export async function requestVehicleDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<VehicleDocumentOcrResult> {
+  const res = await authenticatedFetch("/api/ai/scan-vehicle-document", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось распознать СТС");
+  }
+  return res.json();
+}
+
 export async function requestDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<{ text: string; sources?: { vision: string | null; local: string; confidence: number }; preprocessing?: { variants: string[]; mimeType: string }; warning?: string | null }> {
   const res = await authenticatedFetch("/api/ai/scan-document", {
     method: "POST",
