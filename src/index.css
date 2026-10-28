@@ -30,6 +30,12 @@
   --app-text-muted: #536171;
   --app-accent: #b91c1c;
   --app-brand-mark: #ef3038;
+  --anim-duration: 180ms;
+  --anim-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --anim-hover-y: -2px;
+  --anim-btn-hover-y: -1px;
+  --anim-active-scale: 0.98;
+  --card-hover-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.08);
 }
 
 html.dark, :root.dark, .dark {
@@ -40,13 +46,49 @@ html.dark, :root.dark, .dark {
   --app-text: #f8fafc;
   --app-text-muted: #94A3B8;
   --app-accent: #ef3038;
+  --card-hover-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.4);
 }
 
 body {
   background-color: var(--app-bg);
   color: var(--app-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color var(--anim-duration) var(--anim-ease),
+    color var(--anim-duration) var(--anim-ease);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Единая анимация интерактивных карточек лендинга. */
+.garage-card-anim {
+  transition:
+    transform var(--anim-duration) var(--anim-ease),
+    border-color var(--anim-duration) var(--anim-ease),
+    background-color var(--anim-duration) var(--anim-ease),
+    box-shadow var(--anim-duration) var(--anim-ease);
+}
+
+.garage-card-anim:hover {
+  transform: translateY(var(--anim-hover-y));
+  border-color: color-mix(in srgb, var(--app-brand-mark) 45%, var(--app-border));
+  box-shadow: var(--card-hover-shadow);
+}
+
+/* Единая анимация кнопок с нажатием. */
+.garage-btn-anim {
+  transition:
+    transform var(--anim-duration) var(--anim-ease),
+    background-color var(--anim-duration) var(--anim-ease),
+    border-color var(--anim-duration) var(--anim-ease),
+    color var(--anim-duration) var(--anim-ease),
+    box-shadow var(--anim-duration) var(--anim-ease),
+    opacity var(--anim-duration) var(--anim-ease);
+}
+
+.garage-btn-anim:hover:not(:disabled) {
+  transform: translateY(var(--anim-btn-hover-y));
+}
+
+.garage-btn-anim:active:not(:disabled) {
+  transform: translateY(0) scale(var(--anim-active-scale));
 }
 
 /* =========================================
