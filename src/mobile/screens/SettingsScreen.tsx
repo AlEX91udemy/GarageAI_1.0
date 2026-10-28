@@ -195,7 +195,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 localStorage.setItem(NOTIFY_SERVICE_KEY, String(e.target.checked));
                 notifyGarageSettingsChanged();
               }}
-              className="w-4 h-4 accent-brand-strong rounded cursor-pointer"
+              className="garage-theme-checkbox w-4 h-4 rounded cursor-pointer"
             />
           </div>
 
@@ -214,7 +214,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 localStorage.setItem(NOTIFY_AI_KEY, String(e.target.checked));
                 notifyGarageSettingsChanged();
               }}
-              className="w-4 h-4 accent-brand-strong rounded cursor-pointer"
+              className="garage-theme-checkbox w-4 h-4 rounded cursor-pointer"
             />
           </div>
           <p className={`text-[10px] pt-1 ${mutedClass}`}>
