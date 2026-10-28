@@ -646,6 +646,10 @@ app.use("/api", (req, res, next) => {
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||
+    req.path === "/auth/email/request" ||
+    req.path === "/auth/email/request-code" ||
+    req.path === "/auth/email/verify" ||
+    req.path === "/auth/email/verify-code" ||
     req.path.startsWith("/auth/session");
   if (isPublic) return next();
   if (req.path === "/health" || !fullPath) return next();
@@ -2120,7 +2124,7 @@ async function clearLoginAttempts(clientId: string): Promise<void> {
   loginAttempts.delete(clientId);
 }
 
-async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string, email?: string) {
   const { record, token } = createSession(userId);
   if (store instanceof PostgresPersistence) {
     await store.putSession(record);
@@ -2129,7 +2133,7 @@ async function establishSession(req: express.Request, res: express.Response, use
     await persistSessions();
   }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-  return { username, csrfToken: record.csrfSecret };
+  return { username, email, csrfToken: record.csrfSecret };
 }
 
 app.post("/api/auth/register", async (req, res) => {
@@ -2153,7 +2157,7 @@ app.post("/api/auth/register", async (req, res) => {
     }
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email ?? undefined);
     await clearLoginAttempts(req.ip || "unknown");
-    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
+    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!, email ?? undefined) });
   })().catch((error) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
@@ -2183,7 +2187,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
   await clearLoginAttempts(req.ip || "unknown");
   try {
-    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch (error) {
     console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
@@ -2298,7 +2302,7 @@ app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, 
     if (!accepted) {
       return res.status(401).json({ error: "Неверный или просроченный код" });
     }
-    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch {
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
@@ -2345,7 +2349,7 @@ app.get("/api/auth/session", async (req, res) => {
       }
       res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
     }
-    return res.json({ username: user.username, csrfToken: session.csrfSecret });
+    return res.json({ username: user.username, email: user.email, csrfToken: session.csrfSecret });
   } catch (error) {
     console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });

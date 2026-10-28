@@ -150,6 +150,7 @@ export default function App() {
   // Server state
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [garageLoaded, setGarageLoaded] = useState(false);
+  const [hasGarageAccess, setHasGarageAccess] = useState(false);
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
 
   // Active Modals
@@ -179,8 +180,24 @@ export default function App() {
     Partial<ServiceRecord> | undefined
   >(undefined);
 
+  const clearLocalGarageCache = () => {
+    for (const key of [
+      "garagehub_vehicles",
+      "garagehub_reminders",
+      "garagehub_service_records",
+      "garagehub_fuel_records",
+      "garagehub_oem_schedules",
+      "garagehub_garage_parts",
+      "garagehub_to_fix_tasks",
+      "garagehub_tuning_stages",
+    ]) {
+      localStorage.removeItem(key);
+    }
+  };
+
   const handleAuthSuccess = async () => {
     // Авторизация из мобильного профиля не должна менять выбранный интерфейс.
+    setHasGarageAccess(true);
     try {
       const data = await fetchGarageData();
       const readCache = <T,>(key: string): T[] => {
@@ -242,6 +259,7 @@ export default function App() {
     fetchGarageData()
       .then((data) => {
         if (!active) return;
+        setHasGarageAccess(true);
         setIsOnline(true);
         const loadedVehicles = data.vehicles || [];
         setVehicles(loadedVehicles);
@@ -260,8 +278,29 @@ export default function App() {
         setGarageLoaded(true);
       })
       .catch((err) => {
-        console.warn("Backend server not responding, running with local cache:", err);
+        const requiresAuthentication = err instanceof Error && err.message.includes(": 401");
+        console.warn(
+          requiresAuthentication
+            ? "Пользователь не авторизован, открываем пустой гараж:"
+            : "Backend server not responding, running with local cache:",
+          err,
+        );
         setIsOnline(false);
+        setHasGarageAccess(!requiresAuthentication);
+        if (requiresAuthentication) {
+          clearLocalGarageCache();
+          setVehicles([]);
+          setReminders([]);
+          setActiveVehicleId("empty-garage");
+          setServiceRecords([]);
+          setFuelRecords([]);
+          setOemSchedules([]);
+          setGarageParts([]);
+          setToFixTasks([]);
+          setTuningStages([]);
+          setGarageLoaded(true);
+          return;
+        }
         // The app is usable without an account. Keep the last local garage
         // available when the server requires authentication or is offline.
         const readCache = <T,>(key: string): T[] => {
@@ -292,50 +331,50 @@ export default function App() {
 
   // Save to localStorage as offline fallback
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_vehicles", JSON.stringify(vehicles));
-  }, [vehicles, garageLoaded]);
+  }, [vehicles, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_reminders", JSON.stringify(reminders));
-  }, [reminders, garageLoaded]);
+  }, [reminders, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem(
       "garagehub_service_records",
       JSON.stringify(serviceRecords)
     );
-  }, [serviceRecords, garageLoaded]);
+  }, [serviceRecords, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_fuel_records", JSON.stringify(fuelRecords));
-  }, [fuelRecords, garageLoaded]);
+  }, [fuelRecords, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem(
       "garagehub_oem_schedules",
       JSON.stringify(oemSchedules)
     );
-  }, [oemSchedules, garageLoaded]);
+  }, [oemSchedules, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_garage_parts", JSON.stringify(garageParts));
-  }, [garageParts, garageLoaded]);
+  }, [garageParts, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_to_fix_tasks", JSON.stringify(toFixTasks));
-  }, [toFixTasks, garageLoaded]);
+  }, [toFixTasks, garageLoaded, hasGarageAccess]);
 
   useEffect(() => {
-    if (!garageLoaded) return;
+    if (!garageLoaded || !hasGarageAccess) return;
     localStorage.setItem("garagehub_tuning_stages", JSON.stringify(tuningStages));
-  }, [tuningStages, garageLoaded]);
+  }, [tuningStages, garageLoaded, hasGarageAccess]);
 
   // Current selected vehicle
   const currentVehicle =
@@ -932,6 +971,8 @@ export default function App() {
           onSwitchToMobile={() => handleSetPlatform("mobile")}
           onLogout={() => {
             void apiLogout().catch(console.error);
+            setHasGarageAccess(false);
+            clearLocalGarageCache();
             setVehicles([]);
             setReminders([]);
             setActiveVehicleId("empty-garage");
@@ -998,6 +1039,8 @@ export default function App() {
           }}
           onLogout={() => {
             void apiLogout().catch(console.error);
+            setHasGarageAccess(false);
+            clearLocalGarageCache();
             setVehicles([]);
             setReminders([]);
             setActiveVehicleId("empty-garage");

@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
-import { login, register, restoreSession } from "../../api";
+import { login, register, restoreSession, requestEmailCode, verifyEmailCode } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -42,7 +42,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   vehicles,
   serviceRecords,
   garageParts,
-  userEmail = "SAMBUR91@gmail.com",
+  userEmail = "",
   onNavigate,
   onOpenBackup,
   onOpenServiceBook,
@@ -54,9 +54,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
+  const [sessionEmail, setSessionEmail] = React.useState<string | null>(null);
   const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
   const [authUsername, setAuthUsername] = React.useState("");
   const [authPassword, setAuthPassword] = React.useState("");
+  const [authEmail, setAuthEmail] = React.useState("");
+  const [authEmailCode, setAuthEmailCode] = React.useState("");
+  const [emailCodeRequested, setEmailCodeRequested] = React.useState(false);
+  const [emailMode, setEmailMode] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authBusy, setAuthBusy] = React.useState(false);
 
@@ -64,6 +69,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     restoreSession().then((session) => {
       setIsAuthenticated(Boolean(session));
       setSessionUsername(session?.username ?? null);
+      setSessionEmail(session?.email ?? null);
     });
   }, []);
 
@@ -79,13 +85,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setAuthBusy(true);
     setAuthError(null);
     try {
-      const session = authMode === "login"
-        ? await login(authUsername.trim(), authPassword)
-        : await register(authUsername.trim(), authPassword);
+      const session = emailMode
+        ? (emailCodeRequested
+          ? await verifyEmailCode(authEmail.trim(), authEmailCode.trim())
+          : (await requestEmailCode(authEmail.trim()), setEmailCodeRequested(true), null))
+        : authMode === "login"
+          ? await login(authUsername.trim(), authPassword)
+          : await register(authUsername.trim(), authPassword, authEmail.trim() || undefined);
+      if (!session) return;
       setIsAuthenticated(true);
       setSessionUsername(session.username);
+      setSessionEmail(session.email ?? (authEmail.trim() || null));
       setAuthMode(null);
       setAuthPassword("");
+      setAuthEmailCode("");
+      setEmailCodeRequested(false);
+      setEmailMode(false);
       onAuthSuccess?.();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Ошибка авторизации");
@@ -119,9 +134,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <h3 className="text-base font-black text-neutral-900 truncate">
               {isAuthenticated ? sessionUsername ?? "Владелец гаража" : "Гостевой профиль"}
             </h3>
-            {isAuthenticated && (
+            {isAuthenticated && (sessionEmail || userEmail) && (
               <div className="text-xs text-neutral-500 font-mono truncate">
-                {userEmail}
+                {sessionEmail || userEmail}
               </div>
             )}
             <div className={`mt-1 flex items-center gap-1.5 text-[10px] font-bold ${isAuthenticated ? "text-emerald-600" : "text-neutral-500"}`}>
@@ -140,10 +155,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </p>
             </div>
             {!authMode ? (
+              <>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                  onClick={() => { setAuthMode("login"); setEmailMode(false); setAuthError(null); }}
                   className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
                 >
                   <LogIn className="mr-1 inline h-4 w-4" />
@@ -151,32 +167,72 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                  onClick={() => { setAuthMode("register"); setEmailMode(false); setAuthError(null); }}
                   className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
                 >
                   <UserPlus className="mr-1 inline h-4 w-4" />
                   Регистрация
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => { setEmailMode(true); setAuthMode("login"); setAuthError(null); setEmailCodeRequested(false); }}
+                className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-xs font-bold text-neutral-800 transition hover:bg-neutral-100"
+              >
+                Войти по коду из email
+              </button>
+              </>
             ) : (
               <form onSubmit={submitAuth} className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-neutral-700">
                     {authMode === "login" ? "Вход в аккаунт" : "Новый аккаунт"}
                   </span>
-                  <button type="button" onClick={() => setAuthMode(null)} className="text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                  <button type="button" onClick={() => { setAuthMode(null); setEmailMode(false); setEmailCodeRequested(false); setAuthError(null); }} className="text-xs font-semibold text-neutral-500 hover:text-neutral-900">
                     Отмена
                   </button>
                 </div>
-                <input
+                {emailMode ? (
+                  <>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                      placeholder="Email"
+                      autoComplete="email"
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    {emailCodeRequested && (
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        value={authEmailCode}
+                        onChange={(event) => setAuthEmailCode(event.target.value)}
+                        placeholder="Код из письма"
+                        autoComplete="one-time-code"
+                        required
+                        className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      />
+                    )}
+                  </>
+                ) : <input
                   value={authUsername}
                   onChange={(event) => setAuthUsername(event.target.value)}
                   placeholder="Логин"
                   autoComplete="username"
                   required
                   className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />
-                <input
+                />}
+                {!emailMode && authMode === "register" && <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="Email для входа по коду (необязательно)"
+                  autoComplete="email"
+                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                />}
+                {!emailMode && <input
                   type="password"
                   value={authPassword}
                   onChange={(event) => setAuthPassword(event.target.value)}
@@ -185,10 +241,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   minLength={8}
                   required
                   className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />
+                />}
                 {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
-                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : authMode === "login" ? "Войти" : "Создать аккаунт"}
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : emailMode ? (emailCodeRequested ? "Войти" : "Отправить код") : authMode === "login" ? "Войти" : "Создать аккаунт"}
                 </button>
               </form>
             )}
@@ -305,7 +361,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             onClick={() => {
               setIsAuthenticated(false);
               setSessionUsername(null);
+              setSessionEmail(null);
               setAuthMode(null);
+              setEmailMode(false);
+              setEmailCodeRequested(false);
               onLogout?.();
             }}
             className="w-full p-3.5 flex items-center justify-between hover:bg-neutral-50 transition cursor-pointer text-left text-brand-strong"

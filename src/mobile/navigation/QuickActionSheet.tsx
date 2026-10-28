@@ -156,8 +156,9 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
             </div>
           </div>
         ) : (
-        <div className="grid grid-cols-2 gap-2.5">
-          {actions.map((act) => (
+        <div className="space-y-2.5">
+          <div className="flex justify-center">
+            {actions.filter((act) => act.id === "scanner").map((act) => (
             <button
               key={act.id}
               onClick={() => {
@@ -168,7 +169,7 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
                 onClose();
                 onSelectAction(act.id);
               }}
-              className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100/90 border border-neutral-200/80 transition active:scale-[0.98] text-left cursor-pointer group"
+              className="flex w-full items-center gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100/90 border border-neutral-200/80 transition active:scale-[0.98] text-left cursor-pointer group"
             >
               <div
                 className={`w-10 h-10 rounded-xl ${act.bg} ${act.border} border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform`}
@@ -184,7 +185,28 @@ export const QuickActionSheet: React.FC<QuickActionSheetProps> = ({
                 </div>
               </div>
             </button>
-          ))}
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            {actions.filter((act) => act.id !== "scanner").map((act) => (
+              <button
+                key={act.id}
+                onClick={() => {
+                  onClose();
+                  onSelectAction(act.id as QuickActionType);
+                }}
+                className="flex items-start gap-3 p-3 rounded-2xl bg-neutral-50 hover:bg-neutral-100/90 border border-neutral-200/80 transition active:scale-[0.98] text-left cursor-pointer group"
+              >
+                <div className={"w-10 h-10 rounded-xl " + act.bg + " " + act.border + " border flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"}>
+                  {act.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-neutral-900 tracking-tight leading-tight">{act.label}</div>
+                  <div className="text-[10px] text-neutral-500 line-clamp-2 mt-0.5 leading-snug">{act.sublabel}</div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
         )}
       </div>
