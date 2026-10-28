@@ -25,16 +25,18 @@ afterEach(() => {
 
 const renderSettings = (themeMode: "light" | "dark" = "light") => {
   const onThemeChange = vi.fn();
+  const onDarkVariantChange = vi.fn();
   act(() => {
     root.render(
       <SettingsScreen
         onBack={vi.fn()}
         themeMode={themeMode}
         onThemeChange={onThemeChange}
+        onDarkVariantChange={onDarkVariantChange}
       />
     );
   });
-  return onThemeChange;
+  return { onThemeChange, onDarkVariantChange };
 };
 
 it("renders garage parameters in the light theme", () => {
@@ -46,7 +48,7 @@ it("renders garage parameters in the light theme", () => {
 });
 
 it("switches to light theme and persists garage settings", () => {
-  const onThemeChange = renderSettings("dark");
+  const { onThemeChange } = renderSettings("dark");
   const buttons = Array.from(container.querySelectorAll("button"));
 
   act(() => buttons.find((button) => button.textContent?.trim() === "Светлая")?.click());
@@ -59,6 +61,23 @@ it("switches to light theme and persists garage settings", () => {
   expect(localStorage.getItem(DISTANCE_UNIT_KEY)).toBe("mi");
   expect(localStorage.getItem(VOLUME_UNIT_KEY)).toBe("gal");
   expect(localStorage.getItem(GARAGE_CURRENCY_KEY)).toBe("usd");
+});
+
+it("activates and reports both additional dark themes", () => {
+  for (const [label, variant, titlePart] of [
+    ["Carbon Black", "carbon", "Графитовая"],
+    ["OLED Midnight", "oled", "Чёрная OLED"],
+  ] as const) {
+    const { onThemeChange, onDarkVariantChange } = renderSettings("dark");
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (candidate) => candidate.textContent?.trim() === label
+    );
+
+    act(() => button?.click());
+    expect(onDarkVariantChange).toHaveBeenCalledWith(variant);
+    expect(onThemeChange).toHaveBeenCalledWith("dark");
+    expect(button?.getAttribute("title")).toContain(titlePart);
+  }
 });
 
 it("persists notification switches", () => {

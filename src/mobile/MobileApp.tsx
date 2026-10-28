@@ -937,7 +937,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
       {/* Main Mobile Device Container (Matches 360-430px mobile specs) */}
       <div
-        data-theme-variant={darkVariant}
+        data-theme-variant={themeMode === "dark" ? darkVariant : "light"}
         className={`w-full mx-auto relative flex flex-1 min-h-0 flex-col justify-between overflow-hidden shadow-2xl transition-all ${
           isWeb ? "max-w-[820px]" : "max-w-[430px]"
         } ${
