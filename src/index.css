@@ -386,6 +386,25 @@ body {
   border-color: rgba(239, 68, 68, 0.32) !important;
 }
 
+/* Theme-aware switches in mobile garage settings. */
+.garage-theme-checkbox {
+  accent-color: #b91c1c;
+  color-scheme: light;
+}
+
+.dark .garage-theme-checkbox {
+  accent-color: #f87171;
+  color-scheme: dark;
+}
+
+[data-theme-variant="carbon"] .garage-theme-checkbox {
+  accent-color: #ea580c;
+}
+
+[data-theme-variant="oled"] .garage-theme-checkbox {
+  accent-color: #dc2626;
+}
+
 /* =========================================
    LIGHT THEME ADAPTATIONS
    ========================================= */
