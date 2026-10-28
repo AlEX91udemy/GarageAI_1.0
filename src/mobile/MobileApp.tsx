@@ -302,11 +302,17 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       case "home":
         if (vehicles.length === 0 && currentVehicle.id === "empty-garage") {
           return (
-            <div className="h-full w-full bg-neutral-950 text-white flex flex-col items-center justify-center px-6 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-brand-strong/15 text-brand-on-dark flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
+            <div
+              className={`h-full w-full flex flex-col items-center justify-center px-6 text-center transition-colors ${
+                themeMode === "dark"
+                  ? "bg-[#0d131d] text-white"
+                  : "bg-[#F4F5F8] text-[#0F172A]"
+              }`}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-brand-strong/15 text-brand-strong dark:text-brand-on-dark flex items-center justify-center mb-4"><Car className="w-8 h-8" /></div>
               <h2 className="text-xl font-black">Гараж пока пуст</h2>
-              <p className="text-sm text-neutral-400 mt-2 max-w-xs">Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.</p>
-              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-brand-strong px-5 py-3 text-sm font-bold">Добавить автомобиль</button>
+              <p className={`text-sm mt-2 max-w-xs ${themeMode === "dark" ? "text-slate-400" : "text-slate-500"}`}>Добавьте первый автомобиль, чтобы вести историю обслуживания и расходы.</p>
+              <button type="button" onClick={onOpenAddVehicleModal} className="mt-5 rounded-xl bg-brand-strong px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-brand-hover active:scale-95">Добавить автомобиль</button>
             </div>
           );
         }
