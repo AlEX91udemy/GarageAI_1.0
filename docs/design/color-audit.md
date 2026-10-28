@@ -30,7 +30,6 @@
 | Splash screen | [`SplashScreen.tsx:21`](../../src/mobile/screens/SplashScreen.tsx), `:25`, `:36`, `:46` | Лаймовое свечение, точка, слово `AI` и прогресс-бар | `brand.red.500` / `brand.red.700` |
 | Favicon | [`favicon.svg:4`](../../public/favicon.svg), `:6` | Лаймовый дом и точка | Красный знак |
 | Мобильные токены | [`theme.ts:34`](../../src/mobile/theme.ts), `:35`, `:36`, `:38` | `brand.primary`, `glow`, `dark` и gradient заданы лаймом | Красная шкала из палитры |
-| Альтернативные логотипы | [`garage-ai-option-1.svg:4`](../../public/garage-ai-option-1.svg), [`option-2.svg:4`](../../public/garage-ai-option-2.svg), [`option-3.svg:5`](../../public/garage-ai-option-3.svg) | Лаймово-зелёные варианты логотипа | Архивировать или перекрасить в красный |
 
 ## 2. Фиолетовый, циан и розовый в UI
 
@@ -56,13 +55,6 @@
 
 | Ассет | Где | Красный |
 |---|---|---|
-| Apple-red логотип | [`garage-ai-apple-red.svg:4`](../../public/garage-ai-apple-red.svg), `:8`, `:9`, `:11` | `#E5232E` |
-| Основной SVG-знак | [`garage-ai-mark.svg:6`](../../public/garage-ai-mark.svg), `:7` | `#EF3038` — канонический mark |
-| Auto-style 1 | [`garage-ai-auto-style-1.svg:2`](../../public/garage-ai-auto-style-1.svg), `:8` | `#F5222D` |
-| Auto-style 2 | [`garage-ai-auto-style-2.svg:5`](../../public/garage-ai-auto-style-2.svg), `:6`, `:8`, `:9` | `#F5222D` |
-| Auto-style 3 | [`garage-ai-auto-style-3.svg:3`](../../public/garage-ai-auto-style-3.svg), `:7`, `:9` | `#F5222D` |
-| Варианты машинки | [`garageai-car-options.html:6`](../../public/garageai-car-options.html) ... `:15` | `#E5232E` |
-| Варианты SUV | [`garageai-suv-options.html:5`](../../public/garageai-suv-options.html) ... `:14` | `#E5232E` |
 | Растровые логотипы | `garage-ai-mark.png`, `garageai-wordmark.png`, `icon-512.png`, `apple-touch-icon.png` | `#CC2323`, `#FC0E0E` |
 | PDF-экспорт | [`serviceBookPdfExport.ts`](../../src/utils/serviceBookPdfExport.ts) | `#D32F2F`, `#B71C1C` |
 
