@@ -123,10 +123,9 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   );
   const currencySymbol = CURRENCY_SYMBOLS[getGarageCurrency()];
   const prefilledCenter = initialPrefilledData?.serviceCenter || "";
-  const initialLocationType = prefilledCenter === "Автосервис" || prefilledCenter === "Частный мастер"
-    ? prefilledCenter
-    : prefilledCenter ? "Другое" : "Автосервис";
-  const [locationType, setLocationType] = useState<"Автосервис" | "Частный мастер" | "Другое">(initialLocationType);
+  const [locationType, setLocationType] = useState<"Автосервис" | "Частный мастер" | "Другое">(
+    prefilledCenter === "Частный мастер" ? "Частный мастер" : prefilledCenter === "Автосервис" || !prefilledCenter ? "Автосервис" : "Другое"
+  );
   const [customLocation, setCustomLocation] = useState(
     ["Автосервис", "Частный мастер", "Газпромнефть", "Лукойл", "Роснефть", "Татнефть"].includes(prefilledCenter) ? "" : prefilledCenter
   );
