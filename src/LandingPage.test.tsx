@@ -136,5 +136,24 @@ describe("LandingPage UI & UX Audit Suite", () => {
     const duplicateWorkspaceAnchor = heroSection?.querySelector('a[href="#workspace"]');
     expect(duplicateWorkspaceAnchor).toBeNull();
   });
-});
 
+  it("keeps the landing header CTA compact on mobile and constrains the page to the viewport", () => {
+    act(() => {
+      root.render(<LandingPage />);
+    });
+
+    const page = container.querySelector(".landing-page");
+    expect(page).not.toBeNull();
+    expect(page?.className).toContain("overflow-x-clip");
+
+    const header = container.querySelector("header");
+    const actionGroup = header?.querySelector("div.flex.min-w-0");
+    expect(actionGroup).not.toBeNull();
+
+    const appButton = header?.querySelector('a[href="/app?view=mobile"]');
+    expect(appButton?.textContent).toContain("Открыть приложение");
+    expect(appButton?.textContent).toContain("Открыть мобильное приложение");
+    expect(appButton?.className).not.toContain("whitespace-nowrap");
+  });
+
+});
