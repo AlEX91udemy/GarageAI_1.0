@@ -244,22 +244,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             >
               Light
             </button>
-            {(
-              [
-                { id: "dark_racing" as DarkVariant, label: "Dark Racing" },
-              ] as { id: DarkVariant; label: string }[]
-            ).map((th) => (
+            {([{ id: "dark_racing" as DarkVariant, label: "Dark Racing" }] as { id: DarkVariant; label: string }[]).map((th) => (
               <button
                 key={th.id}
                 onClick={() => handleThemeVariant(th.id)}
                 aria-pressed={variantActive(th.id)}
-                title={
-                  th.id === "dark_racing"
-                    ? "Тёмно-синяя тема с красным акцентом"
-                    : th.id === "carbon"
-                      ? "Графитовая тема с оранжевым акцентом"
-                      : "Чёрная OLED тема с красным акцентом"
-                }
+                title="Тёмно-синяя тема с красным акцентом"
                 className={`p-2.5 rounded-xl border text-center font-bold text-[11px] transition cursor-pointer ${
                   variantActive(th.id)
                     ? "bg-brand-strong text-white border-brand shadow-md shadow-brand-strong/30"
@@ -271,7 +261,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             ))}
           </div>
           <p className={`text-[10px] pt-1 ${mutedClass}`}>
-            Light — светлая схема. Dark Racing — тёмно-синяя схема с красным акцентом.
+            Light — светлая схема. Dark Racing — тёмная тема с красным акцентом.
           </p>
         </div>
 
@@ -285,8 +275,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             Разработано для мобильных платформ iOS & Android
           </div>
         </div>
+
+        {/* Legal documents */}
+        <div className={`p-4 rounded-2xl border space-y-1 ${panelClass}`}>
+          <h3 className={`font-bold uppercase tracking-wider text-[11px] ${headingClass}`}>
+            Правовая информация
+          </h3>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <a href="/privacy" className={`block rounded-lg py-2 text-xs font-semibold transition-colors ${isDark ? "text-slate-300 hover:text-white" : "text-neutral-700 hover:text-neutral-950"}`}>
+            Политика конфиденциальности
+          </a>
+          <a href="/terms" className={`block rounded-lg py-2 text-xs font-semibold transition-colors ${isDark ? "text-slate-300 hover:text-white" : "text-neutral-700 hover:text-neutral-950"}`}>
+            Условия использования
+          </a>
+          <a href="/cookies" className={`block rounded-lg py-2 text-xs font-semibold transition-colors ${isDark ? "text-slate-300 hover:text-white" : "text-neutral-700 hover:text-neutral-950"}`}>
+            Политика cookie
+          </a>
+          </div>
+          <a href="mailto:founder@garageai.site" className={`block pt-1 text-[10px] transition-colors ${isDark ? "text-slate-500 hover:text-slate-300" : "text-neutral-500 hover:text-neutral-800"}`}>
+            founder@garageai.site
+          </a>
+        </div>
       </div>
     </div>
   );
 };
-

@@ -850,13 +850,14 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>Проверка в API базы запчастей</span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{availabilityInfo.isLive ? "Проверка в API базы запчастей" : "Демо-оценка запчасти"}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${availabilityInfo.isLive ? "bg-emerald-400 animate-pulse" : "bg-amber-300"}`} />
                         </div>
                         <div className="text-[10px] text-neutral-400">
                           {availabilityInfo.totalSuppliersStock} шт. у поставщиков • от{" "}
                           {availabilityInfo.fastestDeliveryDays} дн.
                         </div>
+                        {!availabilityInfo.isLive && <div className="mt-1 text-[9px] text-amber-300">Демонстрационные цены и остатки</div>}
                       </div>
                     </div>
 

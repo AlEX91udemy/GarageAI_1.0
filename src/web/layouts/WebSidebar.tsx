@@ -131,6 +131,23 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
           );
         })}
 
+        <div className={`mt-3 border-t pt-3 ${isDark ? "border-[#243044]" : "border-slate-200"}`}>
+          {!isCollapsed && (
+            <p className={`px-3 pb-1 text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              Документы
+            </p>
+          )}
+          <a href="/privacy" title="Политика конфиденциальности" className={`block rounded-lg px-3 py-1.5 text-xs transition-colors ${isDark ? "text-slate-500 hover:bg-[#1E293B] hover:text-slate-200" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}>
+            {isCollapsed ? "П" : "Политика конфиденциальности"}
+          </a>
+          <a href="/terms" title="Условия использования" className={`block rounded-lg px-3 py-1.5 text-xs transition-colors ${isDark ? "text-slate-500 hover:bg-[#1E293B] hover:text-slate-200" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}>
+            {isCollapsed ? "У" : "Условия использования"}
+          </a>
+          <a href="/cookies" title="Политика cookie" className={`block rounded-lg px-3 py-1.5 text-xs transition-colors ${isDark ? "text-slate-500 hover:bg-[#1E293B] hover:text-slate-200" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}>
+            {isCollapsed ? "C" : "Политика cookie"}
+          </a>
+        </div>
+
         {onLogout && (
           <button
             onClick={onLogout}

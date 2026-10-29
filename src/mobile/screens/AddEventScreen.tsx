@@ -119,7 +119,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     initialPrefilledData?.laborCost ? String(initialPrefilledData.laborCost) : ""
   );
   const [location, setLocation] = useState(
-    initialPrefilledData?.serviceCenter || "Автосервис"
+    initialPrefilledData?.serviceCenter || (initialType === "fuel" ? "Газпромнефть" : "Автосервис")
   );
   const currencySymbol = CURRENCY_SYMBOLS[getGarageCurrency()];
   const prefilledCenter = initialPrefilledData?.serviceCenter || "";
@@ -133,6 +133,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   const [activeStationSuggestion, setActiveStationSuggestion] = useState(0);
   const [isLocationSuggestionsOpen, setIsLocationSuggestionsOpen] = useState(false);
   const [activeLocationSuggestion, setActiveLocationSuggestion] = useState(0);
+  const [isLocationTypeSelected, setIsLocationTypeSelected] = useState(() => Boolean(prefilledCenter));
   const [notes, setNotes] = useState(initialPrefilledData?.description || "");
 
   // Part-specific inputs for "Добавить запчасть"
@@ -226,6 +227,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
     ? searchServiceWorks(title)
     : [];
   const stationSuggestions = FUEL_STATIONS.filter((station) => station !== "Другое" && station.toLocaleLowerCase("ru").includes(location.trim().toLocaleLowerCase("ru")));
+  const selectedFuelStation = FUEL_STATIONS.includes(location) ? location : "Другое";
   const locationSuggestions = ["Автосервис", "Частный мастер"];
   const partSuggestions = partSuggestionField === "name"
     ? searchParts(partName, "name")
@@ -655,22 +657,22 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide block">
-                  {eventType === "fuel" ? "Вид топлива" : "Выполненные работы"}
+                  {eventType === "fuel" ? "Вид топлива" : "Название события / Работы"}
                 </label>
               </div>
-              <input
+              {eventType === "fuel" ? (
+                <input aria-label="Тип топлива" value={fuelType} onChange={(e) => { setFuelType(e.target.value); setTitle(e.target.value); }} className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold" />
+              ) : <input
                 id="service-work-title"
                 role="combobox"
-                aria-label={eventType === "fuel" ? "Вид топлива" : "Выполненные работы"}
+                aria-label="Выполненные работы"
                 aria-autocomplete="list"
                 aria-expanded={isWorkSuggestionsOpen && workSuggestions.length > 0}
                 aria-controls="service-work-suggestions"
                 aria-activedescendant={isWorkSuggestionsOpen && workSuggestions[activeWorkSuggestion] ? `service-work-option-${activeWorkSuggestion}` : undefined}
                 type="text"
                 placeholder={
-                  eventType === "fuel"
-                    ? fuelType
-                    : eventType === "expense"
+                  eventType === "expense"
                     ? "Мойка, шиномонтаж или парковка"
                     : eventType === "problem"
                     ? "Стук в передней подвеске"
@@ -697,7 +699,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                   }
                 }}
                 className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold"
-              />
+              />}
               {isWorkSuggestionsOpen && workSuggestions.length > 0 && (
                 <div id="service-work-suggestions" role="listbox" aria-label="Варианты видов работ" className={SUGGESTION_LIST_CLASS}>
                   {workSuggestions.map((work, index) => (
@@ -725,14 +727,9 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wide mb-1 block">
                   Категория работ
                 </label>
-                <div className="relative">
-                  <button type="button" aria-haspopup="listbox" aria-expanded={isCategorySuggestionsOpen} onClick={() => setIsCategorySuggestionsOpen((open) => !open)} className={`${SUGGESTION_OPTION_CLASS} w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs flex items-center justify-between`}>
-                    <span>{category}</span><span className="text-neutral-400">⌄</span>
-                  </button>
-                  {isCategorySuggestionsOpen && <div role="listbox" aria-label="Категории работ" className={`${SUGGESTION_LIST_CLASS} absolute left-0 right-0 z-30`}>
-                    {MAINTENANCE_CATEGORIES.map((item, index) => <button key={item} type="button" role="option" aria-selected={category === item} onMouseDown={(event) => event.preventDefault()} onClick={() => { setCategory(item); setActiveCategorySuggestion(index); setIsCategorySuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${category === item ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">{item}</span></button>)}
-                  </div>}
-                </div>
+                <select aria-label="Категория работ" value={category} onChange={(e) => setCategory(e.target.value as MaintenanceCategory)} className="w-full px-3.5 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand">
+                  {MAINTENANCE_CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}
+                </select>
               </div>
             )}
 
@@ -826,22 +823,10 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                 </label>
                 {eventType === "fuel" ? (
                   <div className="relative">
-                    <input
-                      type="text"
-                      role="combobox"
-                      aria-autocomplete="list"
-                      aria-expanded={isStationSuggestionsOpen}
-                      placeholder="Начните вводить название АЗС"
-                      value={location}
-                      onFocus={() => setIsStationSuggestionsOpen(true)}
-                      onBlur={() => window.setTimeout(() => setIsStationSuggestionsOpen(false), 120)}
-                      onChange={(e) => { setLocation(e.target.value); setCustomLocation(e.target.value); setActiveStationSuggestion(0); setIsStationSuggestionsOpen(true); }}
-                      onKeyDown={(e) => { if (!stationSuggestions.length) return; if (e.key === "ArrowDown") { e.preventDefault(); setActiveStationSuggestion((index) => (index + 1) % stationSuggestions.length); } else if (e.key === "ArrowUp") { e.preventDefault(); setActiveStationSuggestion((index) => (index - 1 + stationSuggestions.length) % stationSuggestions.length); } else if (e.key === "Enter" && isStationSuggestionsOpen) { e.preventDefault(); const station = stationSuggestions[activeStationSuggestion]; setLocation(station); setCustomLocation(station); setIsStationSuggestionsOpen(false); } else if (e.key === "Escape") setIsStationSuggestionsOpen(false); }}
-                      className="w-full px-3 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold"
-                    />
-                    {isStationSuggestionsOpen && stationSuggestions.length > 0 && <div id="fuel-station-suggestions" role="listbox" aria-label="Варианты АЗС" className={SUGGESTION_LIST_CLASS}>
-                      {stationSuggestions.map((station, index) => <button key={station} id={`fuel-station-option-${index}`} type="button" role="option" aria-selected={activeStationSuggestion === index} onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocation(station); setCustomLocation(station); setIsStationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${activeStationSuggestion === index ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block break-words text-xs font-semibold leading-4">{station}</span></button>)}
-                    </div>}
+                    <select aria-label="АЗС" value={selectedFuelStation} onChange={(e) => { setLocation(e.target.value); setCustomLocation(e.target.value === "Другое" ? "" : e.target.value); }} className="w-full px-3 pr-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand font-bold">
+                      {FUEL_STATIONS.map((station) => <option key={station} value={station}>{station}</option>)}
+                    </select>
+                    {selectedFuelStation === "Другое" && <input type="text" placeholder="Название АЗС" value={customLocation} onChange={(e) => { setCustomLocation(e.target.value); setLocation(e.target.value); }} className="mt-2 w-full px-3 py-2.5 rounded-2xl bg-neutral-50 border border-neutral-200 text-neutral-900 text-xs focus:outline-none focus:border-brand" />}
                   </div>
                 ) : (
                   <div className="relative">
@@ -850,12 +835,12 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
                       <span>{locationType}</span><span className="text-neutral-400">⌄</span>
                     </button>
                     {isLocationSuggestionsOpen && <div role="listbox" aria-label="Варианты места" className={`${SUGGESTION_LIST_CLASS} absolute left-0 right-0 top-full z-30`}>
-                      {locationSuggestions.map((item, index) => <button key={item} type="button" role="option" aria-selected={locationType === item} onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType(item as "Автосервис" | "Частный мастер"); setLocation(item); setCustomLocation(""); setActiveLocationSuggestion(index); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === item ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">{item}</span><span className="mt-0.5 block text-[10px] text-neutral-500">Место обслуживания</span></button>)}
-                      <button type="button" role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType("Другое"); setLocation(customLocation || "Другое"); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === "Другое" ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">Другое</span><span className="mt-0.5 block text-[10px] text-neutral-500">Ввести вручную</span></button>
+                      {locationSuggestions.map((item, index) => <button key={item} type="button" role="option" aria-selected={locationType === item} onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType(item as "Автосервис" | "Частный мастер"); setLocation(item); setCustomLocation(""); setIsLocationTypeSelected(true); setActiveLocationSuggestion(index); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === item ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">{item}</span><span className="mt-0.5 block text-[10px] text-neutral-500">Место обслуживания</span></button>)}
+                      <button type="button" role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => { setLocationType("Другое"); setLocation(customLocation || "Другое"); setIsLocationTypeSelected(true); setIsLocationSuggestionsOpen(false); }} className={`${SUGGESTION_OPTION_CLASS} ${locationType === "Другое" ? SUGGESTION_ACTIVE_CLASS : SUGGESTION_IDLE_CLASS}`}><span className="block text-xs font-semibold">Другое</span><span className="mt-0.5 block text-[10px] text-neutral-500">Ввести вручную</span></button>
                     </div>}
                   </div>
                 )}
-                {eventType !== "fuel" && (
+                {eventType !== "fuel" && isLocationTypeSelected && (
                   <input
                     type="text"
                     placeholder={locationType === "Частный мастер" ? "Имя частного мастера" : locationType === "Автосервис" ? "Название автосервиса" : "Название места"}

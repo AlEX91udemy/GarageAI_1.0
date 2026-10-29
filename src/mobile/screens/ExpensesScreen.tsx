@@ -7,7 +7,6 @@ import {
   Calendar,
   Gauge,
   Wrench,
-  Camera,
   Droplet,
   Trash2,
 } from "lucide-react";
@@ -189,36 +188,6 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
         {/* TAB 1: SUMMARY */}
         {activeTab === "summary" && (
           <div className="space-y-3.5">
-            {/* SMART OCR RECEIPT SCANNER BANNER (Identical description moved from Home menu) */}
-            {onScanReceipt && (
-              <div className="bg-white dark:bg-[#17202e] text-neutral-900 dark:text-white p-4 rounded-3xl border border-neutral-200 dark:border-[#243044] shadow-xs flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-brand-soft dark:bg-brand-strong/20 text-brand-strong dark:text-brand-on-dark border border-brand-border dark:border-brand/30 flex items-center justify-center shrink-0">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
-                      <span>Умный сканер</span>
-                      <span className="text-[9px] bg-brand-strong text-white font-bold px-1.5 py-0.5 rounded-full">
-                        OCR + AI
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-300 mt-0.5 leading-snug">
-                      Распознает сумму, работы и запчасти с артикулами.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onScanReceipt}
-                  className="px-3 py-2 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-brand-strong/30 whitespace-nowrap active:scale-95 shrink-0"
-                >
-                  Скан
-                </button>
-              </div>
-            )}
-
             {/* Interactive category chart */}
             <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 space-y-3 shadow-xs">
               <div className="flex items-start justify-between gap-2">
@@ -323,7 +292,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   onClick={onAddFuel}
                   className="mt-2 px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold cursor-pointer"
                 >
-                  + Внести заправку
+                  + Добавить заправку
                 </button>
               </div>
             ) : (

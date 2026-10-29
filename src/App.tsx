@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect } from "react";
+import React, { lazy, Suspense, useState, useEffect, useRef } from "react";
 import {
   Home,
   BookOpen,
@@ -58,6 +58,8 @@ import {
   updateReminder as apiUpdateReminder,
   deleteReminder as apiDeleteReminder,
   logout as apiLogout,
+  getActiveUsername,
+  restoreSession,
 } from "./api";
 import { CarHeader } from "./components/CarHeader";
 import { Dashboard } from "./components/Dashboard";
@@ -94,6 +96,45 @@ const WebApp = lazy(() =>
   import("./web/WebApp").then(({ WebApp }) => ({ default: WebApp }))
 );
 
+const LEGACY_CACHE_KEYS = [
+  "vehicles", "reminders", "service_records", "fuel_records",
+  "oem_schedules", "garage_parts", "to_fix_tasks", "tuning_stages",
+] as const;
+type GarageCacheKey = typeof LEGACY_CACHE_KEYS[number];
+
+function cacheKey(owner: string, key: GarageCacheKey): string {
+  const safeOwner = owner.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "_") || "guest";
+  return `garagehub:${safeOwner}:${key}`;
+}
+
+function readGarageCache<T>(owner: string, key: GarageCacheKey): T[] {
+  try {
+    const namespaced = localStorage.getItem(cacheKey(owner, key));
+    const legacy = owner === "guest" ? localStorage.getItem(`garagehub_${key}`) : null;
+    const value = JSON.parse(namespaced ?? legacy ?? "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeGarageCache(owner: string, key: GarageCacheKey, value: unknown[]): void {
+  try {
+    localStorage.setItem(cacheKey(owner, key), JSON.stringify(value));
+    if (owner === "guest") localStorage.removeItem(`garagehub_${key}`);
+  } catch {
+    // Offline cache is best effort. Server persistence remains authoritative.
+  }
+}
+
+function clearGarageCache(owner: string): void {
+  try {
+    for (const key of LEGACY_CACHE_KEYS) localStorage.removeItem(cacheKey(owner, key));
+  } catch {
+    // Best effort cleanup. No authenticated data is loaded from another owner.
+  }
+}
+
 export default function App() {
   // Theme state: "light" vs "dark" (switchable via button). Light by default.
   const [theme, setTheme] = useState<ThemePreference>(readThemePreference);
@@ -116,6 +157,13 @@ export default function App() {
     }
     return "web";
   });
+  const cacheOwnerRef = useRef(getActiveUsername() || "guest");
+  const authLoadGenerationRef = useRef(0);
+  const [cacheOwner, setCacheOwner] = useState(cacheOwnerRef.current);
+  const updateCacheOwner = (owner: string) => {
+    cacheOwnerRef.current = owner;
+    setCacheOwner(owner);
+  };
 
   const handleSetPlatform = (mode: "mobile" | "web") => {
     setAppPlatform(mode);
@@ -124,6 +172,25 @@ export default function App() {
     } catch {
       // ignore
     }
+  };
+
+  const handleLogout = () => {
+    authLoadGenerationRef.current += 1;
+    const previousOwner = cacheOwnerRef.current;
+    void apiLogout().catch(console.error);
+    if (previousOwner !== "guest") clearGarageCache(previousOwner);
+    updateCacheOwner("guest");
+    setVehicles([]);
+    setReminders([]);
+    setServiceRecords([]);
+    setFuelRecords([]);
+    setOemSchedules([]);
+    setGarageParts([]);
+    setToFixTasks([]);
+    setTuningStages([]);
+    setActiveVehicleId("empty-garage");
+    setHasGarageAccess(false);
+    setSyncStatus("guest");
   };
   // Persistent state initialized from localStorage or mockData
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -183,59 +250,30 @@ export default function App() {
   >(undefined);
 
   const handleAuthSuccess = async () => {
+    const generation = ++authLoadGenerationRef.current;
     // Авторизация из мобильного профиля не должна менять выбранный интерфейс.
     setHasGarageAccess(true);
+    // Do not persist the previous guest/account snapshot under the new owner
+    // while the authenticated garage is loading.
+    setGarageLoaded(false);
     try {
       const data = await fetchGarageData();
-      const readCache = <T,>(key: string): T[] => {
-        try {
-          const value = JSON.parse(localStorage.getItem(key) || "[]");
-          return Array.isArray(value) ? value : [];
-        } catch {
-          return [];
-        }
-      };
+      if (generation !== authLoadGenerationRef.current) return;
       const serverVehicles = data.vehicles || [];
-      const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
-      const shouldMigrateGuestGarage = serverVehicles.length === 0 && cachedVehicles.length > 0;
-      const loadedVehicles = shouldMigrateGuestGarage ? cachedVehicles : serverVehicles;
-      const cachedServices = readCache<ServiceRecord>("garagehub_service_records");
-      const cachedFuel = readCache<FuelRecord>("garagehub_fuel_records");
-      const cachedOem = readCache<OemScheduleItem>("garagehub_oem_schedules");
-      const cachedParts = readCache<GaragePart>("garagehub_garage_parts");
-      const cachedTasks = readCache<ToFixTask>("garagehub_to_fix_tasks");
-      const cachedTuning = readCache<TuningStage>("garagehub_tuning_stages");
-      setVehicles(loadedVehicles);
+      const owner = getActiveUsername() || "guest";
+      updateCacheOwner(owner);
+      setVehicles(serverVehicles);
       setReminders(data.reminders || []);
-      setServiceRecords(shouldMigrateGuestGarage ? cachedServices : data.serviceRecords || []);
-      setFuelRecords(shouldMigrateGuestGarage ? cachedFuel : data.fuelRecords || []);
-      setOemSchedules(shouldMigrateGuestGarage ? cachedOem : data.oemSchedules || []);
-      setGarageParts(shouldMigrateGuestGarage ? cachedParts : data.garageParts || []);
-      setToFixTasks(shouldMigrateGuestGarage ? cachedTasks : data.toFixTasks || []);
-      setTuningStages(shouldMigrateGuestGarage ? cachedTuning : data.tuningStages || []);
-      setActiveVehicleId(loadedVehicles[0]?.id || "empty-garage");
+      setServiceRecords(data.serviceRecords || []);
+      setFuelRecords(data.fuelRecords || []);
+      setOemSchedules(data.oemSchedules || []);
+      setGarageParts(data.garageParts || []);
+      setToFixTasks(data.toFixTasks || []);
+      setTuningStages(data.tuningStages || []);
+      setActiveVehicleId(serverVehicles[0]?.id || "empty-garage");
       setIsOnline(true);
       setSyncStatus("synced");
       setGarageLoaded(true);
-      if (shouldMigrateGuestGarage) {
-        await Promise.allSettled([
-          ...cachedVehicles.map((vehicle) => apiCreateVehicle(vehicle)),
-          ...cachedServices.map((record) => apiCreateServiceRecord(record)),
-          ...cachedFuel.map((record) => apiCreateFuelRecord(record)),
-          ...cachedParts.map((part) => apiCreateGaragePart(part)),
-          ...cachedTasks.map((task) => apiCreateToFixTask(task)),
-          ...cachedTuning.map((stage) => apiCreateTuningStage(stage)),
-        ]);
-        if (cachedOem.length > 0) {
-          const byVehicle = new Map<string, OemScheduleItem[]>();
-          cachedOem.forEach((item) => {
-            const list = byVehicle.get(item.vehicleId) || [];
-            list.push(item);
-            byVehicle.set(item.vehicleId, list);
-          });
-          await Promise.allSettled([...byVehicle].map(([vehicleId, items]) => apiSaveOemScheduleItems(vehicleId, items)));
-        }
-      }
     } catch (error) {
       setSyncStatus("error");
       console.warn("Не удалось загрузить персональный гараж:", error);
@@ -245,12 +283,19 @@ export default function App() {
   // Fetch full dataset from backend on load
   useEffect(() => {
     let active = true;
-    fetchGarageData()
+    const generation = authLoadGenerationRef.current;
+    (async () => {
+      // Restore the cookie session first so the local cache is namespaced to
+      // the authenticated owner before any state persistence effects run.
+      await restoreSession().catch(() => null);
+      return fetchGarageData();
+    })()
       .then((data) => {
-        if (!active) return;
+        if (!active || generation !== authLoadGenerationRef.current) return;
         setHasGarageAccess(true);
         setIsOnline(true);
         setSyncStatus("synced");
+        updateCacheOwner(getActiveUsername() || "guest");
         const loadedVehicles = data.vehicles || [];
         setVehicles(loadedVehicles);
         setActiveVehicleId((prev) =>
@@ -268,6 +313,7 @@ export default function App() {
         setGarageLoaded(true);
       })
       .catch((err) => {
+        if (!active || generation !== authLoadGenerationRef.current) return;
         const requiresAuthentication = err instanceof Error && err.message.includes(": 401");
         console.warn(
           requiresAuthentication
@@ -276,50 +322,35 @@ export default function App() {
           err,
         );
         setIsOnline(false);
+        updateCacheOwner("guest");
         setHasGarageAccess(!requiresAuthentication);
         setSyncStatus(requiresAuthentication ? "guest" : "offline");
         if (requiresAuthentication) {
-          const readCache = <T,>(key: string): T[] => {
-            try {
-              const value = JSON.parse(localStorage.getItem(key) || "[]");
-              return Array.isArray(value) ? value : [];
-            } catch {
-              return [];
-            }
-          };
-          const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
+          const cachedVehicles = readGarageCache<Vehicle>("guest", "vehicles");
           setVehicles(cachedVehicles);
-          setReminders(readCache<ReminderRecord>("garagehub_reminders"));
+          setReminders(readGarageCache<ReminderRecord>("guest", "reminders"));
           setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
-          setServiceRecords(readCache<ServiceRecord>("garagehub_service_records"));
-          setFuelRecords(readCache<FuelRecord>("garagehub_fuel_records"));
-          setOemSchedules(readCache<OemScheduleItem>("garagehub_oem_schedules"));
-          setGarageParts(readCache<GaragePart>("garagehub_garage_parts"));
-          setToFixTasks(readCache<ToFixTask>("garagehub_to_fix_tasks"));
-          setTuningStages(readCache<TuningStage>("garagehub_tuning_stages"));
+          setServiceRecords(readGarageCache<ServiceRecord>("guest", "service_records"));
+          setFuelRecords(readGarageCache<FuelRecord>("guest", "fuel_records"));
+          setOemSchedules(readGarageCache<OemScheduleItem>("guest", "oem_schedules"));
+          setGarageParts(readGarageCache<GaragePart>("guest", "garage_parts"));
+          setToFixTasks(readGarageCache<ToFixTask>("guest", "to_fix_tasks"));
+          setTuningStages(readGarageCache<TuningStage>("guest", "tuning_stages"));
           setGarageLoaded(true);
           return;
         }
         // The app is usable without an account. Keep the last local garage
         // available when the server requires authentication or is offline.
-        const readCache = <T,>(key: string): T[] => {
-          try {
-            const value = JSON.parse(localStorage.getItem(key) || "[]");
-            return Array.isArray(value) ? value : [];
-          } catch {
-            return [];
-          }
-        };
-        const cachedVehicles = readCache<Vehicle>("garagehub_vehicles");
+        const cachedVehicles = readGarageCache<Vehicle>("guest", "vehicles");
         setVehicles(cachedVehicles);
-        setReminders(readCache<ReminderRecord>("garagehub_reminders"));
+        setReminders(readGarageCache<ReminderRecord>("guest", "reminders"));
         setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
-        setServiceRecords(readCache<ServiceRecord>("garagehub_service_records"));
-        setFuelRecords(readCache<FuelRecord>("garagehub_fuel_records"));
-        setOemSchedules(readCache<OemScheduleItem>("garagehub_oem_schedules"));
-        setGarageParts(readCache<GaragePart>("garagehub_garage_parts"));
-        setToFixTasks(readCache<ToFixTask>("garagehub_to_fix_tasks"));
-        setTuningStages(readCache<TuningStage>("garagehub_tuning_stages"));
+        setServiceRecords(readGarageCache<ServiceRecord>("guest", "service_records"));
+        setFuelRecords(readGarageCache<FuelRecord>("guest", "fuel_records"));
+        setOemSchedules(readGarageCache<OemScheduleItem>("guest", "oem_schedules"));
+        setGarageParts(readGarageCache<GaragePart>("guest", "garage_parts"));
+        setToFixTasks(readGarageCache<ToFixTask>("guest", "to_fix_tasks"));
+        setTuningStages(readGarageCache<TuningStage>("guest", "tuning_stages"));
         setGarageLoaded(true);
       });
 
@@ -331,49 +362,43 @@ export default function App() {
   // Save to localStorage as offline fallback
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_vehicles", JSON.stringify(vehicles));
-  }, [vehicles, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "vehicles", vehicles);
+  }, [vehicles, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_reminders", JSON.stringify(reminders));
-  }, [reminders, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "reminders", reminders);
+  }, [reminders, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem(
-      "garagehub_service_records",
-      JSON.stringify(serviceRecords)
-    );
-  }, [serviceRecords, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "service_records", serviceRecords);
+  }, [serviceRecords, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_fuel_records", JSON.stringify(fuelRecords));
-  }, [fuelRecords, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "fuel_records", fuelRecords);
+  }, [fuelRecords, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem(
-      "garagehub_oem_schedules",
-      JSON.stringify(oemSchedules)
-    );
-  }, [oemSchedules, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "oem_schedules", oemSchedules);
+  }, [oemSchedules, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_garage_parts", JSON.stringify(garageParts));
-  }, [garageParts, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "garage_parts", garageParts);
+  }, [garageParts, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_to_fix_tasks", JSON.stringify(toFixTasks));
-  }, [toFixTasks, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "to_fix_tasks", toFixTasks);
+  }, [toFixTasks, garageLoaded, cacheOwner]);
 
   useEffect(() => {
     if (!garageLoaded) return;
-    localStorage.setItem("garagehub_tuning_stages", JSON.stringify(tuningStages));
-  }, [tuningStages, garageLoaded]);
+    writeGarageCache(cacheOwnerRef.current, "tuning_stages", tuningStages);
+  }, [tuningStages, garageLoaded, cacheOwner]);
 
   // Current selected vehicle
   const currentVehicle =
@@ -974,9 +999,7 @@ export default function App() {
           onOpenBackup={() => setShowBackupModal(true)}
           onSwitchToMobile={() => handleSetPlatform("mobile")}
           onLogout={() => {
-            void apiLogout().catch(console.error);
-            setHasGarageAccess(false);
-            setSyncStatus("guest");
+            handleLogout();
           }}
         />
         {renderAppModals()}
@@ -1034,9 +1057,7 @@ export default function App() {
             apiDeleteFuelRecord(id).catch(console.error);
           }}
           onLogout={() => {
-            void apiLogout().catch(console.error);
-            setHasGarageAccess(false);
-            setSyncStatus("guest");
+            handleLogout();
           }}
         />
 
