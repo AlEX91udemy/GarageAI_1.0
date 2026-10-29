@@ -514,3 +514,85 @@ html:not(.dark) .light-bottom-nav {
   }
 }
 
+
+
+/* Landing page responsive safety: keep all content inside the viewport. */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+.landing-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.landing-page *,
+.landing-page *::before,
+.landing-page *::after {
+  box-sizing: border-box;
+}
+
+@media (max-width: 639px) {
+  .landing-page header > div {
+    gap: 0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .landing-page header > div > a {
+    min-width: 0;
+    gap: 0.4rem;
+  }
+
+  .landing-page header > div > a img {
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 auto;
+  }
+
+  .landing-page header > div > a span {
+    font-size: 0.95rem;
+  }
+
+  .landing-page header button,
+  .landing-page header a[aria-label*="мобильное приложение"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .landing-page main,
+  .landing-page section,
+  .landing-page footer,
+  .landing-page section > div {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .landing-page h1 {
+    overflow-wrap: anywhere;
+    font-size: clamp(2rem, 9vw, 3rem);
+  }
+
+  .landing-page pre,
+  .landing-page code {
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .landing-page img,
+  .landing-page video,
+  .landing-page canvas,
+  .landing-page svg {
+    max-width: 100%;
+  }
+}
