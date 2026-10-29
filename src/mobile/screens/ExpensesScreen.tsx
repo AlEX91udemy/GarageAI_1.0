@@ -7,7 +7,6 @@ import {
   Calendar,
   Gauge,
   Wrench,
-  Camera,
   Droplet,
   Trash2,
 } from "lucide-react";
@@ -189,36 +188,6 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
         {/* TAB 1: SUMMARY */}
         {activeTab === "summary" && (
           <div className="space-y-3.5">
-            {/* SMART OCR RECEIPT SCANNER BANNER (Identical description moved from Home menu) */}
-            {onScanReceipt && (
-              <div className="bg-white dark:bg-[#17202e] text-neutral-900 dark:text-white p-4 rounded-3xl border border-neutral-200 dark:border-[#243044] shadow-xs flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-brand-soft dark:bg-brand-strong/20 text-brand-strong dark:text-brand-on-dark border border-brand-border dark:border-brand/30 flex items-center justify-center shrink-0">
-                    <Camera className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
-                      <span>Умный сканер</span>
-                      <span className="text-[9px] bg-brand-strong text-white font-bold px-1.5 py-0.5 rounded-full">
-                        OCR + AI
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-neutral-500 dark:text-neutral-300 mt-0.5 leading-snug">
-                      Распознает сумму, работы и запчасти с артикулами.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onScanReceipt}
-                  className="px-3 py-2 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md shadow-brand-strong/30 whitespace-nowrap active:scale-95 shrink-0"
-                >
-                  Скан
-                </button>
-              </div>
-            )}
-
             {/* Interactive category chart */}
             <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 space-y-3 shadow-xs">
               <div className="flex items-start justify-between gap-2">
@@ -241,10 +210,10 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   { key: "cost_per_km", label: "Стоимость 1 " + distanceUnitLabel(), value: formatGarageCurrency(Number(costPerKm)), icon: <Gauge className="w-3 h-3 text-emerald-600" /> },
                   { key: "fuel_cost_km", label: "Средний расход", value: avgConsumption === "—" ? "—" : formatConsumption(parseFloat(avgConsumption)), icon: <Fuel className="w-3 h-3 text-brand-strong" /> },
                   { key: "service_total", label: "ТО и ремонт", value: formatGarageCurrency(serviceTotal), icon: <Wrench className="w-3 h-3 text-amber-600" /> },
-                  { key: "fuel_total", label: "Всего топливо", value: formatGarageCurrency(fuelTotal), icon: <Droplet className="w-3 h-3 text-brand-strong" /> },
+                  { key: "fuel_total", label: "Расходы на топливо", value: formatGarageCurrency(fuelTotal), icon: <Droplet className="w-3 h-3 text-brand-strong" /> },
                 ].map(({ key, label, value, icon }) => (
-                  <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-neutral-900 text-white border-neutral-900" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
-                    <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-neutral-300" : "text-neutral-500"}`}>{icon}{label}</span>
+                  <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-brand-soft border-brand-border shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
+                    <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-brand-hover" : "text-neutral-500"}`}>{icon}{label}</span>
                     <span className="block text-sm font-black font-mono mt-0.5">{value}</span>
                   </button>
                 ))}
@@ -323,7 +292,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   onClick={onAddFuel}
                   className="mt-2 px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold cursor-pointer"
                 >
-                  + Внести заправку
+                  + Добавить заправку
                 </button>
               </div>
             ) : (

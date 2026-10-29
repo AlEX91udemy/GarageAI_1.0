@@ -120,6 +120,18 @@ export interface ReminderRecord {
   notes?: string;
 }
 
+export interface VehicleRegistrationData {
+  engineDisplacementCc?: number;
+  enginePowerKw?: number;
+  enginePowerHp?: number;
+  maxMassKg?: number;
+  massKg?: number;
+  seats?: number;
+  registrationDate?: string;
+  stsNumber?: string;
+  stsIssueDate?: string;
+}
+
 export interface Vehicle {
   id: string;
   make: string;
@@ -141,6 +153,7 @@ export interface Vehicle {
     | "van" | "minibus" | "liftback" | "crossover-coupe";
   photoUrl?: string;
   model3dUrl?: string; // Optional URL or base64 to custom 3D model (.glb)
+  registrationData?: VehicleRegistrationData;
 }
 
 export interface TuningStage {

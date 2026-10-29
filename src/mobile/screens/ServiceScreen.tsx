@@ -7,7 +7,6 @@ import {
   Plus,
   ChevronRight,
   ScanLine,
-  ScanBarcode,
   Calendar,
   FileDown,
 } from "lucide-react";
@@ -85,25 +84,6 @@ export const ServiceScreen: React.FC<ServiceScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => {
-              if (onExportPdf) onExportPdf();
-              else exportServiceBookToPdf(vehicle, carRecords);
-            }}
-            className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition cursor-pointer"
-            title="Экспорт сервисной книжки в PDF"
-          >
-            <FileDown className="w-4 h-4 text-brand-strong" />
-          </button>
-          {onOpenScanBarcode && (
-            <button
-              onClick={onOpenScanBarcode}
-              className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-800 flex items-center justify-center transition cursor-pointer"
-              title="Сканировать штрихкод детали или VIN"
-            >
-              <ScanBarcode className="w-4 h-4 text-neutral-700" />
-            </button>
-          )}
           <button
             onClick={onOpenScanReceipt}
             className="w-9 h-9 rounded-xl bg-neutral-50 border border-neutral-200 hover:bg-neutral-100 text-neutral-700 flex items-center justify-center transition cursor-pointer"

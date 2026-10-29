@@ -40,8 +40,32 @@ export function volumeUnitLabel(): string {
   return getVolumeUnit() === "gal" ? "гал" : "л";
 }
 
+export function toLiters(volume: number): number {
+  return getVolumeUnit() === "gal" ? volume / 0.264172 : volume;
+}
+
+export function toDisplayVolume(liters: number): number {
+  return getVolumeUnit() === "gal" ? liters * 0.264172 : liters;
+}
+
+export function toDisplayVolumePrice(pricePerLiter: number): number {
+  return getVolumeUnit() === "gal" ? pricePerLiter / 0.264172 : pricePerLiter;
+}
+
+export function toPricePerLiter(pricePerVolume: number): number {
+  return getVolumeUnit() === "gal" ? pricePerVolume * 0.264172 : pricePerVolume;
+}
+
 export function distanceUnitLabel(): string {
   return getDistanceUnit() === "mi" ? "ми" : "км";
+}
+
+export function toDisplayDistance(kilometers: number): number {
+  return getDistanceUnit() === "mi" ? kilometers * 0.621371 : kilometers;
+}
+
+export function toKilometers(distance: number): number {
+  return getDistanceUnit() === "mi" ? distance / 0.621371 : distance;
 }
 
 export function formatConsumption(lPer100km: number): string {

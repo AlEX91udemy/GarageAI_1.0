@@ -12,10 +12,29 @@ import {
 
 let csrfToken: string | null = null;
 let authSessionActive = false;
+const ACTIVE_USER_KEY = "garagehub_active_user";
+
+export function getActiveUsername(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setActiveUsername(username: string | undefined): void {
+  try {
+    if (username) localStorage.setItem(ACTIVE_USER_KEY, username.trim().toLowerCase());
+    else localStorage.removeItem(ACTIVE_USER_KEY);
+  } catch {
+    // Storage can be unavailable in private or embedded browsers.
+  }
+}
 
 export interface AuthSession {
   username: string;
   csrfToken: string;
+  email?: string;
 }
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -27,17 +46,18 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string): Promise<AuthSession> {
+export async function register(username: string, password: string, email?: string): Promise<AuthSession> {
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(email?.trim() ? { email: email.trim() } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
@@ -52,15 +72,41 @@ export async function login(username: string, password: string): Promise<AuthSes
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
+  return data.session;
+}
+
+export async function requestEmailCode(email: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/email/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось отправить код");
+}
+
+export async function verifyEmailCode(email: string, code: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/email/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось войти по коду");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {
   const res = await authenticatedFetch("/api/auth/session", { credentials: "same-origin" });
-  if (!res.ok) { csrfToken = null; authSessionActive = false; return null; }
+  if (!res.ok) { csrfToken = null; authSessionActive = false; setActiveUsername(undefined); return null; }
   const data = await res.json();
   csrfToken = data.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.username);
   return data as AuthSession;
 }
 
@@ -68,6 +114,7 @@ export async function logout(): Promise<void> {
   await authenticatedFetch("/api/auth/logout", { method: "POST" });
   csrfToken = null;
   authSessionActive = false;
+  setActiveUsername(undefined);
 }
 
 export interface FullGarageData {
@@ -453,6 +500,42 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось распознать чек");
+  }
+  return res.json();
+}
+
+export interface VehicleDocumentOcrResult {
+  make?: string;
+  model?: string;
+  generation?: string;
+  year?: number;
+  licensePlate?: string;
+  vin?: string;
+  engine?: string;
+  engineDisplacementCc?: number;
+  enginePowerKw?: number;
+  enginePowerHp?: number;
+  fuelType?: string;
+  bodyType?: string;
+  maxMassKg?: number;
+  massKg?: number;
+  seats?: number;
+  registrationDate?: string;
+  stsNumber?: string;
+  stsIssueDate?: string;
+  confidence?: Record<string, number>;
+  rawText?: string;
+}
+
+export async function requestVehicleDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<VehicleDocumentOcrResult> {
+  const res = await authenticatedFetch("/api/ai/scan-vehicle-document", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось распознать СТС");
   }
   return res.json();
 }

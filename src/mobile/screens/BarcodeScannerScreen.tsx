@@ -45,6 +45,7 @@ interface BarcodeScannerScreenProps {
   allVehicles?: Vehicle[];
   garageParts?: GaragePart[];
   defaultTarget?: "part" | "service";
+  vinOnly?: boolean;
   onBack: () => void;
   onApplyResult: (prefilled: PrefilledScanData) => void;
 }
@@ -56,6 +57,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
   allVehicles = [],
   garageParts = [],
   defaultTarget = "part",
+  vinOnly = false,
   onBack,
   onApplyResult,
 }) => {
@@ -126,6 +128,10 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       playScannerSuccessTone();
 
       const parsed = parseBarcodeOrQr(codeText, vehicle, allVehicles);
+      if (vinOnly && parsed.scanType !== "vin") {
+        setIsProcessing(false);
+        return;
+      }
       setScannedResult(parsed);
       setIsProcessing(false);
 
@@ -147,7 +153,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
           setIsCheckingAvailability(false);
         });
     },
-    [isProcessing, scannedResult, vehicle, allVehicles, garageParts]
+    [isProcessing, scannedResult, vehicle, allVehicles, garageParts, vinOnly]
   );
 
   // Real-time frame scanner loop
@@ -497,7 +503,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         <div className="flex items-center gap-1.5">
           <Scan className="w-4 h-4 text-brand-strong animate-pulse" />
           <span className="text-xs font-black text-neutral-900 tracking-tight">
-            Сканер штрихкодов & VIN
+            {vinOnly ? "Сканер VIN" : "Сканер штрихкодов & VIN"}
           </span>
         </div>
 
@@ -512,7 +518,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       </header>
 
       {/* TARGET FORM SELECTOR TABS */}
-      <div className="px-4 py-2 bg-white border-b border-neutral-200 flex items-center justify-between gap-2 z-20">
+      {!vinOnly && <div className="px-4 py-2 bg-white border-b border-neutral-200 flex items-center justify-between gap-2 z-20">
         <span className="text-[11px] font-bold text-neutral-500 shrink-0">
           Заполнить форму:
         </span>
@@ -540,7 +546,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             <span>Добавить услугу (ТО)</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* SCANNER VIEWPORT AREA */}
       <div className="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-neutral-200">
@@ -844,13 +850,14 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                       </div>
                       <div>
                         <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>Проверка в API базы запчастей</span>
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{availabilityInfo.isLive ? "Проверка в API базы запчастей" : "Демо-оценка запчасти"}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${availabilityInfo.isLive ? "bg-emerald-400 animate-pulse" : "bg-amber-300"}`} />
                         </div>
                         <div className="text-[10px] text-neutral-400">
                           {availabilityInfo.totalSuppliersStock} шт. у поставщиков • от{" "}
                           {availabilityInfo.fastestDeliveryDays} дн.
                         </div>
+                        {!availabilityInfo.isLive && <div className="mt-1 text-[9px] text-amber-300">Демонстрационные цены и остатки</div>}
                       </div>
                     </div>
 
@@ -922,8 +929,13 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             ) : null}
           </div>
 
-          {/* TWO PRIMARY ACTION BUTTONS: ADD PART & ADD SERVICE */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          {/* PRIMARY ACTION */}
+          {vinOnly ? (
+            <button onClick={handleApplyAsService} className="w-full py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow-md bg-brand-strong hover:bg-brand text-white">
+              <Car className="w-4 h-4" />
+              Использовать этот VIN
+            </button>
+          ) : <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               onClick={handleApplyAsPart}
               className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow-md ${
@@ -951,7 +963,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                 {availabilityInfo?.inGarage ? "Установить из гаража" : "В «Добавить услугу»"}
               </span>
             </button>
-          </div>
+          </div>}
         </div>
       ) : (
         /* TEST SCAN CHIPS & INSTRUCTIONS */
@@ -998,7 +1010,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
           {/* Helper caption */}
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 pt-0.5">
             <Info className="w-3 h-3 text-neutral-500" />
-            <span>Наведите объектив на штрихкод коробки, QR-наклейку или VIN кузова</span>
+              <span>{vinOnly ? "Наведите объектив на VIN кузова" : "Наведите объектив на штрихкод коробки, QR-наклейку или VIN кузова"}</span>
           </div>
         </div>
       )}

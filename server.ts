@@ -53,12 +53,13 @@ import {
   normalizeExtractedVin,
   normalizeRussianPlate,
 } from "./server/documentOcr";
-import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData, type EmailAuthChallengeRecord } from "./server/store";
 import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
+import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
 import { classifyReceiptText } from "./server/receiptClassification";
 import {
@@ -85,6 +86,30 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
+
+// Express 4 does not forward rejected promises from async route handlers.
+// Wrap route registration once so unexpected failures reach the JSON error
+// middleware instead of becoming unhandled rejections.
+const asyncRoute = (handler: (...args: any[]) => unknown) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    Promise.resolve()
+      .then(() => handler(req, res, next))
+      .catch(next);
+  };
+
+// Express route methods accept callback arrays as well as individual handlers.
+// Preserve that overload while wrapping every non-error callback.
+const wrapRouteHandler = (handler: unknown): unknown => {
+  if (Array.isArray(handler)) return handler.map(wrapRouteHandler);
+  if (typeof handler !== "function" || handler.length === 4) return handler;
+  return asyncRoute(handler as (...args: any[]) => unknown);
+};
+for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+  const original = app[method].bind(app) as (...args: any[]) => unknown;
+  (app as any)[method] = (pathOrPaths: unknown, ...handlers: Array<(...args: any[]) => unknown>) =>
+    original(pathOrPaths, ...handlers.map(wrapRouteHandler));
+}
+
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
@@ -119,7 +144,10 @@ async function processWithDocumentAi(content: Buffer, mimeType: string, processo
   return result.document;
 }
 
-app.set("trust proxy", 1);
+// Trust only the configured reverse-proxy hop count. This keeps client IP
+// based rate limits from being bypassed by spoofed X-Forwarded-For headers.
+const trustedProxyHops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS || "0", 10);
+app.set("trust proxy", Number.isInteger(trustedProxyHops) && trustedProxyHops >= 0 ? trustedProxyHops : 0);
 
 // Middleware for parsing JSON with a 10mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
@@ -148,13 +176,8 @@ app.use((req, res, next) => {
     } catch {
       return res.status(403).json({ error: "Некорректный Origin" });
     }
-    const forwardedHost =
-      typeof req.headers["x-forwarded-host"] === "string"
-        ? req.headers["x-forwarded-host"].split(",")[0].trim()
-        : undefined;
     const hostMatches =
       originHost === req.headers.host ||
-      (forwardedHost !== undefined && originHost === forwardedHost) ||
       ALLOWED_ORIGIN_HOSTS.has(originHost);
     if (!hostMatches) {
       return res.status(403).json({ error: "Запрос отклонён: несовпадение origin" });
@@ -202,6 +225,10 @@ function clone<T>(value: T): T {
 function uniqueId(preferred: unknown, prefix: string, existing: { id: string }[]): string {
   const candidate = typeof preferred === "string" && preferred.trim() ? preferred.trim() : newId(prefix);
   return existing.some((item) => item.id === candidate) ? newId(prefix) : candidate;
+}
+
+function hasVehicle(vehicleId: unknown): vehicleId is string {
+  return typeof vehicleId === "string" && dbMemory.vehicles.some((vehicle) => vehicle.id === vehicleId);
 }
 
 function getInitialDatabase(): GarageDatabase {
@@ -645,6 +672,10 @@ app.use("/api", (req, res, next) => {
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||
+    req.path === "/auth/email/request" ||
+    req.path === "/auth/email/request-code" ||
+    req.path === "/auth/email/verify" ||
+    req.path === "/auth/email/verify-code" ||
     req.path.startsWith("/auth/session");
   if (isPublic) return next();
   if (req.path === "/health" || !fullPath) return next();
@@ -1127,6 +1158,9 @@ app.put("/api/services/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.serviceRecords[index];
   const body = (req.body || {}) as Partial<ServiceRecord>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const parts = Array.isArray(body.parts)
     ? body.parts.map((p, i) => ({
@@ -1301,6 +1335,9 @@ app.post("/api/inventory", async (req, res) => {
     typeof body.partNumber === "string" && body.partNumber.trim()
       ? body.partNumber.trim().toUpperCase()
       : `SKU-${Date.now().toString().slice(-6)}`;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const newPart: GaragePart = {
     id: uniqueId(body.id, "gp", dbMemory.garageParts),
@@ -1330,6 +1367,9 @@ app.put("/api/inventory/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.garageParts[index];
   const body = (req.body || {}) as Partial<GaragePart>;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.garageParts[index] = {
     ...current,
@@ -1471,6 +1511,9 @@ app.post("/api/parts/check-availability", (req, res) => {
     totalSuppliersStock: totalStock,
     fastestDeliveryDays: 1,
     suppliers,
+    dataSource: "demo",
+    isLive: false,
+    notice: "Цены, остатки и сроки являются демонстрационными и не подтверждают наличие у поставщика.",
     lastCheckedTime: new Date().toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
@@ -1535,6 +1578,9 @@ app.put("/api/to-fix/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.toFixTasks[index];
   const body = (req.body || {}) as Partial<ToFixTask>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.toFixTasks[index] = {
     ...current,
@@ -1607,6 +1653,9 @@ app.post("/api/oem-schedule", async (req, res) => {
   if (!vehicleId || !Array.isArray(items)) {
     return res.status(400).json({ error: "vehicleId и items обязательны" });
   }
+  if (!hasVehicle(vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   // Remove existing or merge
   dbMemory.oemSchedules = dbMemory.oemSchedules.filter((s) => s.vehicleId !== vehicleId);
@@ -1638,6 +1687,9 @@ app.put("/api/oem-schedule/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.oemSchedules[index];
   const body = (req.body || {}) as Partial<OemScheduleItem>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.oemSchedules[index] = {
     ...current,
@@ -1676,6 +1728,9 @@ app.post("/api/tuning", async (req, res) => {
   if (!body.vehicleId || !body.title) {
     return res.status(400).json({ error: "vehicleId и title обязательны" });
   }
+  if (!hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const newStage: TuningStage = {
     id: body.id || `ts-${Date.now()}`,
@@ -1705,6 +1760,9 @@ app.put("/api/tuning/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.tuningStages[index];
   const body = (req.body || {}) as Partial<TuningStage>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.tuningStages[index] = {
     ...current,
@@ -1816,9 +1874,14 @@ const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LIMIT = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_LIMIT = 5;
+const EMAIL_CODE_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+const EMAIL_VERIFY_LIMIT = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
 const loginAttempts = new Map<string, { count: number; startedAt: number }>();
+const emailCodeAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
 const SESSION_COOKIE = "garagehub_session";
 
@@ -1878,6 +1941,9 @@ const rateLimitCleanupTimer = setInterval(() => {
       loginAttempts.delete(key);
     }
   }
+  for (const [key, attempt] of emailCodeAttempts) {
+    if (now - attempt.startedAt >= EMAIL_CODE_WINDOW_MS) emailCodeAttempts.delete(key);
+  }
   if (store instanceof PostgresPersistence) {
     void Promise.all([
       store.deleteExpiredSessions(now),
@@ -1905,7 +1971,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (index === -1) continue;
     const key = part.slice(0, index).trim();
     const value = part.slice(index + 1).trim();
-    if (key) jar[key] = decodeURIComponent(value);
+    if (key) {
+      try {
+        jar[key] = decodeURIComponent(value);
+      } catch {
+        // Ignore malformed cookie values instead of failing session lookup.
+      }
+    }
   }
   return jar;
 }
@@ -2111,7 +2183,7 @@ async function clearLoginAttempts(clientId: string): Promise<void> {
   loginAttempts.delete(clientId);
 }
 
-async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string, email?: string) {
   const { record, token } = createSession(userId);
   if (store instanceof PostgresPersistence) {
     await store.putSession(record);
@@ -2120,7 +2192,7 @@ async function establishSession(req: express.Request, res: express.Response, use
     await persistSessions();
   }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-  return { username, csrfToken: record.csrfSecret };
+  return { username, email, csrfToken: record.csrfSecret };
 }
 
 app.post("/api/auth/register", async (req, res) => {
@@ -2135,18 +2207,23 @@ app.post("/api/auth/register", async (req, res) => {
     console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
-  void (async () => {
+  try {
     const userId = newId("user");
-    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
+    const email = req.body?.email ? normalizeEmail(req.body.email) : null;
+    if (req.body?.email && !email) { res.status(400).json({ error: "Введите корректный email" }); return; }
+    if (email && (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email))) {
+      res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
+    }
+    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email ?? undefined);
     await clearLoginAttempts(req.ip || "unknown");
-    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
-  })().catch((error) => {
+    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!, email ?? undefined) });
+  } catch (error) {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
     console.error("Registration error:", error);
     return res.status(500).json({ error: "Не удалось создать аккаунт" });
-  });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -2169,10 +2246,129 @@ app.post("/api/auth/login", async (req, res) => {
   }
   await clearLoginAttempts(req.ip || "unknown");
   try {
-    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch (error) {
     console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
+});
+
+async function consumeEmailCodeLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-code-ip", hashToken(req.ip || "unknown"), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-code-email", hashToken(email), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`ip:${req.ip || "unknown"}`, `email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_CODE_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function consumeEmailVerifyLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-verify-ip", hashToken(req.ip || "unknown"), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-verify-email", hashToken(email), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`verify-ip:${req.ip || "unknown"}`, `verify-email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_VERIFY_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function sendEmailCode(email: string, code: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!apiKey || !from) throw new Error("Email provider is not configured");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
+  });
+  if (!response.ok) throw new Error("Email provider rejected the request");
+}
+
+app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Введите корректный email" });
+  if (!(await consumeEmailCodeLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много запросов. Повторите позже." });
+  }
+  try {
+    if (!process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+      return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+    }
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (user) {
+      const id = newId("email-challenge");
+      const code = generateEmailCode();
+      const secret = process.env.EMAIL_CODE_SECRET?.trim();
+      if (!secret) throw new Error("Email code secret is not configured");
+      const record: EmailAuthChallengeRecord = { id, userId: user.id, codeHash: hashEmailCode(id, code, secret), expiresAtMs: Date.now() + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs: Date.now() };
+      await store.createEmailChallenge(record);
+      try {
+        await sendEmailCode(email, code);
+      } catch (sendError) {
+        await store.consumeEmailChallenge(user.id, id, Date.now());
+        throw sendError;
+      }
+    }
+    return res.json({ success: true, message: "Если аккаунт существует, код отправлен на email." });
+  } catch (error) {
+    console.error("Email code request failed");
+    return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+  }
+});
+
+app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Введите email и шестизначный код" });
+  if (!(await consumeEmailVerifyLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много попыток. Повторите позже." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (!user) return res.status(401).json({ error: "Неверный или просроченный код" });
+    const secret = process.env.EMAIL_CODE_SECRET?.trim();
+    if (!secret) return res.status(503).json({ error: "Сервис входа временно недоступен." });
+    const accepted = await store.verifyEmailChallenge(user.id, code, secret);
+    if (!accepted) {
+      return res.status(401).json({ error: "Неверный или просроченный код" });
+    }
+    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
+  } catch {
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
 });
 
@@ -2217,7 +2413,7 @@ app.get("/api/auth/session", async (req, res) => {
       }
       res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
     }
-    return res.json({ username: user.username, csrfToken: session.csrfSecret });
+    return res.json({ username: user.username, email: user.email, csrfToken: session.csrfSecret });
   } catch (error) {
     console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });
@@ -2576,6 +2772,38 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     res.status(500).json({
       error: "Не удалось распознать чек.",
     });
+  }
+});
+
+// 2a. Structured OCR for a Russian vehicle registration certificate (STS)
+app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (typeof imageBase64 !== "string" || !imageBase64) return res.status(400).json({ error: "Изображение СТС не предоставлено." });
+    if (imageBase64.length > 9_000_000) return res.status(413).json({ error: "Изображение СТС слишком большое." });
+    const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
+    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное изображение СТС." });
+    const prompt = [
+      "Ты высокоточный OCR российского свидетельства о регистрации транспортного средства (СТС).",
+      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай.",
+      "Верни только JSON. Для отсутствующих или нечитабельных полей используй null.",
+      JSON.stringify({ make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
+      "Подсказка по полям СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест.",
+      "Дату верни в формате YYYY-MM-DD. Мощность в л.с. вычисляй из кВт только если P.2 прочитано уверенно. Не подменяй VIN номером свидетельства."
+    ].join("\n");
+    const responseText = getOpenRouterConfig("document").key
+      ? await requestOpenRouterVision(imageBase64, detectedMime, prompt, "document")
+      : (await getAi().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: detectedMime } }, { text: prompt }] },
+          config: { responseMimeType: "application/json" },
+        })).text;
+    const parsed = parseJsonSafely(responseText, {});
+    return res.json(parsed && typeof parsed === "object" ? parsed : {});
+  } catch (error) {
+    console.error("STS OCR error:", error);
+    return res.status(500).json({ error: "Не удалось распознать СТС." });
   }
 });
 

@@ -6,13 +6,13 @@
  */
 
 export type ThemeMode = "dark" | "light";
-export type DarkVariant = "dark_racing" | "carbon" | "oled";
+export type DarkVariant = "dark_racing";
 export const DARK_VARIANT_KEY = "garagehub_dark_variant";
 
 export function readDarkVariant(): DarkVariant {
   try {
     const saved = localStorage.getItem(DARK_VARIANT_KEY);
-    if (saved === "carbon" || saved === "oled") return saved;
+    if (saved === "dark_racing") return saved;
   } catch {
     // Keep the default when storage is unavailable.
   }

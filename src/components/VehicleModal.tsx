@@ -15,8 +15,13 @@ import {
   HelpCircle,
   Lock,
   ChevronDown,
+  ScanLine,
+  Camera,
+  Upload,
+  Loader2,
 } from "lucide-react";
-import { Vehicle } from "../types";
+import { Vehicle, VehicleRegistrationData } from "../types";
+import { requestVehicleDocumentOcr, VehicleDocumentOcrResult } from "../api";
 import { LicensePlateBadge } from "./LicensePlateBadge";
 import { CarCascadeSelector } from "./CarCascadeSelector";
 import { CarBodyType, findGeneration } from "../carCatalog";
@@ -193,6 +198,68 @@ const decodeVinOrigin = (vinStr: string) => {
   return "Корректный формат VIN";
 };
 
+interface StsScannerProps {
+  onClose: () => void;
+  onApply: (result: VehicleDocumentOcrResult) => void;
+}
+
+const StsScanner: React.FC<StsScannerProps> = ({ onClose, onApply }) => {
+  const [image, setImage] = useState<string | null>(null);
+  const [result, setResult] = useState<VehicleDocumentOcrResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const chooseFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { setImage(String(reader.result)); setResult(null); setError(null); };
+    reader.readAsDataURL(file);
+  };
+
+  const scan = async () => {
+    if (!image) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const mime = image.match(/^data:([^;]+);/)?.[1] || "image/jpeg";
+      setResult(await requestVehicleDocumentOcr(image, mime));
+    } catch (e: any) {
+      setError(e?.message || "Не удалось распознать СТС");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fields = result ? [
+    ["Марка", result.make], ["Модель", result.model], ["Год", result.year],
+    ["Госномер", result.licensePlate], ["VIN", result.vin], ["Двигатель", result.engine],
+    ["Объём", result.engineDisplacementCc ? String(result.engineDisplacementCc) + " см³" : undefined],
+    ["Мощность", result.enginePowerHp ? String(result.enginePowerHp) + " л.с." : result.enginePowerKw ? String(result.enginePowerKw) + " кВт" : undefined],
+    ["Топливо", result.fuelType], ["Масса", result.massKg ? String(result.massKg) + " кг" : undefined],
+  ].filter(([, value]) => value !== undefined && value !== null && String(value).trim()) : [];
+
+  return <div className="fixed inset-0 z-[80] bg-[#F4F5F8] text-neutral-900 flex flex-col">
+    <header className="px-4 py-3 flex items-center justify-between border-b border-neutral-200 bg-white"><button type="button" onClick={onClose} className="text-xs text-neutral-600 hover:text-neutral-900">← Назад</button><span className="text-sm font-black text-neutral-900">Сканирование СТС</span><span className="w-12" /></header>
+    <main className="flex-1 overflow-y-auto p-4 space-y-4">
+      {!result && <>
+        <div className="text-center"><h2 className="text-lg font-black">Сфотографируйте СТС целиком</h2><p className="text-xs text-neutral-500 mt-1">AI заполнит марку, модель, год, госномер, VIN и характеристики.</p></div>
+        <div className="relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-brand/70 bg-neutral-200 max-w-xl mx-auto">{image ? <img src={image} alt="Предпросмотр СТС" className="w-full h-full object-contain" /> : <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-neutral-500"><Camera className="w-10 h-10" /><span className="text-xs">Фото ещё не выбрано</span></div>}<div className="absolute inset-4 border-2 border-dashed border-white/80 rounded-xl pointer-events-none" /></div>
+        {error && <p className="text-xs text-red-600 text-center">{error}</p>}
+        <div className="flex justify-center gap-2"><button type="button" onClick={() => cameraRef.current?.click()} className="px-4 py-2 rounded-xl bg-brand-strong text-white text-xs font-bold flex items-center gap-2"><Camera className="w-4 h-4" />Камера</button><button type="button" onClick={() => fileRef.current?.click()} className="px-4 py-2 rounded-xl bg-neutral-200 text-neutral-800 text-xs font-bold flex items-center gap-2 border border-neutral-300"><Upload className="w-4 h-4" />Файл</button><input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={chooseFile} className="hidden" /><input ref={fileRef} type="file" accept="image/*" onChange={chooseFile} className="hidden" /></div>
+        <button type="button" disabled={!image || busy} onClick={scan} className="w-full max-w-xl mx-auto py-3 rounded-xl bg-neutral-900 text-white text-xs font-black disabled:opacity-40 flex items-center justify-center gap-2">{busy ? <><Loader2 className="w-4 h-4 animate-spin" />Распознаём СТС...</> : <><ScanLine className="w-4 h-4" />Распознать и заполнить данные</>}</button>
+      </>}
+      {result && <>
+        <div className="text-center"><h2 className="text-lg font-black">Данные СТС распознаны</h2><p className="text-xs text-neutral-500 mt-1">Проверьте результат перед заполнением формы.</p></div>
+        <div className="rounded-2xl bg-white border border-neutral-200 p-4 grid grid-cols-2 gap-2">{fields.map(([label, value]) => <div key={label} className="rounded-xl bg-neutral-50 border border-neutral-100 p-2"><div className="text-[10px] text-neutral-500">{label}</div><div className="text-xs font-bold text-neutral-900 break-words">{String(value)}</div></div>)}</div>
+        <div className="flex gap-2"><button type="button" onClick={() => setResult(null)} className="flex-1 py-3 rounded-xl bg-neutral-200 text-neutral-800 text-xs font-bold">Переснять</button><button type="button" onClick={() => onApply(result)} className="flex-1 py-3 rounded-xl bg-brand-strong text-white text-xs font-bold">Заполнить автомобиль</button></div>
+      </>}
+    </main>
+  </div>;
+};
+
 export const VehicleModal: React.FC<VehicleModalProps> = ({
   currentVehicle,
   allVehicles,
@@ -204,6 +271,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
 }) => {
   const [mode, setMode] = useState<"edit" | "add">(initialMode);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showStsScanner, setShowStsScanner] = useState(false);
 
   // Form states
   const [make, setMake] = useState(mode === "add" ? "" : (currentVehicle?.make || ""));
@@ -266,7 +334,37 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   const colorHex = STANDARD_VEHICLE_COLOR;
   const [licensePlate, setLicensePlate] = useState(mode === "add" ? "" : (currentVehicle?.licensePlate || ""));
   const [vin, setVin] = useState(mode === "add" ? "" : (currentVehicle?.vin || ""));
+  const [registrationData, setRegistrationData] = useState<VehicleRegistrationData>(currentVehicle?.registrationData || {});
   const decodedVin = decodeVin(vin, currentVehicle, allVehicles);
+
+  const applyStsData = (data: VehicleDocumentOcrResult) => {
+    setRegistrationData({
+      engineDisplacementCc: data.engineDisplacementCc,
+      enginePowerKw: data.enginePowerKw,
+      enginePowerHp: data.enginePowerHp,
+      maxMassKg: data.maxMassKg,
+      massKg: data.massKg,
+      seats: data.seats,
+      registrationDate: data.registrationDate,
+      stsNumber: data.stsNumber,
+      stsIssueDate: data.stsIssueDate,
+    });
+    if (data.make) setMake(data.make.trim());
+    if (data.model) setModel(data.model.trim());
+    if (data.generation) setGeneration(data.generation.trim());
+    if (data.year && data.year >= 1970 && data.year <= 2030) setYear(data.year);
+    if (data.licensePlate) setLicensePlate(data.licensePlate.trim().toUpperCase());
+    if (data.vin) setVin(data.vin.replace(/[^A-Za-z0-9]/g, "").toUpperCase());
+    if (data.engine) setEngine(data.engine.trim());
+    else if (data.engineDisplacementCc) setEngine(String(data.engineDisplacementCc) + " см³" + (data.enginePowerHp ? ", " + data.enginePowerHp + " л.с." : ""));
+    if (data.fuelType) setFuelType(data.fuelType.trim());
+    if (data.bodyType) {
+      const type = data.bodyType.toLowerCase();
+      const mapped: CarBodyType = type.includes("внедорож") || type.includes("крос") ? "suv" : type.includes("седан") ? "sedan" : type.includes("хэтч") ? "hatchback" : type.includes("универс") ? "wagon" : type.includes("купе") ? "coupe" : bodyType;
+      setBodyType(mapped);
+    }
+    setShowStsScanner(false);
+  };
 
   // A complete VIN can identify a known make/model/year in the offline decoder.
   // Unknown VINs leave the user's existing make and model untouched.
@@ -332,6 +430,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     setMileage(20000);
     setLicensePlate("");
     setVin("");
+    setRegistrationData({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -354,6 +453,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         colorHex: currentVehicle.colorHex || STANDARD_VEHICLE_COLOR,
         licensePlate: currentVehicle?.licensePlate, // Locked upon creation
         vin: vin.trim().toUpperCase() || undefined,
+        registrationData,
         photoUrl: undefined,
         lastMileageUpdate: new Date().toLocaleDateString("ru-RU"),
       };
@@ -374,6 +474,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         colorHex,
         licensePlate: licensePlate.trim() || undefined,
         vin: vin.trim().toUpperCase() || undefined,
+        registrationData,
         photoUrl: undefined,
         lastMileageUpdate: new Date().toLocaleDateString("ru-RU"),
       };
@@ -419,8 +520,8 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
         {/* Mode switcher tabs */}
-        <div className="flex items-center justify-between pt-3 pb-2 text-xs border-b border-neutral-100">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between pt-3 pb-2 text-xs border-b border-neutral-100">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => {
                 setMode("edit");
@@ -437,6 +538,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                   setMileage(currentVehicle.currentMileage || 0);
                   setLicensePlate(currentVehicle.licensePlate || "");
                   setVin(currentVehicle.vin || "");
+                  setRegistrationData(currentVehicle.registrationData || {});
                 }
               }}
               className={`px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
@@ -453,6 +555,14 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Добавить авто</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStsScanner(true)}
+              className="px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer bg-neutral-900 text-white hover:bg-neutral-800"
+            >
+              <ScanLine className="w-3.5 h-3.5" />
+              <span>Сканировать СТС</span>
             </button>
           </div>
 
@@ -591,11 +701,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                     <Lock className="w-3 h-3 text-neutral-500" />
                     Зафиксирован
                   </span>
-                ) : (
-                  <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-medium">
-                    При создании авто
-                  </span>
-                )}
+                ) : null}
               </div>
               <div className="relative">
                 {mode === "add" ? (
@@ -638,6 +744,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 placeholder="JN1TBNT31U0048123"
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold uppercase focus:outline-none focus:border-brand"
               />
+              <p className="text-[10px] text-neutral-500 mt-1">VIN и характеристики можно подставить из СТС — кнопка сверху</p>
               {vin && (
                 <div className="text-[10px] text-neutral-500 mt-1 flex items-center gap-1">
                   <span>{decodeVinOrigin(vin)}</span>
@@ -723,16 +830,19 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
             </div>
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
-                Текущий пробег (км) <span className="text-brand-strong">*</span>
+                Текущий пробег <span className="text-brand-strong">*</span>
               </label>
-              <input
-                type="number"
-                min="0"
-                value={mileage}
-                onChange={(e) => setMileage(Number(e.target.value))}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  value={mileage}
+                  onChange={(e) => setMileage(Number(e.target.value))}
+                  className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 pr-10 py-2 text-xs font-mono font-bold"
+                  required
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">км</span>
+              </div>
             </div>
           </div>
 
@@ -754,6 +864,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
         </form>
       </div>
+      {showStsScanner && <StsScanner onClose={() => setShowStsScanner(false)} onApply={applyStsData} />}
     </div>
   </div>
 );

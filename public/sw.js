@@ -1,8 +1,8 @@
-const CACHE_NAME = "garage-ai-cache-v4";
+const CACHE_NAME = "garage-ai-cache-v8";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
-  "/favicon.svg",
+  "/garage-ai-mark.png",
   "/icon-192.png",
   "/icon-512.png",
   "/manifest.webmanifest"

@@ -13,6 +13,8 @@ import {
   Zap,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord } from "../types";
+import { getVolumeUnit, toDisplayVolume, toLiters, toDisplayVolumePrice, toPricePerLiter, volumeUnitLabel } from "../mobile/units";
+import { GARAGE_SETTINGS_CHANGE_EVENT } from "../mobile/settings";
 
 // Palette for expense category chart slices and badges
 const CATEGORY_PALETTE = [
@@ -103,11 +105,27 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
     new Date().toISOString().split("T")[0]
   );
   const [fuelMileage, setFuelMileage] = useState(vehicle.currentMileage);
-  const [liters, setLiters] = useState(50);
-  const [pricePerLiter, setPricePerLiter] = useState(59.5);
+  const [liters, setLiters] = useState(() => toDisplayVolume(50));
+  const [pricePerLiter, setPricePerLiter] = useState(() => toDisplayVolumePrice(59.5));
+  const [volumeUnit, setVolumeUnit] = useState(getVolumeUnit);
   const [fuelType, setFuelType] = useState("АИ-95");
   const [isFullTank, setIsFullTank] = useState(true);
   const [station, setStation] = useState("Лукойл");
+
+  React.useEffect(() => {
+    let previousUnit = getVolumeUnit();
+    const refreshVolumeUnit = () => {
+      const nextUnit = getVolumeUnit();
+      if (nextUnit === previousUnit) return;
+      const conversion = nextUnit === "gal" ? 0.264172 : 1 / 0.264172;
+      setLiters((value) => value * conversion);
+      setPricePerLiter((value) => value / conversion);
+      previousUnit = nextUnit;
+      setVolumeUnit(nextUnit);
+    };
+    window.addEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshVolumeUnit);
+    return () => window.removeEventListener(GARAGE_SETTINGS_CHANGE_EVENT, refreshVolumeUnit);
+  }, []);
 
   const currentServices = serviceRecords.filter(
     (r) => r.vehicleId === vehicle.id
@@ -219,7 +237,9 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
   const handleSaveFuel = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const totalCost = Math.round(Number(liters) * Number(pricePerLiter));
+    const litersValue = toLiters(Number(liters));
+    const pricePerLiterValue = toPricePerLiter(Number(pricePerLiter));
+    const totalCost = Math.round(litersValue * pricePerLiterValue);
 
     // Calculate consumption from previous fuel record if full tank
     let calculatedConsumption: number | undefined = undefined;
@@ -230,7 +250,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
       const prev = sortedExistingFuels[0];
       const deltaKm = Number(fuelMileage) - prev.mileage;
       if (deltaKm > 0) {
-        calculatedConsumption = Number(((Number(liters) / deltaKm) * 100).toFixed(1));
+        calculatedConsumption = Number(((litersValue / deltaKm) * 100).toFixed(1));
       }
     }
 
@@ -239,8 +259,8 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
       vehicleId: vehicle.id,
       date: fuelDate,
       mileage: Number(fuelMileage),
-      liters: Number(liters),
-      pricePerLiter: Number(pricePerLiter),
+      liters: litersValue,
+      pricePerLiter: pricePerLiterValue,
       totalCost,
       fuelType,
       isFullTank,
@@ -456,8 +476,8 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                 </span>
               </div>
               <div className="text-xl font-extrabold text-emerald-600 font-mono mt-1 flex items-baseline gap-1">
-                {totalFuelLiters}{" "}
-                <span className="text-xs font-normal text-emerald-700 font-sans">литров</span>
+                {toDisplayVolume(currentFuels.reduce((sum, record) => sum + record.liters, 0)).toFixed(0)}{" "}
+                <span className="text-xs font-normal text-emerald-700 font-sans">{volumeUnitLabel()}</span>
               </div>
               <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
                 на {totalFuelCost.toLocaleString("ru-RU")} ₽ ({currentFuels.length} заправок)
@@ -668,7 +688,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                           {selectedMetric === "fuel_cost_km" && `${fuelCostPerKm} ₽/км`}
                           {selectedMetric === "service_total" &&
                             `${totalServiceCost.toLocaleString("ru-RU")} ₽`}
-                          {selectedMetric === "fuel_total" && `${totalFuelLiters} л`}
+                          {selectedMetric === "fuel_total" && (toDisplayVolume(currentFuels.reduce((sum, record) => sum + record.liters, 0)).toFixed(0) + " " + volumeUnitLabel())}
                         </div>
                         <div className="mt-1">
                           <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-800 border border-neutral-200/80">
@@ -783,7 +803,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                             )}
                             {selectedMetric === "fuel_total" && cat === "Топливо" && (
                               <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                                ✓ {totalFuelLiters} л
+                                ✓ {toDisplayVolume(currentFuels.reduce((sum, record) => sum + record.liters, 0)).toFixed(0)} {volumeUnitLabel()}
                               </span>
                             )}
                             {selectedMetric === "service_total" && cat !== "Топливо" && (
@@ -834,8 +854,8 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                   <th className="py-2.5 px-3 rounded-l-xl">Дата</th>
                   <th className="py-2.5 px-3">Пробег</th>
                   <th className="py-2.5 px-3">Топливо</th>
-                  <th className="py-2.5 px-3 text-right">Объем</th>
-                  <th className="py-2.5 px-3 text-right">Цена/л</th>
+                  <th className="py-2.5 px-3 text-right">Объем ({volumeUnitLabel()})</th>
+                  <th className="py-2.5 px-3 text-right">Цена/{volumeUnitLabel()}</th>
                   <th className="py-2.5 px-3 text-right">Сумма</th>
                   <th className="py-2.5 px-3 text-right rounded-r-xl">Расход</th>
                 </tr>
@@ -856,10 +876,10 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-bold">
-                      {fuel.liters.toFixed(1)} л
+                      {toDisplayVolume(fuel.liters).toFixed(1)} {volumeUnitLabel()}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-neutral-600">
-                      {fuel.pricePerLiter.toFixed(2)} ₽
+                      {toDisplayVolumePrice(fuel.pricePerLiter).toFixed(2)} ₽
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-extrabold text-neutral-900">
                       {fuel.totalCost.toLocaleString("ru-RU")} ₽
@@ -922,7 +942,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-semibold text-neutral-700 mb-1">
-                    Залито литров
+                    Залито ({volumeUnitLabel()})
                   </label>
                   <input
                     type="number"
@@ -937,7 +957,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
 
                 <div>
                   <label className="block font-semibold text-neutral-700 mb-1">
-                    Цена за 1 литр (₽)
+                    Цена за 1 {volumeUnitLabel()} (₽)
                   </label>
                   <input
                     type="number"
