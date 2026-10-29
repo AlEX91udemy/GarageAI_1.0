@@ -13,7 +13,9 @@
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('server.js',{force:true})\"",
     "lint": "tsc --noEmit",
     "test": "vitest run --environment happy-dom",
-    "catalog:audit": "tsx scripts/catalog-audit.ts"
+    "catalog:audit": "tsx scripts/catalog-audit.ts",
+    "revoke:sessions": "tsx scripts/revoke-all-sessions.ts",
+    "preflight:production": "tsx scripts/production-preflight.ts"
   },
   "dependencies": {
     "@google-cloud/documentai": "^10.2.0",

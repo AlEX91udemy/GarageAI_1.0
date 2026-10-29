@@ -159,6 +159,15 @@ export class PostgresPersistence {
     });
   }
 
+  async consumeEmailChallenge(userId: string, challengeId: string, now = Date.now()): Promise<void> {
+    this.assertInitialized();
+    await this.sql`
+      UPDATE garageai_email_auth_challenges
+      SET consumed_at_ms = ${now}
+      WHERE id = ${challengeId} AND user_id = ${userId} AND consumed_at_ms IS NULL
+    `;
+  }
+
   async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
     this.assertInitialized();
     return this.sql.begin(async (tx) => {

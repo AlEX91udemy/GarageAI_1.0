@@ -12,6 +12,24 @@ import {
 
 let csrfToken: string | null = null;
 let authSessionActive = false;
+const ACTIVE_USER_KEY = "garagehub_active_user";
+
+export function getActiveUsername(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setActiveUsername(username: string | undefined): void {
+  try {
+    if (username) localStorage.setItem(ACTIVE_USER_KEY, username.trim().toLowerCase());
+    else localStorage.removeItem(ACTIVE_USER_KEY);
+  } catch {
+    // Storage can be unavailable in private or embedded browsers.
+  }
+}
 
 export interface AuthSession {
   username: string;
@@ -39,6 +57,7 @@ export async function register(username: string, password: string, email?: strin
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
@@ -53,6 +72,7 @@ export async function login(username: string, password: string): Promise<AuthSes
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
@@ -76,15 +96,17 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
   if (!res.ok) throw new Error(data.error || "Не удалось войти по коду");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {
   const res = await authenticatedFetch("/api/auth/session", { credentials: "same-origin" });
-  if (!res.ok) { csrfToken = null; authSessionActive = false; return null; }
+  if (!res.ok) { csrfToken = null; authSessionActive = false; setActiveUsername(undefined); return null; }
   const data = await res.json();
   csrfToken = data.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.username);
   return data as AuthSession;
 }
 
@@ -92,6 +114,7 @@ export async function logout(): Promise<void> {
   await authenticatedFetch("/api/auth/logout", { method: "POST" });
   csrfToken = null;
   authSessionActive = false;
+  setActiveUsername(undefined);
 }
 
 export interface FullGarageData {

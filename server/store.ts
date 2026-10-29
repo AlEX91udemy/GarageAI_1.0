@@ -231,12 +231,20 @@ export class GarageStore {
       this.lastPersistError = null;
     });
 
-    const safeChain = task.catch((err) => {
+    // Keep the queue usable after a failed write, but preserve the rejection
+    // for the request that initiated the write. Returning a resolved promise
+    // here made the HTTP layer report success while data was still only in
+    // memory.
+    const safeChain = task.then(
+      () => undefined,
+      (err) => {
       this.lastPersistError = err instanceof Error ? err : new Error(String(err));
       console.error("Ошибка сохранения garage_store.json:", err);
-    });
+        return undefined;
+      },
+    );
     this.writeChain = safeChain;
-    return safeChain;
+    return task;
   }
 
   flush(): Promise<void> {
@@ -322,6 +330,17 @@ export class GarageStore {
       next.push({ ...record });
       writeJsonAtomic(this.emailChallengesFile, next);
       this.state.emailChallenges = next;
+    });
+    this.writeChain = task.then(() => undefined, () => undefined);
+    await task;
+  }
+
+  async consumeEmailChallenge(userId: string, challengeId: string, now = Date.now()): Promise<void> {
+    const task = this.writeChain.then(() => {
+      const challenge = this.state.emailChallenges.find((item) => item.userId === userId && item.id === challengeId && !item.consumedAtMs);
+      if (!challenge) return;
+      challenge.consumedAtMs = now;
+      writeJsonAtomic(this.emailChallengesFile, this.state.emailChallenges);
     });
     this.writeChain = task.then(() => undefined, () => undefined);
     await task;

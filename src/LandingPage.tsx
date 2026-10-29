@@ -743,6 +743,11 @@ export function LandingPage() {
             © 2026 GarageAI
           </span>
         </div>
+        <div className="mx-auto mt-3 flex max-w-7xl flex-wrap gap-x-4 gap-y-1 px-4 text-[11px] text-[#536171] dark:text-[#94A3B8] sm:px-6 lg:px-8">
+          <a href="/privacy" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Политика конфиденциальности</a>
+          <a href="/terms" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Условия использования</a>
+          <a href="/cookies" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Политика cookie</a>
+        </div>
       </motion.footer>
     </div>
   );

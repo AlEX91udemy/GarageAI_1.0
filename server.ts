@@ -86,6 +86,30 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
+
+// Express 4 does not forward rejected promises from async route handlers.
+// Wrap route registration once so unexpected failures reach the JSON error
+// middleware instead of becoming unhandled rejections.
+const asyncRoute = (handler: (...args: any[]) => unknown) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    Promise.resolve()
+      .then(() => handler(req, res, next))
+      .catch(next);
+  };
+
+// Express route methods accept callback arrays as well as individual handlers.
+// Preserve that overload while wrapping every non-error callback.
+const wrapRouteHandler = (handler: unknown): unknown => {
+  if (Array.isArray(handler)) return handler.map(wrapRouteHandler);
+  if (typeof handler !== "function" || handler.length === 4) return handler;
+  return asyncRoute(handler as (...args: any[]) => unknown);
+};
+for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+  const original = app[method].bind(app) as (...args: any[]) => unknown;
+  (app as any)[method] = (pathOrPaths: unknown, ...handlers: Array<(...args: any[]) => unknown>) =>
+    original(pathOrPaths, ...handlers.map(wrapRouteHandler));
+}
+
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
@@ -120,7 +144,10 @@ async function processWithDocumentAi(content: Buffer, mimeType: string, processo
   return result.document;
 }
 
-app.set("trust proxy", 1);
+// Trust only the configured reverse-proxy hop count. This keeps client IP
+// based rate limits from being bypassed by spoofed X-Forwarded-For headers.
+const trustedProxyHops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS || "0", 10);
+app.set("trust proxy", Number.isInteger(trustedProxyHops) && trustedProxyHops >= 0 ? trustedProxyHops : 0);
 
 // Middleware for parsing JSON with a 10mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
@@ -149,13 +176,8 @@ app.use((req, res, next) => {
     } catch {
       return res.status(403).json({ error: "Некорректный Origin" });
     }
-    const forwardedHost =
-      typeof req.headers["x-forwarded-host"] === "string"
-        ? req.headers["x-forwarded-host"].split(",")[0].trim()
-        : undefined;
     const hostMatches =
       originHost === req.headers.host ||
-      (forwardedHost !== undefined && originHost === forwardedHost) ||
       ALLOWED_ORIGIN_HOSTS.has(originHost);
     if (!hostMatches) {
       return res.status(403).json({ error: "Запрос отклонён: несовпадение origin" });
@@ -203,6 +225,10 @@ function clone<T>(value: T): T {
 function uniqueId(preferred: unknown, prefix: string, existing: { id: string }[]): string {
   const candidate = typeof preferred === "string" && preferred.trim() ? preferred.trim() : newId(prefix);
   return existing.some((item) => item.id === candidate) ? newId(prefix) : candidate;
+}
+
+function hasVehicle(vehicleId: unknown): vehicleId is string {
+  return typeof vehicleId === "string" && dbMemory.vehicles.some((vehicle) => vehicle.id === vehicleId);
 }
 
 function getInitialDatabase(): GarageDatabase {
@@ -1132,6 +1158,9 @@ app.put("/api/services/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.serviceRecords[index];
   const body = (req.body || {}) as Partial<ServiceRecord>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const parts = Array.isArray(body.parts)
     ? body.parts.map((p, i) => ({
@@ -1306,6 +1335,9 @@ app.post("/api/inventory", async (req, res) => {
     typeof body.partNumber === "string" && body.partNumber.trim()
       ? body.partNumber.trim().toUpperCase()
       : `SKU-${Date.now().toString().slice(-6)}`;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const newPart: GaragePart = {
     id: uniqueId(body.id, "gp", dbMemory.garageParts),
@@ -1335,6 +1367,9 @@ app.put("/api/inventory/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.garageParts[index];
   const body = (req.body || {}) as Partial<GaragePart>;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.garageParts[index] = {
     ...current,
@@ -1476,6 +1511,9 @@ app.post("/api/parts/check-availability", (req, res) => {
     totalSuppliersStock: totalStock,
     fastestDeliveryDays: 1,
     suppliers,
+    dataSource: "demo",
+    isLive: false,
+    notice: "Цены, остатки и сроки являются демонстрационными и не подтверждают наличие у поставщика.",
     lastCheckedTime: new Date().toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
@@ -1540,6 +1578,9 @@ app.put("/api/to-fix/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.toFixTasks[index];
   const body = (req.body || {}) as Partial<ToFixTask>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.toFixTasks[index] = {
     ...current,
@@ -1612,6 +1653,9 @@ app.post("/api/oem-schedule", async (req, res) => {
   if (!vehicleId || !Array.isArray(items)) {
     return res.status(400).json({ error: "vehicleId и items обязательны" });
   }
+  if (!hasVehicle(vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   // Remove existing or merge
   dbMemory.oemSchedules = dbMemory.oemSchedules.filter((s) => s.vehicleId !== vehicleId);
@@ -1643,6 +1687,9 @@ app.put("/api/oem-schedule/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.oemSchedules[index];
   const body = (req.body || {}) as Partial<OemScheduleItem>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.oemSchedules[index] = {
     ...current,
@@ -1681,6 +1728,9 @@ app.post("/api/tuning", async (req, res) => {
   if (!body.vehicleId || !body.title) {
     return res.status(400).json({ error: "vehicleId и title обязательны" });
   }
+  if (!hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const newStage: TuningStage = {
     id: body.id || `ts-${Date.now()}`,
@@ -1710,6 +1760,9 @@ app.put("/api/tuning/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.tuningStages[index];
   const body = (req.body || {}) as Partial<TuningStage>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.tuningStages[index] = {
     ...current,
@@ -1918,7 +1971,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (index === -1) continue;
     const key = part.slice(0, index).trim();
     const value = part.slice(index + 1).trim();
-    if (key) jar[key] = decodeURIComponent(value);
+    if (key) {
+      try {
+        jar[key] = decodeURIComponent(value);
+      } catch {
+        // Ignore malformed cookie values instead of failing session lookup.
+      }
+    }
   }
   return jar;
 }
@@ -2148,7 +2207,7 @@ app.post("/api/auth/register", async (req, res) => {
     console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
-  void (async () => {
+  try {
     const userId = newId("user");
     const email = req.body?.email ? normalizeEmail(req.body.email) : null;
     if (req.body?.email && !email) { res.status(400).json({ error: "Введите корректный email" }); return; }
@@ -2158,13 +2217,13 @@ app.post("/api/auth/register", async (req, res) => {
     await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email ?? undefined);
     await clearLoginAttempts(req.ip || "unknown");
     res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!, email ?? undefined) });
-  })().catch((error) => {
+  } catch (error) {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
     console.error("Registration error:", error);
     return res.status(500).json({ error: "Не удалось создать аккаунт" });
-  });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -2275,8 +2334,13 @@ app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req
       const secret = process.env.EMAIL_CODE_SECRET?.trim();
       if (!secret) throw new Error("Email code secret is not configured");
       const record: EmailAuthChallengeRecord = { id, userId: user.id, codeHash: hashEmailCode(id, code, secret), expiresAtMs: Date.now() + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs: Date.now() };
-      await sendEmailCode(email, code);
       await store.createEmailChallenge(record);
+      try {
+        await sendEmailCode(email, code);
+      } catch (sendError) {
+        await store.consumeEmailChallenge(user.id, id, Date.now());
+        throw sendError;
+      }
     }
     return res.json({ success: true, message: "Если аккаунт существует, код отправлен на email." });
   } catch (error) {

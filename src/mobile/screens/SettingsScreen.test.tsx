@@ -63,21 +63,11 @@ it("switches to light theme and persists garage settings", () => {
   expect(localStorage.getItem(GARAGE_CURRENCY_KEY)).toBe("usd");
 });
 
-it("activates and reports both additional dark themes", () => {
-  for (const [label, variant, titlePart] of [
-    ["Carbon Black", "carbon", "Графитовая"],
-    ["OLED Midnight", "oled", "Чёрная OLED"],
-  ] as const) {
-    const { onThemeChange, onDarkVariantChange } = renderSettings("dark");
-    const button = Array.from(container.querySelectorAll("button")).find(
-      (candidate) => candidate.textContent?.trim() === label
-    );
-
-    act(() => button?.click());
-    expect(onDarkVariantChange).toHaveBeenCalledWith(variant);
-    expect(onThemeChange).toHaveBeenCalledWith("dark");
-    expect(button?.getAttribute("title")).toContain(titlePart);
-  }
+it("keeps the single dark theme option", () => {
+  renderSettings("dark");
+  expect(container.textContent).toContain("Dark Racing");
+  expect(container.textContent).not.toContain("Carbon Black");
+  expect(container.textContent).not.toContain("OLED Midnight");
 });
 
 it("persists notification switches", () => {
