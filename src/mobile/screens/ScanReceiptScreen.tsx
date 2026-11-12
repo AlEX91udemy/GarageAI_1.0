@@ -7,22 +7,70 @@ interface ScanReceiptScreenProps { vehicle: Vehicle; onBack: () => void; onConfi
 type ScanStep = "scanning" | "processing" | "confirm";
 
 function normalizeResult(raw: any, vehicle: Vehicle, image: string) {
-  const parts = Array.isArray(raw?.parts) ? raw.parts.map((p: any, i: number) => ({ id: `ocr-${Date.now()}-${i}`, name: p.name || p.description || "Запчасть", brand: p.brand || "", partNumber: p.partNumber || p.sku || "", quantity: Number(p.quantity || 1), unitPrice: Number(p.price || p.unitPrice || 0) })) : [];
+  const parts = Array.isArray(raw?.parts) ? raw.parts.map((p: any, i: number) => ({
+    id: `ocr-${Date.now()}-${i}`,
+    name: typeof p?.name === "string" && p.name.trim() ? p.name.trim() : (typeof p?.description === "string" && p.description.trim() ? p.description.trim() : "Запчасть"),
+    brand: typeof p?.brand === "string" ? p.brand.trim() : "",
+    partNumber: typeof p?.partNumber === "string" ? p.partNumber.trim() : (typeof p?.sku === "string" ? p.sku.trim() : ""),
+    quantity: Number.isFinite(Number(p?.quantity)) && Number(p.quantity) > 0 ? Number(p.quantity) : 1,
+    unitPrice: Number.isFinite(Number(p?.price ?? p?.unitPrice)) && Number(p.price ?? p.unitPrice) >= 0 ? Number(p.price ?? p.unitPrice) : 0,
+  })) : [];
   const works = Array.isArray(raw?.works) ? raw.works : [];
-  const laborCost = Number(raw?.laborCost ?? works.reduce((sum: number, w: any) => sum + Number(w.cost || 0), 0));
-  return { title: raw?.description || raw?.title || `Обслуживание в ${raw?.merchantName || "автосервисе"}`, serviceCenter: raw?.merchantName || raw?.serviceCenter || "Не указано", date: raw?.date || new Date().toISOString().slice(0, 10), totalCost: Number(raw?.totalAmount ?? raw?.totalCost ?? laborCost + parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0)), laborCost, parts, image, raw, category: raw?.category, vehicleId: vehicle.id };
+  const laborCost = Number.isFinite(Number(raw?.laborCost)) && Number(raw.laborCost) >= 0
+    ? Number(raw.laborCost)
+    : works.reduce((sum: number, w: any) => sum + (Number.isFinite(Number(w?.cost)) && Number(w.cost) >= 0 ? Number(w.cost) : 0), 0);
+  const calculatedTotal = laborCost + parts.reduce((sum: number, part: any) => sum + part.unitPrice * part.quantity, 0);
+  const totalCost = Number.isFinite(Number(raw?.totalAmount ?? raw?.totalCost)) && Number(raw.totalAmount ?? raw.totalCost) >= 0
+    ? Number(raw.totalAmount ?? raw.totalCost)
+    : calculatedTotal;
+  const date = typeof raw?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.date) && !Number.isNaN(Date.parse(raw.date))
+    ? raw.date
+    : new Date().toISOString().slice(0, 10);
+  return { title: typeof raw?.description === "string" && raw.description.trim() ? raw.description.trim() : (typeof raw?.title === "string" && raw.title.trim() ? raw.title.trim() : `Обслуживание в ${raw?.merchantName || "автосервисе"}`), serviceCenter: typeof raw?.merchantName === "string" && raw.merchantName.trim() ? raw.merchantName.trim() : (typeof raw?.serviceCenter === "string" && raw.serviceCenter.trim() ? raw.serviceCenter.trim() : "Не указано"), date, totalCost, laborCost, parts, image, raw, category: raw?.category, vehicleId: vehicle.id };
 }
 
 export const ScanReceiptScreen: React.FC<ScanReceiptScreenProps> = ({ vehicle, onBack, onConfirmRecord, onConfirmFuel }) => {
   const [step, setStep] = useState<ScanStep>("scanning"); const [image, setImage] = useState<string | null>(null); const [result, setResult] = useState<any>(null); const [error, setError] = useState<string | null>(null);
   const photoFileRef = useRef<HTMLInputElement>(null); const fileRef = useRef<HTMLInputElement>(null);
-  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => setImage(String(reader.result)); reader.readAsDataURL(file); };
+  const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Выберите файл изображения (JPG, PNG или WebP).");
+      return;
+    }
+    if (file.size > 9 * 1024 * 1024) {
+      setError("Фото слишком большое. Максимальный размер — 9 МБ.");
+      return;
+    }
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      if (!value) {
+        setError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
+        return;
+      }
+      setImage(value);
+    };
+    reader.onerror = () => setError("Не удалось прочитать файл. Попробуйте другое фото.");
+    reader.onabort = () => setError("Чтение фотографии было прервано. Попробуйте ещё раз.");
+    reader.readAsDataURL(file);
+  };
   const scan = async () => { if (!image) return; setStep("processing"); setError(null); try { const mime = image.match(/^data:([^;]+);/)?.[1] || "image/jpeg"; setResult(normalizeResult(await requestReceiptOcr(image, mime), vehicle, image)); setStep("confirm"); } catch (e: any) { setError(e?.message || "Не удалось распознать документ. Проверьте фото и настройки AI."); setStep("scanning"); } };
   const save = () => {
     if (!result) return;
     if (result.category === "fuel" && onConfirmFuel) {
       const details = result.raw?.fuelDetails || {};
-      onConfirmFuel({ vehicleId: vehicle.id, date: result.date, mileage: vehicle.currentMileage, liters: Number(details.liters || 0), pricePerLiter: Number(details.pricePerLiter || 0), totalCost: result.totalCost, fuelType: details.fuelType || "АИ-95", isFullTank: true, station: result.serviceCenter });
+      const liters = Number(details.liters);
+      const pricePerLiter = Number(details.pricePerLiter);
+      if (!Number.isFinite(liters) || liters <= 0 || !Number.isFinite(pricePerLiter) || pricePerLiter < 0 || !Number.isFinite(Number(result.totalCost)) || Number(result.totalCost) < 0) {
+        setError("Не удалось распознать объём, цену за литр или итоговую сумму. Повторите сканирование.");
+        return;
+      }
+      onConfirmFuel({ vehicleId: vehicle.id, date: result.date, mileage: vehicle.currentMileage, liters, pricePerLiter, totalCost: Number(result.totalCost), fuelType: typeof details.fuelType === "string" && details.fuelType.trim() ? details.fuelType.trim() : "АИ-95", isFullTank: true, station: result.serviceCenter });
     } else {
       onConfirmRecord({ vehicleId: vehicle.id, title: result.title, category: "ТО и замена жидкостей", date: result.date, mileage: vehicle.currentMileage, totalCost: result.totalCost, laborCost: result.laborCost, serviceCenter: result.serviceCenter, description: result.raw?.description || "Документ распознан AI OCR.", parts: result.parts, receiptImages: [result.image] });
     }

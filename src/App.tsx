@@ -64,19 +64,11 @@ import {
 import { CarHeader } from "./components/CarHeader";
 import { Dashboard } from "./components/Dashboard";
 import { ServiceLogView } from "./components/ServiceLogView";
-import { AddServiceModal } from "./components/AddServiceModal";
-import { ReceiptScannerModal } from "./components/ReceiptScannerModal";
 import { OemScheduleView } from "./components/OemScheduleView";
 import { ExpensesFuelView } from "./components/ExpensesFuelView";
 import { GarageInventoryToFixView } from "./components/GarageInventoryToFixView";
-import { AiMechanicModal } from "./components/AiMechanicModal";
 import { TuningProjectView } from "./components/TuningProjectView";
-import { ServiceBookModal } from "./components/ServiceBookModal";
 import { readThemePreference, saveThemePreference, applyThemePreference, type ThemePreference } from "./themePreference";
-import { VehicleModal } from "./components/VehicleModal";
-import { RemindersModal } from "./components/RemindersModal";
-import { DataSyncBackupModal } from "./components/DataSyncBackupModal";
-import { InstallPcModal } from "./components/InstallPcModal";
 import { Smartphone } from "lucide-react";
 import type { SyncStatus } from "./mobile/types";
 
@@ -94,6 +86,31 @@ const MobileApp = lazy(() =>
 
 const WebApp = lazy(() =>
   import("./web/WebApp").then(({ WebApp }) => ({ default: WebApp }))
+);
+
+const AddServiceModal = lazy(() =>
+  import("./components/AddServiceModal").then(({ AddServiceModal }) => ({ default: AddServiceModal }))
+);
+const ReceiptScannerModal = lazy(() =>
+  import("./components/ReceiptScannerModal").then(({ ReceiptScannerModal }) => ({ default: ReceiptScannerModal }))
+);
+const AiMechanicModal = lazy(() =>
+  import("./components/AiMechanicModal").then(({ AiMechanicModal }) => ({ default: AiMechanicModal }))
+);
+const ServiceBookModal = lazy(() =>
+  import("./components/ServiceBookModal").then(({ ServiceBookModal }) => ({ default: ServiceBookModal }))
+);
+const VehicleModal = lazy(() =>
+  import("./components/VehicleModal").then(({ VehicleModal }) => ({ default: VehicleModal }))
+);
+const RemindersModal = lazy(() =>
+  import("./components/RemindersModal").then(({ RemindersModal }) => ({ default: RemindersModal }))
+);
+const DataSyncBackupModal = lazy(() =>
+  import("./components/DataSyncBackupModal").then(({ DataSyncBackupModal }) => ({ default: DataSyncBackupModal }))
+);
+const InstallPcModal = lazy(() =>
+  import("./components/InstallPcModal").then(({ InstallPcModal }) => ({ default: InstallPcModal }))
 );
 
 const LEGACY_CACHE_KEYS = [
@@ -177,7 +194,7 @@ export default function App() {
   const handleLogout = () => {
     authLoadGenerationRef.current += 1;
     const previousOwner = cacheOwnerRef.current;
-    void apiLogout().catch(console.error);
+    void apiLogout().catch(handleMutationError);
     if (previousOwner !== "guest") clearGarageCache(previousOwner);
     updateCacheOwner("guest");
     setVehicles([]);
@@ -220,7 +237,44 @@ export default function App() {
   const [garageLoaded, setGarageLoaded] = useState(false);
   const [hasGarageAccess, setHasGarageAccess] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("loading");
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
   const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
+
+  const handleMutationError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "Не удалось сохранить изменения на сервере";
+    setSyncStatus("error");
+    setSyncErrorMessage(message);
+    console.warn("Не удалось сохранить изменения на сервере; локальное состояние может отличаться:", error);
+
+    if (!/сессия|авторизац|войдите/i.test(message)) {
+      void fetchGarageData()
+        .then((data) => {
+          setIsOnline(true);
+          setVehicles(data.vehicles || []);
+          setReminders(data.reminders || []);
+          setServiceRecords(data.serviceRecords || []);
+          setFuelRecords(data.fuelRecords || []);
+          setOemSchedules(data.oemSchedules || []);
+          setGarageParts(data.garageParts || []);
+          setToFixTasks(data.toFixTasks || []);
+          setTuningStages(data.tuningStages || []);
+          setActiveVehicleId((current) =>
+            data.vehicles?.some((vehicle) => vehicle.id === current)
+              ? current
+              : data.vehicles?.[0]?.id || "empty-garage"
+          );
+          setSyncStatus("error");
+          setSyncErrorMessage(
+            message.includes("Данные гаража изменились")
+              ? "Данные обновлены после конфликта. Повторите действие."
+              : "Данные обновлены после ошибки сохранения. Повторите действие.",
+          );
+        })
+        .catch((refreshError) => {
+          console.warn("Не удалось обновить данные после конфликта:", refreshError);
+        });
+    }
+  };
 
   // Active Modals
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
@@ -322,35 +376,36 @@ export default function App() {
           err,
         );
         setIsOnline(false);
-        updateCacheOwner("guest");
+        const fallbackOwner = requiresAuthentication ? "guest" : (getActiveUsername() || "guest");
+        updateCacheOwner(fallbackOwner);
         setHasGarageAccess(!requiresAuthentication);
         setSyncStatus(requiresAuthentication ? "guest" : "offline");
         if (requiresAuthentication) {
-          const cachedVehicles = readGarageCache<Vehicle>("guest", "vehicles");
+          const cachedVehicles = readGarageCache<Vehicle>(fallbackOwner, "vehicles");
           setVehicles(cachedVehicles);
-          setReminders(readGarageCache<ReminderRecord>("guest", "reminders"));
+          setReminders(readGarageCache<ReminderRecord>(fallbackOwner, "reminders"));
           setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
-          setServiceRecords(readGarageCache<ServiceRecord>("guest", "service_records"));
-          setFuelRecords(readGarageCache<FuelRecord>("guest", "fuel_records"));
-          setOemSchedules(readGarageCache<OemScheduleItem>("guest", "oem_schedules"));
-          setGarageParts(readGarageCache<GaragePart>("guest", "garage_parts"));
-          setToFixTasks(readGarageCache<ToFixTask>("guest", "to_fix_tasks"));
-          setTuningStages(readGarageCache<TuningStage>("guest", "tuning_stages"));
+          setServiceRecords(readGarageCache<ServiceRecord>(fallbackOwner, "service_records"));
+          setFuelRecords(readGarageCache<FuelRecord>(fallbackOwner, "fuel_records"));
+          setOemSchedules(readGarageCache<OemScheduleItem>(fallbackOwner, "oem_schedules"));
+          setGarageParts(readGarageCache<GaragePart>(fallbackOwner, "garage_parts"));
+          setToFixTasks(readGarageCache<ToFixTask>(fallbackOwner, "to_fix_tasks"));
+          setTuningStages(readGarageCache<TuningStage>(fallbackOwner, "tuning_stages"));
           setGarageLoaded(true);
           return;
         }
         // The app is usable without an account. Keep the last local garage
         // available when the server requires authentication or is offline.
-        const cachedVehicles = readGarageCache<Vehicle>("guest", "vehicles");
+        const cachedVehicles = readGarageCache<Vehicle>(fallbackOwner, "vehicles");
         setVehicles(cachedVehicles);
-        setReminders(readGarageCache<ReminderRecord>("guest", "reminders"));
+        setReminders(readGarageCache<ReminderRecord>(fallbackOwner, "reminders"));
         setActiveVehicleId(cachedVehicles[0]?.id || "empty-garage");
-        setServiceRecords(readGarageCache<ServiceRecord>("guest", "service_records"));
-        setFuelRecords(readGarageCache<FuelRecord>("guest", "fuel_records"));
-        setOemSchedules(readGarageCache<OemScheduleItem>("guest", "oem_schedules"));
-        setGarageParts(readGarageCache<GaragePart>("guest", "garage_parts"));
-        setToFixTasks(readGarageCache<ToFixTask>("guest", "to_fix_tasks"));
-        setTuningStages(readGarageCache<TuningStage>("guest", "tuning_stages"));
+        setServiceRecords(readGarageCache<ServiceRecord>(fallbackOwner, "service_records"));
+        setFuelRecords(readGarageCache<FuelRecord>(fallbackOwner, "fuel_records"));
+        setOemSchedules(readGarageCache<OemScheduleItem>(fallbackOwner, "oem_schedules"));
+        setGarageParts(readGarageCache<GaragePart>(fallbackOwner, "garage_parts"));
+        setToFixTasks(readGarageCache<ToFixTask>(fallbackOwner, "to_fix_tasks"));
+        setTuningStages(readGarageCache<TuningStage>(fallbackOwner, "tuning_stages"));
         setGarageLoaded(true);
       });
 
@@ -429,7 +484,7 @@ export default function App() {
           : v
       )
     );
-    apiUpdateMileage(currentVehicle.id, newMileage).catch(console.error);
+    apiUpdateMileage(currentVehicle.id, newMileage).catch(handleMutationError);
   };
 
   const handleSaveServiceRecord = (
@@ -458,7 +513,7 @@ export default function App() {
       );
       // BUG FIX: Persist task completion to the backend, otherwise the status
       // resets to "pending" after the next fetchGarageData() refresh.
-      apiCompleteToFixTask(completedTaskId).catch(console.error);
+      apiCompleteToFixTask(completedTaskId).catch(handleMutationError);
     }
 
     // Mark garage parts installed if used
@@ -492,7 +547,7 @@ export default function App() {
           completedTaskId,
           ...(usedPartIds && usedPartIds.length > 0 ? { installedPartIds: usedPartIds } : {}),
         } as any);
-    saveRequest.catch(console.error);
+    saveRequest.catch(handleMutationError);
 
     setShowAddServiceModal(false);
     setServiceModalInitialData(undefined);
@@ -500,7 +555,7 @@ export default function App() {
 
   const handleDeleteServiceRecord = (recordId: string) => {
     setServiceRecords((prev) => prev.filter((r) => r.id !== recordId));
-    apiDeleteServiceRecord(recordId).catch(console.error);
+    apiDeleteServiceRecord(recordId).catch(handleMutationError);
   };
 
   const handleAddFuelRecord = (fuelRecord: FuelRecord) => {
@@ -508,7 +563,7 @@ export default function App() {
     if (fuelRecord.mileage > currentVehicle.currentMileage) {
       handleUpdateMileage(fuelRecord.mileage);
     }
-    apiCreateFuelRecord(fuelRecord).catch(console.error);
+    apiCreateFuelRecord(fuelRecord).catch(handleMutationError);
   };
 
   // When marking an OEM schedule item done
@@ -529,7 +584,7 @@ export default function App() {
     apiUpdateOemScheduleItem(item.id, {
       lastDoneKm: currentVehicle.currentMileage,
       lastDoneDate: today,
-    }).catch(console.error);
+    }).catch(handleMutationError);
 
     // Prompt to create a service record
     setServiceModalInitialData({
@@ -572,13 +627,13 @@ export default function App() {
   const handleAddVehicle = (newV: Vehicle) => {
     setVehicles((prev) => [...prev, newV]);
     setActiveVehicleId(newV.id);
-    apiCreateVehicle(newV).catch(console.error);
+    apiCreateVehicle(newV).catch(handleMutationError);
   };
 
   // Save vehicle edits
   const handleSaveVehicle = (updatedV: Vehicle) => {
     setVehicles((prev) => prev.map((v) => (v.id === updatedV.id ? updatedV : v)));
-    apiUpdateVehicle(updatedV.id, updatedV).catch(console.error);
+    apiUpdateVehicle(updatedV.id, updatedV).catch(handleMutationError);
   };
 
   // Quick update vehicle color
@@ -587,7 +642,7 @@ export default function App() {
     setVehicles((prev) =>
       prev.map((v) => (v.id === currentVehicle.id ? { ...v, colorHex: newColor } : v))
     );
-    apiUpdateVehicle(currentVehicle.id, { colorHex: newColor }).catch(console.error);
+    apiUpdateVehicle(currentVehicle.id, { colorHex: newColor }).catch(handleMutationError);
   };
 
   // Quick update vehicle 3D model
@@ -595,7 +650,7 @@ export default function App() {
     setVehicles((prev) =>
       prev.map((v) => (v.id === currentVehicle.id ? { ...v, model3dUrl } : v))
     );
-    apiUpdateVehicle(currentVehicle.id, { model3dUrl }).catch(console.error);
+    apiUpdateVehicle(currentVehicle.id, { model3dUrl }).catch(handleMutationError);
   };
 
   // Delete vehicle
@@ -610,7 +665,7 @@ export default function App() {
     setGarageParts((prev) => prev.filter((p) => p.vehicleId !== vehicleId));
     setToFixTasks((prev) => prev.filter((t) => t.vehicleId !== vehicleId));
     setTuningStages((prev) => prev.filter((t) => t.vehicleId !== vehicleId));
-    apiDeleteVehicle(vehicleId).catch(console.error);
+    apiDeleteVehicle(vehicleId).catch(handleMutationError);
   };
 
   // Backup restore
@@ -630,9 +685,9 @@ export default function App() {
         // BUG FIX: persist the imported vehicle to the backend, otherwise the
         // import is lost after the next page reload.
         if (vehicleExists) {
-          apiUpdateVehicle(data.vehicle.id, data.vehicle).catch(console.error);
+          apiUpdateVehicle(data.vehicle.id, data.vehicle).catch(handleMutationError);
         } else {
-          apiCreateVehicle(data.vehicle).catch(console.error);
+          apiCreateVehicle(data.vehicle).catch(handleMutationError);
         }
       }
       if (data.serviceRecords && Array.isArray(data.serviceRecords)) {
@@ -657,9 +712,9 @@ export default function App() {
           data.serviceRecords.forEach((record: ServiceRecord) => {
             const existsLocally = existingForVehicle.some((r) => r.id === record.id);
             if (existsLocally) {
-              apiUpdateServiceRecord(record.id, record).catch(console.error);
+              apiUpdateServiceRecord(record.id, record).catch(handleMutationError);
             } else {
-              apiCreateServiceRecord(record).catch(console.error);
+              apiCreateServiceRecord(record).catch(handleMutationError);
             }
           });
         }
@@ -671,31 +726,34 @@ export default function App() {
         };
         if (Array.isArray(data.fuelRecords)) {
           mergeByVehicle(data.fuelRecords, setFuelRecords);
-          data.fuelRecords.forEach((record: FuelRecord) => apiCreateFuelRecord(record).catch(console.error));
+          data.fuelRecords.forEach((record: FuelRecord) => apiCreateFuelRecord(record).catch(handleMutationError));
         }
         if (Array.isArray(data.garageParts)) {
           mergeByVehicle(data.garageParts, setGarageParts);
-          data.garageParts.forEach((part: GaragePart) => apiCreateGaragePart(part).catch(console.error));
+          data.garageParts.forEach((part: GaragePart) => apiCreateGaragePart(part).catch(handleMutationError));
         }
         if (Array.isArray(data.toFixTasks)) {
           mergeByVehicle(data.toFixTasks, setToFixTasks);
-          data.toFixTasks.forEach((task: ToFixTask) => apiCreateToFixTask(task).catch(console.error));
+          data.toFixTasks.forEach((task: ToFixTask) => apiCreateToFixTask(task).catch(handleMutationError));
         }
         if (Array.isArray(data.tuningStages)) {
           mergeByVehicle(data.tuningStages, setTuningStages);
-          data.tuningStages.forEach((stage: TuningStage) => apiCreateTuningStage(stage).catch(console.error));
+          data.tuningStages.forEach((stage: TuningStage) => apiCreateTuningStage(stage).catch(handleMutationError));
         }
         if (Array.isArray(data.oemSchedules)) {
           setOemSchedules((prev) => [...prev.filter((item) => item.vehicleId !== targetVehicleId), ...data.oemSchedules]);
-          apiSaveOemScheduleItems(targetVehicleId, data.oemSchedules).catch(console.error);
+          apiSaveOemScheduleItems(targetVehicleId, data.oemSchedules).catch(handleMutationError);
         }
       }
     } catch (e) {
-      console.error(e);
+      handleMutationError(e);
     }
   };
 
   const handleDataReloaded = (data: FullGarageData) => {
+    setIsOnline(true);
+    setSyncStatus("synced");
+    setSyncErrorMessage(null);
     setVehicles(data.vehicles || []);
     setActiveVehicleId(data.vehicles?.[0]?.id || "empty-garage");
     setReminders(data.reminders || []);
@@ -713,43 +771,43 @@ export default function App() {
 
   const handleAddGaragePart = (part: GaragePart) => {
     setGarageParts((prev) => [part, ...prev]);
-    apiCreateGaragePart(part).catch(console.error);
+    apiCreateGaragePart(part).catch(handleMutationError);
   };
 
   const handleDeleteGaragePart = (id: string) => {
     setGarageParts((prev) => prev.filter((p) => p.id !== id));
-    apiDeleteGaragePart(id).catch(console.error);
+    apiDeleteGaragePart(id).catch(handleMutationError);
   };
 
   const handleUpdateGaragePart = (part: GaragePart) => {
     setGarageParts((prev) => prev.map((p) => (p.id === part.id ? part : p)));
     if (part.status === "installed") {
       apiInstallGaragePart(part.id).catch(() =>
-        apiUpdateGaragePart(part.id, part).catch(console.error)
+        apiUpdateGaragePart(part.id, part).catch(handleMutationError)
       );
     } else {
-      apiUpdateGaragePart(part.id, part).catch(console.error);
+      apiUpdateGaragePart(part.id, part).catch(handleMutationError);
     }
   };
 
   const handleCreateTuningStage = (stage: TuningStage) => {
     setTuningStages((prev) => [stage, ...prev]);
-    apiCreateTuningStage(stage).catch(console.error);
+    apiCreateTuningStage(stage).catch(handleMutationError);
   };
 
   const handleUpdateTuningStage = (stage: TuningStage) => {
     setTuningStages((prev) => prev.map((s) => (s.id === stage.id ? stage : s)));
-    apiUpdateTuningStage(stage.id, stage).catch(console.error);
+    apiUpdateTuningStage(stage.id, stage).catch(handleMutationError);
   };
 
   const handleDeleteTuningStage = (stageId: string) => {
     setTuningStages((prev) => prev.filter((s) => s.id !== stageId));
-    apiDeleteTuningStage(stageId).catch(console.error);
+    apiDeleteTuningStage(stageId).catch(handleMutationError);
   };
 
   const handleCreateToFixTask = (task: ToFixTask) => {
     setToFixTasks((prev) => [task, ...prev]);
-    apiCreateToFixTask(task).catch(console.error);
+    apiCreateToFixTask(task).catch(handleMutationError);
   };
 
   const handleToggleToFixStatus = (id: string, currentStatus: string) => {
@@ -758,9 +816,9 @@ export default function App() {
       prev.map((t) => (t.id === id ? { ...t, status: nextStatus as any } : t))
     );
     if (nextStatus === "completed") {
-      apiCompleteToFixTask(id).catch(console.error);
+      apiCompleteToFixTask(id).catch(handleMutationError);
     } else {
-      apiUpdateToFixTask(id, { status: nextStatus as ToFixTask["status"] }).catch(console.error);
+      apiUpdateToFixTask(id, { status: nextStatus as ToFixTask["status"] }).catch(handleMutationError);
     }
   };
 
@@ -915,7 +973,7 @@ export default function App() {
               const updatedIds = new Set(items.map((i) => i.id));
               return [...prev.filter((s) => !updatedIds.has(s.id)), ...items];
             });
-            apiSaveOemScheduleItems(currentVehicle.id, items).catch(console.error);
+            apiSaveOemScheduleItems(currentVehicle.id, items).catch(handleMutationError);
           }}
           onAddOemScheduleItem={(item) => {
             const nextItem = { ...item, vehicleId: currentVehicle.id };
@@ -926,7 +984,7 @@ export default function App() {
               nextItem,
             ];
             setOemSchedules((prev) => [...prev, nextItem]);
-            apiSaveOemScheduleItems(currentVehicle.id, itemsForVehicle).catch(console.error);
+            apiSaveOemScheduleItems(currentVehicle.id, itemsForVehicle).catch(handleMutationError);
           }}
           onAddGaragePart={handleAddGaragePart}
           onUpdateGaragePart={handleUpdateGaragePart}
@@ -934,37 +992,37 @@ export default function App() {
           onAddToFixTask={handleCreateToFixTask}
           onUpdateToFixTask={(task) => {
             setToFixTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
-            apiUpdateToFixTask(task.id, task).catch(console.error);
+            apiUpdateToFixTask(task.id, task).catch(handleMutationError);
           }}
           onCompleteToFixTask={(taskId) => {
             setToFixTasks((prev) =>
               prev.map((t) => (t.id === taskId ? { ...t, status: "completed" } : t))
             );
-            apiCompleteToFixTask(taskId).catch(console.error);
+            apiCompleteToFixTask(taskId).catch(handleMutationError);
           }}
           onAddTuningStage={(stage) => {
             setTuningStages((prev) => [stage, ...prev]);
-            apiCreateTuningStage(stage).catch(console.error);
+            apiCreateTuningStage(stage).catch(handleMutationError);
           }}
           onUpdateTuningStage={(stage) => {
             setTuningStages((prev) => prev.map((s) => (s.id === stage.id ? stage : s)));
-            apiUpdateTuningStage(stage.id, stage).catch(console.error);
+            apiUpdateTuningStage(stage.id, stage).catch(handleMutationError);
           }}
           onDeleteTuningStage={(stageId) => {
             setTuningStages((prev) => prev.filter((s) => s.id !== stageId));
-            apiDeleteTuningStage(stageId).catch(console.error);
+            apiDeleteTuningStage(stageId).catch(handleMutationError);
           }}
           onAddReminder={(reminder) => {
             setReminders((prev) => [reminder, ...prev]);
-            apiCreateReminder(reminder).catch(console.error);
+            apiCreateReminder(reminder).catch(handleMutationError);
           }}
           onUpdateReminder={(reminder) => {
             setReminders((prev) => prev.map((r) => (r.id === reminder.id ? reminder : r)));
-            apiUpdateReminder(reminder.id, reminder).catch(console.error);
+            apiUpdateReminder(reminder.id, reminder).catch(handleMutationError);
           }}
           onDeleteReminder={(reminderId) => {
             setReminders((prev) => prev.filter((r) => r.id !== reminderId));
-            apiDeleteReminder(reminderId).catch(console.error);
+            apiDeleteReminder(reminderId).catch(handleMutationError);
           }}
           onImportBackup={handleImportBackup}
           onExportBackup={() => {
@@ -1054,7 +1112,7 @@ export default function App() {
           syncStatus={syncStatus}
           onDeleteFuelRecord={(id) => {
             setFuelRecords((prev) => prev.filter((record) => record.id !== id));
-            apiDeleteFuelRecord(id).catch(console.error);
+            apiDeleteFuelRecord(id).catch(handleMutationError);
           }}
           onLogout={() => {
             handleLogout();
@@ -1206,11 +1264,17 @@ export default function App() {
                   ? "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
                   : "bg-[#17202E] hover:bg-[#1e293b] text-slate-200 border-[#243044]"
               }`}
-              title="Статус сервера базы данных и резервное копирование"
+              title={
+                syncErrorMessage
+                  ? `Ошибка синхронизации: ${syncErrorMessage}`
+                  : "Статус сервера базы данных и резервное копирование"
+              }
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  isOnline
+                  syncStatus === "error"
+                    ? "bg-red-500"
+                    : isOnline
                     ? "bg-emerald-500 shadow-sm shadow-emerald-500/80 animate-pulse"
                     : "bg-amber-500"
                 }`}
@@ -1407,11 +1471,11 @@ export default function App() {
                 setOemSchedules((prev) => [...prev, item]);
                 // Сохраняем на сервер полный список для текущего авто,
                 // чтобы добавленный пункт не пропал после перезагрузки.
-                apiSaveOemScheduleItems(currentVehicle.id, [...oemSchedules.filter((s) => s.vehicleId === currentVehicle.id), item]).catch(console.error);
+                apiSaveOemScheduleItems(currentVehicle.id, [...oemSchedules.filter((s) => s.vehicleId === currentVehicle.id), item]).catch(handleMutationError);
               }}
               onUpdateSchedules={(items) => {
                 setOemSchedules(items);
-                apiSaveOemScheduleItems(currentVehicle.id, items.filter((s) => s.vehicleId === currentVehicle.id)).catch(console.error);
+                apiSaveOemScheduleItems(currentVehicle.id, items.filter((s) => s.vehicleId === currentVehicle.id)).catch(handleMutationError);
               }}
             />
           )}
@@ -1436,19 +1500,19 @@ export default function App() {
               toFixTasks={toFixTasks}
               onAddPart={(part) => {
                 setGarageParts((prev) => [part, ...prev]);
-                apiCreateGaragePart(part).catch(console.error);
+                apiCreateGaragePart(part).catch(handleMutationError);
               }}
               onUpdatePartStatus={(partId, status) => {
                 setGarageParts((prev) =>
                   prev.map((p) => (p.id === partId ? { ...p, status } : p))
                 );
                 if (status === "installed") {
-                  apiInstallGaragePart(partId).catch(console.error);
+                  apiInstallGaragePart(partId).catch(handleMutationError);
                 }
               }}
               onAddTask={(task) => {
                 setToFixTasks((prev) => [task, ...prev]);
-                apiCreateToFixTask(task).catch(console.error);
+                apiCreateToFixTask(task).catch(handleMutationError);
               }}
               onCompleteTask={(taskId) => {
                 const task = toFixTasks.find((t) => t.id === taskId);
@@ -1565,7 +1629,7 @@ export default function App() {
       </nav>
 
       {/* Modals */}
-      {renderAppModals()}
+      <Suspense fallback={null}>{renderAppModals()}</Suspense>
     </div>
   );
 }

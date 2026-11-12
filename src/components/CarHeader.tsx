@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import {
   Car,
   Bell,
@@ -19,9 +19,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Vehicle, ToFixTask, OemScheduleItem } from "../types";
-import { VehicleStage } from "./VehicleStage";
 import { DialogFrame } from "./DialogFrame";
 import { LicensePlateBadge } from "./LicensePlateBadge";
+
+const VehicleStage = lazy(() =>
+  import("./VehicleStage").then(({ VehicleStage }) => ({ default: VehicleStage }))
+);
 interface CarHeaderProps {
   vehicle: Vehicle;
   allVehicles: Vehicle[];
@@ -625,8 +628,10 @@ export const CarHeader: React.FC<CarHeaderProps> = ({
 
         {/* Right Column: Built-in body template */}
         <div className="lg:col-span-5 w-full min-w-0">
-          <VehicleStage key={`${vehicle.id}-${vehicle.photoUrl || ''}`} vehicle={vehicle}
-            onColorChange={onUpdateColor} onModelChange={onUpdateModel3dUrl} />
+          <Suspense fallback={<div className="vehicle-stage min-h-[220px]" aria-label="Загрузка модели автомобиля" />}>
+            <VehicleStage key={`${vehicle.id}-${vehicle.photoUrl || ''}`} vehicle={vehicle}
+              onColorChange={onUpdateColor} onModelChange={onUpdateModel3dUrl} />
+          </Suspense>
         </div>
       </div>
 

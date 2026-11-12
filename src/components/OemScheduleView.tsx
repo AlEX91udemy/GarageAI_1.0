@@ -49,7 +49,13 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
   const [newCategory, setNewCategory] = useState<MaintenanceCategory>("ТО и замена жидкостей");
   const [newDescription, setNewDescription] = useState("");
 
-  const vehicleSchedules = schedules.filter((s) => s.vehicleId === vehicle.id);
+  const vehicleSchedules = schedules.filter((s) => {
+    const intervalKm = Number(s.intervalKm);
+    const intervalMonths = Number(s.intervalMonths);
+    return s.vehicleId === vehicle.id
+      && Number.isFinite(intervalKm) && intervalKm > 0
+      && Number.isFinite(intervalMonths) && intervalMonths > 0;
+  });
 
   // Calculate status for each item
   const scheduleStatuses = vehicleSchedules.map((item) => {
@@ -99,24 +105,42 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
       }
 
       const data = await response.json();
-      if (data.items && Array.isArray(data.items)) {
-        const generatedItems: OemScheduleItem[] = data.items.map(
-          (aiItem: any, idx: number) => ({
+      if (!data || !Array.isArray(data.items)) {
+        throw new Error("Сервис AI вернул некорректный формат регламента");
+      }
+
+      const generatedItems: OemScheduleItem[] = data.items
+        .slice(0, 100)
+        .flatMap((aiItem: unknown, idx: number) => {
+          if (!aiItem || typeof aiItem !== "object") return [];
+          const item = aiItem as Record<string, unknown>;
+          const title = typeof item.title === "string" ? item.title.trim() : "";
+          const intervalKm = Number(item.intervalKm);
+          const intervalMonths = Number(item.intervalMonths);
+          if (!title || !Number.isFinite(intervalKm) || intervalKm <= 0 || !Number.isFinite(intervalMonths) || intervalMonths <= 0) {
+            return [];
+          }
+          return [{
             id: `oem-${vehicle.id}-${Date.now()}-${idx}`,
             vehicleId: vehicle.id,
-            title: aiItem.title,
-            category: (aiItem.category as MaintenanceCategory) || "ТО и замена жидкостей",
-            intervalKm: aiItem.intervalKm || 10000,
-            intervalMonths: aiItem.intervalMonths || 12,
-            lastDoneKm: Math.max(0, vehicle.currentMileage - (aiItem.intervalKm / 2)),
-            lastDoneDate: "2025-10-01",
-            notes: aiItem.notes || "Сгенерировано по регламенту завода",
-          })
-        );
+            title,
+            category: typeof item.category === "string" ? item.category as MaintenanceCategory : "ТО и замена жидкостей",
+            intervalKm: Math.round(intervalKm),
+            intervalMonths: Math.round(intervalMonths),
+            lastDoneKm: Math.max(0, vehicle.currentMileage - Math.round(intervalKm / 2)),
+            lastDoneDate: new Date().toISOString().split("T")[0],
+            notes: typeof item.notes === "string" && item.notes.trim()
+              ? item.notes.trim()
+              : "Сгенерировано по регламенту завода",
+          }];
+        });
 
-        // Replace or merge with existing
-        onUpdateSchedules(generatedItems);
+      if (generatedItems.length === 0) {
+        throw new Error("Сервис AI не вернул ни одного корректного пункта регламента");
       }
+
+      // Replace or merge with existing
+      onUpdateSchedules(generatedItems);
     } catch (err) {
       console.error(err);
       setAiError("Не удалось загрузить рекомендации OEM. Проверьте подключение к серверу.");
@@ -127,15 +151,20 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
 
   const handleAddNewItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    const intervalKm = Number(newIntervalKm);
+    const intervalMonths = Number(newIntervalMonths);
+    if (!newTitle.trim() || !Number.isFinite(intervalKm) || intervalKm <= 0 || intervalKm > 1_000_000 || !Number.isFinite(intervalMonths) || intervalMonths <= 0 || intervalMonths > 240) {
+      setAiError("Укажите корректные интервалы: километраж больше 0 (до 1 000 000 км), срок от 1 до 240 месяцев.");
+      return;
+    }
 
     const newItem: OemScheduleItem = {
       id: `oem-${Date.now()}`,
       vehicleId: vehicle.id,
       title: newTitle.trim(),
       category: newCategory,
-      intervalKm: Number(newIntervalKm),
-      intervalMonths: Number(newIntervalMonths),
+      intervalKm: Math.round(intervalKm),
+      intervalMonths: Math.round(intervalMonths),
       lastDoneKm: vehicle.currentMileage,
       lastDoneDate: new Date().toISOString().split("T")[0],
       notes: newDescription.trim() || undefined,

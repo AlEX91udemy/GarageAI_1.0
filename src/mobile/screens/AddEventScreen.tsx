@@ -135,6 +135,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   const [activeLocationSuggestion, setActiveLocationSuggestion] = useState(0);
   const [isLocationTypeSelected, setIsLocationTypeSelected] = useState(() => Boolean(prefilledCenter));
   const [notes, setNotes] = useState(initialPrefilledData?.description || "");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Part-specific inputs for "Добавить запчасть"
   const [partName, setPartName] = useState(initialPrefilledData?.name || "");
@@ -315,6 +316,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
   };
 
   const handleSave = () => {
+    setSaveError(null);
     const enteredMileage = parseFloat(mileage);
     const numMileage = Number.isFinite(enteredMileage) && enteredMileage >= 0
       ? Math.round(toKilometers(enteredMileage))
@@ -328,6 +330,10 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
       const enteredVolume = Number.isFinite(parsedLiters) && parsedLiters > 0 ? parsedLiters : 0;
       const numLiters = toLiters(enteredVolume);
       const enteredPrice = Number.isFinite(enteredPricePerLiter) && enteredPricePerLiter >= 0 ? enteredPricePerLiter : 0;
+      if (enteredVolume <= 0) {
+        setSaveError("Укажите объём заправки больше нуля.");
+        return;
+      }
       const totalCost = fuelCostMode === "per_liter"
         ? (Number.isFinite(enteredPricePerLiter) && enteredPricePerLiter >= 0
           ? enteredPrice * enteredVolume
@@ -441,6 +447,12 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
       </div>
 
       <div className="p-4 space-y-4">
+        {saveError && (
+          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold text-red-700">
+            {saveError}
+          </div>
+        )}
+
         {/* Scanned Badge Notification */}
         {scannedBadge && (
           <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between text-xs shadow-xs animate-fade-in">

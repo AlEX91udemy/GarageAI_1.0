@@ -121,19 +121,18 @@ describe("HTTP tenant isolation", () => {
     if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("reports provider readiness without mislabeling Vertex AI as an API key", async () => {
+  it("keeps the public health response free of configuration and tenant details", async () => {
     const response = await fetch(`${baseUrl}/api/health`);
     expect(response.status).toBe(200);
-    const health = await response.json() as {
-      hasApiKey: boolean;
-      hasAiConfigured: boolean;
-      hasGeminiConfigured: boolean;
-      vertexAiEnabled: boolean;
-    };
-    expect(health.hasApiKey).toBe(false);
-    expect(health.hasAiConfigured).toBe(false);
-    expect(health.hasGeminiConfigured).toBe(false);
-    expect(health.vertexAiEnabled).toBe(false);
+    const health = await response.json() as Record<string, unknown>;
+    expect(health).toEqual(expect.objectContaining({ status: "ok" }));
+    expect(health).not.toHaveProperty("storageProvider");
+    expect(health).not.toHaveProperty("hasApiKey");
+    expect(health).not.toHaveProperty("hasAiConfigured");
+    expect(health).not.toHaveProperty("hasGeminiConfigured");
+    expect(health).not.toHaveProperty("vertexAiEnabled");
+    expect(health).not.toHaveProperty("vehiclesCount");
+    expect(health).not.toHaveProperty("lastUpdated");
   });
 
   it("rejects anonymous access to private garage routes", async () => {

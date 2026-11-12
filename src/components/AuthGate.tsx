@@ -23,6 +23,10 @@ export const AuthGate: React.FC<
         setSession(restored);
         if (restored) onAuthenticated?.();
       })
+      .catch(() => {
+        // A missing API is a valid guest/offline state during local startup.
+        setSession(null);
+      })
       .finally(() => setChecking(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

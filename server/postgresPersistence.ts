@@ -21,6 +21,9 @@ export class ConcurrentGarageUpdateError extends Error {
 
 export interface PostgresPersistenceOptions {
   connectionString: string;
+  /** Optional Cloud SQL socket or host override for managed runtimes. */
+  host?: string;
+  port?: number;
   maxConnections?: number;
   ssl?: "require" | false;
   migrationsDirectory?: string;
@@ -45,6 +48,8 @@ export class PostgresPersistence {
     }
     this.sql = postgres(options.connectionString, {
       max: Math.max(1, Math.min(options.maxConnections ?? 5, 20)),
+      ...(options.host?.trim() ? { host: options.host.trim() } : {}),
+      ...(options.port && Number.isInteger(options.port) ? { port: options.port } : {}),
       connect_timeout: 10,
       idle_timeout: 20,
       max_lifetime: 60 * 30,

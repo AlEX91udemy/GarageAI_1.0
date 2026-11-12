@@ -1,6 +1,6 @@
 # GarageAI Cloud Run deployment runbook
 
-Status: **deployment prepared, not executed**. PostgreSQL persistence and the importer are merged, but no Google Cloud resource is claimed to have been created and no real user data has been migrated.
+Status: **canary deployment executed on 2026-11-08; legacy import and restore rehearsal completed on 2026-11-11**. The Cloudflare Worker now proxies to `garageai-web-canary` in project `garage-ai-512223`. The canary uses Cloud SQL/Secret Manager. PostgreSQL schema, legacy import, backup, restore rehearsal, tenant isolation, auth, CSRF, durable CRUD, restart, logout, concurrency, and session lifecycle checks have passed. Live email-code smoke and the observation window remain open release gates.
 
 ## Production blockers
 
@@ -103,6 +103,7 @@ Do this only after the JSON store/session persistence blockers are resolved and 
 4. On the web service, configure the same Secret Manager secret `agents-api-token` used by the agent service, plus the agent service URL/audience. Keep the service public only if the application’s own login/session controls and production database are ready. Do not disable Cloud Run IAM on the agent service.
 
 Environment settings:
+- `ALLOWED_ORIGINS`: include every browser origin that can reach the API through the Worker, including `https://garageai.site`, `https://www.garageai.site`, and `https://garageai-1-0.sambur91.workers.dev`. The Worker forwards the browser `Origin` header to Cloud Run, so omitting the Worker hostname causes legitimate state-changing requests to receive `403`.
 - `AGENTS_SERVICE_URL`: exact Cloud Run service URL returned by `gcloud run services describe`.
 - `AGENTS_SERVICE_AUDIENCE`: normally the same service URL; use a custom value only when Cloud Run is configured for that audience.
 - `AGENTS_API_TOKEN`: same high-entropy secret in both services, stored in Secret Manager. Never commit or send it to the browser.

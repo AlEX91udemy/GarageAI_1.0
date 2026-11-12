@@ -212,10 +212,31 @@ const StsScanner: React.FC<StsScannerProps> = ({ onClose, onApply }) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const chooseFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Выберите файл изображения (JPG, PNG или WebP).");
+      return;
+    }
+    if (file.size > 9 * 1024 * 1024) {
+      setError("Фото слишком большое. Максимальный размер — 9 МБ.");
+      return;
+    }
+    setError(null);
     const reader = new FileReader();
-    reader.onload = () => { setImage(String(reader.result)); setResult(null); setError(null); };
+    reader.onload = () => {
+      const value = typeof reader.result === "string" ? reader.result : "";
+      if (!value) {
+        setError("Не удалось прочитать изображение. Попробуйте выбрать фото ещё раз.");
+        return;
+      }
+      setImage(value);
+      setResult(null);
+    };
+    reader.onerror = () => setError("Не удалось прочитать файл. Попробуйте другое фото.");
+    reader.onabort = () => setError("Чтение фотографии было прервано. Попробуйте ещё раз.");
     reader.readAsDataURL(file);
   };
 

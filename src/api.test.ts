@@ -1,31 +1,41 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchGarageData,
+  importDatabaseBackup,
   runGarageAiAgents,
+  resetDatabase,
   type GarageAiAgentName,
-  getAdminToken,
-  setAdminToken,
 } from "./api";
 
-describe("admin session", () => {
+describe("account-scoped backup APIs", () => {
   afterEach(() => {
-    sessionStorage.clear();
-    localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
-  it("keeps the signed admin token only for the current browser session", () => {
-    setAdminToken("signed-token");
+  it("resets only through the authenticated account endpoint", async () => {
+    const data = {
+      vehicles: [], reminders: [], serviceRecords: [], fuelRecords: [], oemSchedules: [],
+      garageParts: [], toFixTasks: [], tuningStages: [], lastUpdated: "2026-01-01T00:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
 
-    expect(getAdminToken()).toBe("signed-token");
-    expect(sessionStorage.getItem("garagehub_admin_token")).toBe("signed-token");
-    expect(localStorage.getItem("garagehub_admin_token")).toBeNull();
+    await expect(resetDatabase()).resolves.toEqual(data);
+    expect(fetchMock).toHaveBeenCalledWith("/api/backup/reset", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
   });
 
-  it("clears the admin token", () => {
-    setAdminToken("signed-token");
-    setAdminToken(null);
+  it("imports the supplied account backup without an admin header", async () => {
+    const backup = {
+      vehicles: [], reminders: [], serviceRecords: [], fuelRecords: [], oemSchedules: [],
+      garageParts: [], toFixTasks: [], tuningStages: [], lastUpdated: "2026-01-01T00:00:00.000Z",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
 
-    expect(getAdminToken()).toBeNull();
+    await expect(importDatabaseBackup(backup)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/backup/import", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
   });
 });
 

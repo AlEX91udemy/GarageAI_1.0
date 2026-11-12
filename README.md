@@ -112,12 +112,14 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 ### Публикация frontend через Cloudflare
 
-#### Статус на 28.10.2026
+#### Статус на 08.11.2026
 
 - Email-code authentication реализована в ветке `codex/email-code-authentication` и проверена локальными тестами. Для production нужны `RESEND_API_KEY`, `EMAIL_FROM` и отдельный `EMAIL_CODE_SECRET`; секреты не добавляются во frontend или Cloudflare Assets.
-- Cloudflare Worker `garageai-1-0` доступен по адресу `https://garageai-1-0.sambur91.workers.dev/`. После ручной публикации обязательно проверить `/api/health` и авторизацию.
-- Google Cloud Run не считается опубликованным, пока не подтверждены Cloud SQL, миграция/импорт, backup/restore, IAM/OIDC и production smoke tests. Нельзя обходить этот gate через `GARAGE_ALLOW_EPHEMERAL_STORAGE=true`.
-- Целевой Google Cloud project нужно указывать явно. В текущем окружении обнаружены `garageai-512320` и историческая ссылка на `garage-ai-512223`; перед изменением IAM или ресурсов сверяйте проект командой `gcloud config get-value project`.
+- Cloudflare Worker `garageai-1-0` доступен по адресу `https://garageai-1-0.sambur91.workers.dev/` и проксирует API на canary Cloud Run `garageai-web-canary` в проекте `garage-ai-512223`. `/api/health`, регистрация, защищённые маршруты и tenant isolation проверены 08.11.2026.
+- Cloud SQL schema version 2, Secret Manager, dedicated runtime service account и backup/PITR настроены; создан pre-canary backup. Legacy import не выполнен, потому что в checkout отсутствует `data/garage_store.json`, поэтому база остаётся пустой.
+- Email-code login требует production-секреты `RESEND_API_KEY`, `EMAIL_FROM` и `EMAIL_CODE_SECRET`. Полный backup/restore в отдельную базу и длительное production-наблюдение ещё не завершены.
+- Предыдущий Cloud Run сервис `garage-ai` сохранён для rollback. Нельзя обходить production gate через `GARAGE_ALLOW_EPHEMERAL_STORAGE=true`.
+- Подробный журнал текущего развёртывания: [`docs/cloud-deployment-status-2026-11-08.md`](docs/cloud-deployment-status-2026-11-08.md).
 
 #### Email-code authentication
 
@@ -198,7 +200,7 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 #### 🔴 Критические исправления (Backend & Security)
 *   **Конфигурация Gemini:** Убраны захардкоженные имена моделей в `server.ts`. Теперь версия модели управляется через переменную окружения `GEMINI_MODEL` в `.env`.
-*   **Безопасность UI:** Удалена кнопка-подсказка с демо-паролем администратора (`admin123`) из `DataSyncBackupModal.tsx`. Мастер-ключ задаётся только на сервере.
+*   **Резервное копирование:** Экспорт, импорт и сброс в `DataSyncBackupModal.tsx` работают в рамках текущего авторизованного аккаунта. Сервер проверяет сессию и изоляцию владельца для каждой операции.
 *   **Синхронизация данных:** Исправлена потеря данных при перезагрузке страницы.
     *   Добавлена загрузка этапов тюнинга (`tuningStages`) с сервера.
     *   Настроена отправка обновлений регламента ТО (OEM Schedule) на бэкенд.
