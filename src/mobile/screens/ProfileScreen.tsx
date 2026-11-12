@@ -69,11 +69,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [authBusy, setAuthBusy] = React.useState(false);
 
   React.useEffect(() => {
-    restoreSession().then((session) => {
-      setIsAuthenticated(Boolean(session));
-      setSessionUsername(session?.username ?? null);
-      setSessionEmail(session?.email ?? null);
-    });
+    restoreSession()
+      .then((session) => {
+        setIsAuthenticated(Boolean(session));
+        setSessionUsername(session?.username ?? null);
+        setSessionEmail(session?.email ?? null);
+      })
+      .catch(() => {
+        // Treat an unavailable API as the normal guest/offline state.
+        setIsAuthenticated(false);
+        setSessionUsername(null);
+        setSessionEmail(null);
+      });
   }, []);
 
   const totalMileage = vehicles.reduce((sum, v) => sum + v.currentMileage, 0);
@@ -114,7 +121,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       setEmailMode(false);
       onAuthSuccess?.();
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Ошибка авторизации");
+      const message = error instanceof Error ? error.message : "Ошибка авторизации";
+      setAuthError(
+        message === "Пользователь с таким логином уже существует"
+          ? "Этот логин уже занят. Выберите другой."
+          : message
+      );
     } finally {
       setAuthBusy(false);
     }
@@ -170,7 +182,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => { setAuthMode("login"); setEmailMode(true); setAuthError(null); setEmailCodeRequested(false); }}
+                  onClick={() => { setAuthMode("login"); setEmailMode(false); setAuthError(null); setEmailCodeRequested(false); }}
                   className="rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover"
                 >
                   <LogIn className="mr-1 inline h-4 w-4" />
@@ -220,32 +232,58 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       />
                     )}
                   </>
-                ) : <input
-                  value={authUsername}
-                  onChange={(event) => setAuthUsername(event.target.value)}
-                  placeholder="Логин"
-                  autoComplete="username"
-                  required
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />}
-                {!emailMode && authMode === "register" && <input
-                  type="email"
-                  value={authEmail}
-                  onChange={(event) => setAuthEmail(event.target.value)}
-                  placeholder="Email для входа по коду (необязательно)"
-                  autoComplete="email"
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />}
-                {!emailMode && <input
-                  type="password"
-                  value={authPassword}
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  placeholder="Пароль"
-                  autoComplete={authMode === "login" ? "current-password" : "new-password"}
-                  minLength={8}
-                  required
-                  className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
-                />}
+                ) : authMode === "register" ? (
+                  <>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                      placeholder="Email"
+                      autoComplete="email"
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(event) => setAuthPassword(event.target.value)}
+                      placeholder="Пароль"
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    <input
+                      value={authUsername}
+                      onChange={(event) => setAuthUsername(event.target.value)}
+                      placeholder="Логин"
+                      autoComplete="username"
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <input
+                      value={authUsername}
+                      onChange={(event) => setAuthUsername(event.target.value)}
+                      placeholder="Логин"
+                      autoComplete="username"
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(event) => setAuthPassword(event.target.value)}
+                      placeholder="Пароль"
+                      autoComplete="current-password"
+                      minLength={8}
+                      required
+                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                  </>
+                )}
                 {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
                   {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : emailMode ? (emailCodeRequested ? "Войти" : "Отправить код") : authMode === "login" ? "Войти" : "Создать аккаунт"}

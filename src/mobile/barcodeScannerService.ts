@@ -727,8 +727,8 @@ export async function checkPartAvailabilityAPI(
       }
       return data;
     }
-  } catch (err) {
-    console.warn("API check availability error, using offline local fallback:", err);
+  } catch {
+    // Offline mode is expected when the API is unavailable; use the local catalog fallback.
   }
 
   // 3. Fallback simulation using local data + catalog

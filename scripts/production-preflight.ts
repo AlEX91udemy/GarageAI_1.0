@@ -11,6 +11,8 @@ if (process.env.GARAGE_POSTGRES_READY === "true") {
 
 const db = postgres(connectionString, {
   max: 1,
+  ...(process.env.DATABASE_HOST?.trim() ? { host: process.env.DATABASE_HOST.trim() } : {}),
+  ...(Number.isInteger(Number(process.env.DATABASE_PORT)) ? { port: Number(process.env.DATABASE_PORT) } : {}),
   prepare: false,
   ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
 });

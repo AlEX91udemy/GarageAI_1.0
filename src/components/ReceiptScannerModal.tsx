@@ -182,30 +182,37 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const handleApplyToService = () => {
     if (!scanResult) return;
 
-    const parts = (scanResult.parts || []).map((p: any, idx: number) => ({
+    const parts = (Array.isArray(scanResult.parts) ? scanResult.parts : []).map((p: any, idx: number) => ({
       id: "scan-p-" + idx + "-" + Date.now(),
-      name: p.name || "Деталь",
-      brand: p.brand || "",
-      partNumber: p.partNumber || "",
-      quantity: p.quantity || 1,
-      unitPrice: p.price || 0,
+      name: typeof p?.name === "string" && p.name.trim() ? p.name.trim() : "Деталь",
+      brand: typeof p?.brand === "string" ? p.brand.trim() : "",
+      partNumber: typeof p?.partNumber === "string" ? p.partNumber.trim() : "",
+      quantity: Number.isFinite(Number(p?.quantity)) && Number(p.quantity) > 0 ? Number(p.quantity) : 1,
+      unitPrice: Number.isFinite(Number(p?.price)) && Number(p.price) >= 0 ? Number(p.price) : 0,
     }));
 
-    const laborCost = (scanResult.works || []).reduce(
-      (sum: number, w: any) => sum + (w.cost || 0),
+    const laborCost = (Array.isArray(scanResult.works) ? scanResult.works : []).reduce(
+      (sum: number, w: any) => sum + (Number.isFinite(Number(w?.cost)) && Number(w.cost) >= 0 ? Number(w.cost) : 0),
       0
     );
+    const calculatedTotal = laborCost + parts.reduce((sum: number, part: { unitPrice: number; quantity: number }) => sum + part.unitPrice * part.quantity, 0);
+    const totalCost = Number.isFinite(Number(scanResult.totalAmount)) && Number(scanResult.totalAmount) >= 0
+      ? Number(scanResult.totalAmount)
+      : calculatedTotal;
+    const date = typeof scanResult.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(scanResult.date) && !Number.isNaN(Date.parse(scanResult.date))
+      ? scanResult.date
+      : new Date().toISOString().split("T")[0];
 
     const recordData: Partial<ServiceRecord> = {
-      date: scanResult.date || new Date().toISOString().split("T")[0],
+      date,
       mileage: vehicle.currentMileage,
       category: "ТО и замена жидкостей",
       title: scanResult.description || `Обслуживание в ${scanResult.merchantName || "автосервисе"}`,
       description: `Чек от ${scanResult.merchantName || "сервиса"}. ` +
-        (scanResult.works?.map((w: any) => w.description).join(", ") || ""),
+        (Array.isArray(scanResult.works) ? scanResult.works.map((w: any) => typeof w?.description === "string" ? w.description.trim() : "").filter(Boolean).join(", ") : ""),
       laborCost: laborCost,
       parts: parts,
-      totalCost: scanResult.totalAmount || (laborCost + parts.reduce((s: number, p: any) => s + p.unitPrice * p.quantity, 0)),
+      totalCost,
       serviceCenter: scanResult.merchantName || "Автосервис",
       receiptImages: imagePreview ? [imagePreview] : [],
       notes: scanResult.notes || "Распознано через AI-сканер чеков Garage AI.",
@@ -218,12 +225,23 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const handleApplyToFuel = () => {
     if (!scanResult) return;
 
+    const liters = Number(scanResult.fuelDetails?.liters);
+    const pricePerLiter = Number(scanResult.fuelDetails?.pricePerLiter);
+    const totalCost = Number(scanResult.totalAmount);
+    if (!Number.isFinite(liters) || liters <= 0 || !Number.isFinite(pricePerLiter) || pricePerLiter < 0 || !Number.isFinite(totalCost) || totalCost < 0) {
+      setScanError("Не удалось распознать объём, цену за литр или итоговую сумму. Проверьте чек и повторите сканирование.");
+      return;
+    }
+    const date = typeof scanResult.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(scanResult.date) && !Number.isNaN(Date.parse(scanResult.date))
+      ? scanResult.date
+      : new Date().toISOString().split("T")[0];
+
     const fuelData: Partial<FuelRecord> = {
-      date: scanResult.date || new Date().toISOString().split("T")[0],
+      date,
       mileage: vehicle.currentMileage,
-      liters: scanResult.fuelDetails?.liters || 50,
-      pricePerLiter: scanResult.fuelDetails?.pricePerLiter || 60,
-      totalCost: scanResult.totalAmount || 3000,
+      liters,
+      pricePerLiter,
+      totalCost,
       fuelType: scanResult.fuelDetails?.fuelType || "АИ-95",
       isFullTank: true,
       station: scanResult.merchantName || "АЗС",

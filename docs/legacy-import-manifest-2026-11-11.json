@@ -1,0 +1,28 @@
+{
+  "capturedAtUtc": "2026-11-11T20:35:19.6118703Z",
+  "sourceDirectory": "data",
+  "provenance": "local checkout bundle, source environment not independently confirmed",
+  "usersCount": 18,
+  "garageMapEntries": 1,
+  "sessionsCount": 0,
+  "files": [
+    {
+      "file": "data/users.json",
+      "sha256": "FD5E1C42A8AF6331305ED8DB06B83627FBFDC8165FDFAD5D5B05247401A391AF",
+      "bytes": 5455,
+      "lastWriteTimeUtc": "2026-11-09T06:31:49.3090854Z"
+    },
+    {
+      "file": "data/garage_store.json",
+      "sha256": "13D43D29E034BEAE7CFA1003ED0B06070C57661B052D30AE26BA05B335BB7FAD",
+      "bytes": 342,
+      "lastWriteTimeUtc": "2026-11-09T06:31:49.3100900Z"
+    },
+    {
+      "file": "data/sessions.json",
+      "sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945",
+      "bytes": 2,
+      "lastWriteTimeUtc": "2026-11-09T09:44:19.5265466Z"
+    }
+  ]
+}

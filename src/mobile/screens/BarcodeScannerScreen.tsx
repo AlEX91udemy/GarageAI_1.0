@@ -291,8 +291,19 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
 
   // Handle Photo / Gallery Upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCameraError("Выберите изображение с кодом (JPG, PNG или WebP).");
+      return;
+    }
+    if (file.size > 9 * 1024 * 1024) {
+      setCameraError("Фото слишком большое. Максимальный размер — 9 МБ.");
+      return;
+    }
+    setCameraError(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -323,8 +334,11 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
           tryJsQR(ctx, canvas.width, canvas.height);
         }
       };
+      img.onerror = () => setCameraError("Не удалось открыть изображение. Попробуйте другое фото.");
       img.src = event.target?.result as string;
     };
+    reader.onerror = () => setCameraError("Не удалось прочитать файл. Попробуйте другое фото.");
+    reader.onabort = () => setCameraError("Чтение фотографии было прервано. Попробуйте ещё раз.");
     reader.readAsDataURL(file);
 
     function tryJsQR(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -334,10 +348,10 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         if (code && code.data) {
           handleDetectedCode(code.data);
         } else {
-          handleDetectedCode("4011558296303");
+          setCameraError("Штрихкод или QR-код не найден на изображении. Попробуйте другое фото.");
         }
       } catch {
-        handleDetectedCode("4011558296303");
+        setCameraError("Не удалось обработать изображение. Попробуйте другое фото.");
       }
     }
   };
