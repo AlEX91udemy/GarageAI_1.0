@@ -3,11 +3,8 @@ import {
   Car,
   ChevronDown,
   Layers,
-  Sparkles,
   Link as LinkIcon,
-  HelpCircle,
-  RotateCcw,
-  Check,
+  AlertTriangle,
   Zap,
 } from "lucide-react";
 import {
@@ -272,12 +269,21 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           <span>Каталог автомобиля: Марка ➔ Модель ➔ Поколение</span>
         </div>
         {matchedGen && (
-          <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
-            <Check className="w-3 h-3 text-emerald-600" />
-            Поколение выбрано из каталога
+          <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 text-amber-700" />
+            Справочный вариант — нужна сверка
           </span>
         )}
       </div>
+
+      {matchedGen && (
+        <div role="status" className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-950">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" aria-hidden="true" />
+          <span>
+            Данные справочника служат ориентиром. Перед заказом запчастей или работ подтвердите двигатель, КПП, привод и год выпуска по VIN и официальной документации.
+          </span>
+        </div>
+      )}
 
       {/* Row 1: Linked Make & Model */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -507,7 +513,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           <div className="text-neutral-500 font-medium mb-1.5 flex items-center justify-between">
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3 text-amber-500" />
-              Штатные параметры поколения ({matchedGen.name}):
+              Справочные варианты для поколения ({matchedGen.name}):
             </span>
             <span className="text-[10px] text-neutral-400">кликните для быстрой вставки</span>
           </div>
