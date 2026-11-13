@@ -258,4 +258,5 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 *   **Линтинг/Типизация:** `npm run lint` (TypeScript)
 *   **Тесты:** `npm test` (Vitest)
 *   **Production build:** `npm run build`
+*   **Post-deploy health contract:** после release задайте `GARAGE_PUBLIC_URL=https://<ваш-домен>` и запустите `npm run release:verify-health`. Команда принимает только HTTPS и проверяет, что публичный health endpoint не раскрывает конфигурацию или tenant-данные.
 
