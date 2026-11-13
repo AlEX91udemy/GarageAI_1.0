@@ -14,6 +14,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run --environment happy-dom",
     "catalog:audit": "tsx scripts/catalog-audit.ts",
+    "config:check": "node scripts/check-env-example.mjs",
     "revoke:sessions": "tsx scripts/revoke-all-sessions.ts",
     "preflight:production": "tsx scripts/production-preflight.ts"
   },
