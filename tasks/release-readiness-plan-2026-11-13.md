@@ -12,9 +12,9 @@
 - [x] Добавить post-deploy health contract (`npm run release:verify-health`), который не допускает публичную выдачу конфигурационных/tenant-полей.
 - [ ] Подтвердить полный набор тестов в CI для точного commit SHA текущей ветки.
 
-### CI evidence — product commit `0673521`
+### CI evidence — product commit `e3fa304`
 
-- GitHub Actions run `43423492552`: Node.js checks (включая deployment-конфигурацию, PostgreSQL, HTTP integration, Docker и Cloudflare dry run) и Python dependency security audit прошли.
+- GitHub Actions run `43425837718`: Node.js checks (включая deployment-конфигурацию, PostgreSQL, HTTP integration, Docker, Cloudflare dry run и public-health gate) и Python dependency security audit прошли.
 - Gitleaks заблокировал run: шесть исторических `tokenHash`/`csrfSecret` в `data/sessions.json` из коммитов `433a567` и `b24b8e5`. Эти значения не являются ложными срабатываниями и не должны добавляться в allowlist.
 - Workers Builds в Cloudflare также завершился ошибкой; локальный и CI dry run прошли, а причина требует просмотра лога в аккаунте Cloudflare.
 - 13.11.2026 read-only проверка публичного Worker вернула устаревший контракт с `storageProvider: "postgresql"`; текущая ветка это поле не выдаёт. Внешний Worker необходимо обновить проверенным SHA и затем выполнить `npm run release:verify-health`.
