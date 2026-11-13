@@ -125,6 +125,30 @@ export async function logout(): Promise<void> {
   setActiveUsername(undefined);
 }
 
+export async function deleteAccount(password: string): Promise<void> {
+  const username = getActiveUsername();
+  const res = await authenticatedFetch("/api/auth/account", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось удалить аккаунт");
+  try {
+    if (username) {
+      const prefix = `garagehub:${username}:`;
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(prefix)) localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage cleanup is best effort; the deleted server account cannot be restored.
+  }
+  csrfToken = null;
+  authSessionActive = false;
+  setActiveUsername(undefined);
+}
+
 export interface FullGarageData {
   vehicles: Vehicle[];
   reminders: ReminderRecord[];

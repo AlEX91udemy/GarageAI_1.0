@@ -474,4 +474,39 @@ describe("HTTP tenant isolation", () => {
     expect(await (await request(other, "/api/vehicles")).json()).toEqual([]);
   });
 
+  it("requires CSRF and the current password before deleting an account and its sessions", async () => {
+    const owner = await register("delete-account-owner");
+    const password = "TestPassword-123!";
+
+    const missingCsrf = await fetch(`${baseUrl}/api/auth/account`, {
+      method: "DELETE",
+      headers: { cookie: owner.cookie, origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    expect(missingCsrf.status).toBe(403);
+
+    const wrongPassword = await request(owner, "/api/auth/account", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: "not-the-current-password" }),
+    });
+    expect(wrongPassword.status).toBe(403);
+
+    const deleted = await request(owner, "/api/auth/account", {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toEqual({ success: true });
+    expect((await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: owner.cookie } })).status).toBe(401);
+
+    const loginAfterDeletion = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json" },
+      body: JSON.stringify({ username: "delete-account-owner", password }),
+    });
+    expect(loginAfterDeletion.status).toBe(401);
+  });
+
 });

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Server,
+  Trash2,
 } from "lucide-react";
 import {
   FullGarageData,
@@ -16,6 +17,7 @@ import {
   resetDatabase,
   importDatabaseBackup,
   authenticatedFetch,
+  deleteAccount,
 } from "../api";
 
 interface DataSyncBackupModalProps {
@@ -36,6 +38,8 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmAccountDeletion, setConfirmAccountDeletion] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   const [dbStats, setDbStats] = useState<{
     vehicles: number;
     services: number;
@@ -49,6 +53,8 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     if (isOpen) {
       setStatusMessage(null);
       setConfirmReset(false);
+      setConfirmAccountDeletion(false);
+      setDeletePassword("");
       loadStats();
     }
   }, [isOpen]);
@@ -155,6 +161,19 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       setStatusMessage({ type: "success", text: "Данные текущего гаража успешно сброшены!" });
     } catch (err: any) {
       setStatusMessage({ type: "error", text: "Ошибка сброса: " + err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAccountDeletion = async () => {
+    setIsProcessing(true);
+    setStatusMessage(null);
+    try {
+      await deleteAccount(deletePassword);
+      window.location.assign("/");
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err.message || "Не удалось удалить аккаунт" });
     } finally {
       setIsProcessing(false);
     }
@@ -268,6 +287,54 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                       <div className="text-[10px] text-neutral-500 uppercase font-bold">Деталей склада</div>
                     </div>
                   </div>
+                )}
+
+                {confirmAccountDeletion ? (
+                  <div className="p-3.5 bg-brand-soft border border-brand-border rounded-2xl text-xs space-y-2.5">
+                    <div className="font-bold text-brand-hover">Удаление аккаунта необратимо. Сначала скачайте резервную копию, затем введите текущий пароль.</div>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(event) => setDeletePassword(event.target.value)}
+                      autoComplete="current-password"
+                      placeholder="Текущий пароль"
+                      className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAccountDeletion}
+                        disabled={isProcessing || !deletePassword}
+                        className="px-3.5 py-1.5 bg-brand-strong hover:bg-brand-hover text-white font-bold rounded-xl transition disabled:opacity-50"
+                      >
+                        Удалить аккаунт и данные
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setConfirmAccountDeletion(false); setDeletePassword(""); }}
+                        disabled={isProcessing}
+                        className="px-3.5 py-1.5 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-semibold rounded-xl transition"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAccountDeletion(true)}
+                    disabled={isProcessing}
+                    className="w-full flex items-center justify-between p-3.5 bg-brand-soft/60 hover:bg-brand-soft text-brand-hover border border-brand-border/80 rounded-2xl text-xs font-bold transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-brand-soft-strong flex items-center justify-center"><Trash2 className="w-4 h-4 text-brand-strong" /></div>
+                      <div className="text-left">
+                        <div className="font-extrabold">Удалить аккаунт</div>
+                        <div className="text-[11px] text-brand-strong font-normal">Удалить профиль, гараж и активные сессии</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-brand-strong font-mono">Удалить</span>
+                  </button>
                 )}
               </div>
 

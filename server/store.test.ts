@@ -105,4 +105,21 @@ describe("GarageStore tenant isolation and persistence", () => {
     expect(store.getUserByName("ALEX")).toBeDefined();
   });
 
+  it("deletes only the selected user's account, garage and email challenges", async () => {
+    const store = makeStore();
+    await store.createUser("alice", "test-hash-a", "user-a", "alice@example.test");
+    await store.createUser("bob", "test-hash-b", "user-b", "bob@example.test");
+    await store.run("user-a", (garage) => { garage.vehicles.push({ id: "alice-car" }); });
+    await store.run("user-b", (garage) => { garage.vehicles.push({ id: "bob-car" }); });
+    await store.createEmailChallenge({ id: "alice-challenge", userId: "user-a", codeHash: "a".repeat(64), expiresAtMs: Date.now() + 60_000, attempts: 0, createdAtMs: Date.now() });
+
+    await expect(store.deleteUser("user-a")).resolves.toBe(true);
+    expect(store.getUserById("user-a")).toBeUndefined();
+    expect(store.getUserByEmail("alice@example.test")).toBeUndefined();
+    expect(store.getUserById("user-b")).toBeDefined();
+    expect(store.snapshotForUser("user-b").vehicles).toEqual([{ id: "bob-car" }]);
+    await expect(store.verifyEmailChallenge("user-a", "000000", "secret")).resolves.toBe(false);
+    await expect(store.deleteUser("user-a")).resolves.toBe(false);
+  });
+
 });

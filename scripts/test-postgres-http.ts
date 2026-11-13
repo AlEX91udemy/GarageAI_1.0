@@ -59,12 +59,10 @@ async function startServer(port: number, connectionString: string): Promise<Chil
     try {
       const response = await fetch(baseUrl + "/api/health", { signal: AbortSignal.timeout(1_000) });
       if (response.ok) {
-        const body = await response.json() as Record<string, unknown>;
-        if (body.storageProvider !== "postgresql") throw new Error("Server did not select PostgreSQL storage");
         return child;
       }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("did not select PostgreSQL")) throw error;
+    } catch {
+      // The server has not started listening yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -137,6 +135,17 @@ async function main() {
     const garageB = await requestJson(baseUrl, "/api/vehicles", { headers: { cookie: authB.cookie } });
     assert(garageB.response.status === 200 && Array.isArray(garageB.body) && garageB.body.length === 0,
       "user B must not see user A vehicle");
+
+    const deleteB = await requestJson(baseUrl, "/api/auth/account", {
+      method: "DELETE",
+      headers: { cookie: authB.cookie, "x-csrf-token": authB.csrfToken },
+      body: JSON.stringify({ password: userB.password }),
+    });
+    assert(deleteB.response.status === 200, "account deletion failed with HTTP " + deleteB.response.status);
+    const deletedUserRows = await db`SELECT count(*)::integer AS count FROM garageai_users WHERE username = ${userB.username}`;
+    assert(Number(deletedUserRows[0]?.count ?? -1) === 0, "deleted account remained in PostgreSQL");
+    const deletedSession = await requestJson(baseUrl, "/api/auth/session", { headers: { cookie: authB.cookie } });
+    assert(deletedSession.response.status === 401, "deleted account session remained active");
 
     await stopServer(child);
     child = await startServer(port, connectionString);

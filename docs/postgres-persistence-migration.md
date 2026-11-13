@@ -1,6 +1,6 @@
 # PostgreSQL persistence migration plan
 
-Status: PostgreSQL schema, async repository, PostgreSQL-backed sessions, revision-checked garage writes, dry-run-first JSON importer, and PostgreSQL integration tests are merged to `main`. **Real-data import, Cloud SQL deployment, backup/restore validation, and live production smoke tests are still outstanding.** Keep `GARAGE_POSTGRES_READY` unset until those checks pass.
+Status: PostgreSQL schema, async repository, PostgreSQL-backed sessions, revision-checked garage writes, dry-run-first JSON importer, and PostgreSQL integration tests are merged. The 2026-11-11 deployment record reports real-data import, Cloud SQL deployment/preflight, backup/restore rehearsal and live smoke checks as complete. Remaining release gates are independent confirmation of the legacy bundle's origin and the production observation window; repeat the cutover checks before any subsequent migration or import.
 
 ## Target architecture
 

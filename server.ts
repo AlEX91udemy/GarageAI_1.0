@@ -789,7 +789,6 @@ app.get("/api/health", async (_req, res) => {
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
-    storageProvider: store instanceof PostgresPersistence ? "postgresql" : "json",
   });
 });
 
@@ -2234,7 +2233,7 @@ async function requireAuth(req: express.Request, res: express.Response, next: ex
     const garageWritePrefixes = [
       "/api/vehicles", "/api/reminders", "/api/services", "/api/fuel",
       "/api/inventory", "/api/to-fix", "/api/oem-schedule", "/api/tuning",
-      "/api/backup/import", "/api/backup/reset",
+      "/api/backup/import", "/api/backup/reset", "/api/auth/account",
     ];
     const isGarageWrite =
       ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
@@ -2579,6 +2578,38 @@ app.post("/api/auth/logout", async (req, res) => {
   } catch (error) {
     console.error("Logout failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось завершить сессию. Повторите попытку." });
+  }
+});
+
+/**
+ * Deletes only the authenticated owner's account. CSRF and the current password
+ * are both required, so a browser session alone cannot trigger irreversible data
+ * removal. PostgreSQL cascades the garage/session/challenge rows; JSON mode
+ * removes the matching local records and all active process sessions.
+ */
+app.delete("/api/auth/account", async (req, res) => {
+  try {
+    const context = currentContext();
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!password) return res.status(400).json({ error: "Введите текущий пароль для удаления аккаунта" });
+    const user = await store.getUserById(context.userId);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return res.status(403).json({ error: "Неверный пароль" });
+    }
+
+    const deleted = await store.deleteUser(context.userId);
+    if (!deleted) return res.status(404).json({ error: "Аккаунт не найден" });
+    if (!(store instanceof PostgresPersistence)) {
+      for (const [tokenHash, session] of sessions) {
+        if (session.userId === context.userId) sessions.delete(tokenHash);
+      }
+      await persistSessions();
+    }
+    res.setHeader("Set-Cookie", clearSessionCookie());
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Account deletion failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось удалить аккаунт. Повторите попытку." });
   }
 });
 
