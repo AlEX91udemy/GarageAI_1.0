@@ -9,6 +9,11 @@
 - [x] Реализовать self-service удаление аккаунта: повторная проверка пароля, CSRF, удаление гаража, сессий и email challenges, очистка локального кеша, тесты.
 - [ ] Подтвердить полный набор тестов в CI для точного commit SHA текущей ветки.
 
+### CI evidence — commit `1a118f0`
+
+- GitHub Actions run `43412170439`: Node.js checks (включая PostgreSQL и HTTP integration) и Python dependency security audit прошли.
+- Gitleaks заблокировал run: шесть исторических `tokenHash`/`csrfSecret` в `data/sessions.json` из коммитов `433a567` и `b24b8e5`. Эти значения не являются ложными срабатываниями и не должны добавляться в allowlist.
+
 ## Этап 1 — выпуск и наблюдение
 
 - [ ] Открыть PR, дождаться зелёного CI: Node, PostgreSQL, HTTP integration, Docker, Python audit и Gitleaks.
