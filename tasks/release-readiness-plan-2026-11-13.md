@@ -10,10 +10,11 @@
 - [x] Не выдавать локальный справочник за подтверждённую комплектацию: при выборе поколения показать обязательную сверку двигателя, КПП, привода и года по VIN/официальной документации.
 - [ ] Подтвердить полный набор тестов в CI для точного commit SHA текущей ветки.
 
-### CI evidence — commit `1a118f0`
+### CI evidence — product commit `76c7ebe`
 
-- GitHub Actions run `43412170439`: Node.js checks (включая PostgreSQL и HTTP integration) и Python dependency security audit прошли.
+- GitHub Actions run `43413776512`: Node.js checks (включая PostgreSQL, HTTP integration, Docker и Cloudflare dry run) и Python dependency security audit прошли.
 - Gitleaks заблокировал run: шесть исторических `tokenHash`/`csrfSecret` в `data/sessions.json` из коммитов `433a567` и `b24b8e5`. Эти значения не являются ложными срабатываниями и не должны добавляться в allowlist.
+- Workers Builds в Cloudflare также завершился ошибкой; локальный и CI dry run прошли, а причина требует просмотра лога в аккаунте Cloudflare.
 
 ## Этап 1 — выпуск и наблюдение
 
