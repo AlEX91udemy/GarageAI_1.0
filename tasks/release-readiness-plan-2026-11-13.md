@@ -11,9 +11,9 @@
 - [x] Проверять deployment-конфигурацию в CI: `.env.example` содержит обязательные runtime-переменные без credential defaults, контракт запускается через `npm run config:check`.
 - [ ] Подтвердить полный набор тестов в CI для точного commit SHA текущей ветки.
 
-### CI evidence — product commit `76c7ebe`
+### CI evidence — product commit `0673521`
 
-- GitHub Actions run `43413776512`: Node.js checks (включая PostgreSQL, HTTP integration, Docker и Cloudflare dry run) и Python dependency security audit прошли.
+- GitHub Actions run `43423492552`: Node.js checks (включая deployment-конфигурацию, PostgreSQL, HTTP integration, Docker и Cloudflare dry run) и Python dependency security audit прошли.
 - Gitleaks заблокировал run: шесть исторических `tokenHash`/`csrfSecret` в `data/sessions.json` из коммитов `433a567` и `b24b8e5`. Эти значения не являются ложными срабатываниями и не должны добавляться в allowlist.
 - Workers Builds в Cloudflare также завершился ошибкой; локальный и CI dry run прошли, а причина требует просмотра лога в аккаунте Cloudflare.
 
