@@ -17,7 +17,7 @@ const values = new Map(
 // diagnostic variables are intentionally excluded, so this contract stays
 // focused on application deployment rather than local experiments.
 const requiredKeys = [
-  "NODE_ENV", "PORT", "APP_URL", "TRUSTED_PROXY_HOPS", "ALLOWED_ORIGINS",
+  "NODE_ENV", "PORT", "APP_URL", "GARAGE_PUBLIC_URL", "TRUSTED_PROXY_HOPS", "ALLOWED_ORIGINS",
   "DATABASE_URL", "DATABASE_HOST", "DATABASE_PORT", "DATABASE_SSL",
   "DATABASE_POOL_MAX", "DATABASE_AUTO_MIGRATE", "GARAGE_POSTGRES_READY",
   "GARAGE_ALLOW_EPHEMERAL_STORAGE", "GARAGE_DB_FILE", "GARAGE_SESSIONS_FILE",
