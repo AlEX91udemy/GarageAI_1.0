@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useModalFocus } from "./useModalFocus";
 import { ConnectionNotice } from "./ConnectionNotice";
 import { VehicleStage } from "./VehicleStage";
+import { CarCascadeSelector } from "./CarCascadeSelector";
 import { Vehicle } from "../types";
 import { getMobileVehicleVisual } from "../mobile/vehicleVisuals";
 import { CATALOG_VEHICLE_VISUALS } from "../mobile/catalogVehicleVisuals";
@@ -99,4 +100,19 @@ it("maps every model to its body template", () => {
 it("has an image record for every model in the dropdown catalog", () => {
   expect(CATALOG_VEHICLE_VISUALS).toHaveLength(55);
   expect(CATALOG_VEHICLE_VISUALS.every((visual) => visual.src)).toBe(true);
+});
+
+it("marks catalog generation details as requiring VIN verification", () => {
+  act(() => root.render(
+    <CarCascadeSelector
+      make="Nissan"
+      model="X-Trail"
+      generation="T31 Рестайлинг (2011–2015)"
+      bodyType="suv"
+      year={2013}
+    />,
+  ));
+
+  expect(container.querySelector('[role="status"]')?.textContent).toContain("подтвердите двигатель, КПП, привод и год выпуска по VIN");
+  expect(container.textContent).toContain("Справочный вариант — нужна сверка");
 });
