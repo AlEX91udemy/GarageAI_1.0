@@ -319,6 +319,35 @@ export class GarageStore {
     return task;
   }
 
+  /** Remove one account and every locally persisted record owned by it. */
+  async deleteUser(userId: string): Promise<boolean> {
+    const task = this.writeChain.then(() => {
+      if (!this.state.users.some((user) => user.id === userId)) return false;
+      const nextUsers = this.state.users.filter((user) => user.id !== userId);
+      const nextGarages = { ...this.state.garages };
+      delete nextGarages[userId];
+      const nextChallenges = this.state.emailChallenges.filter((challenge) => challenge.userId !== userId);
+
+      this.persistUsers(nextUsers);
+      this.persistGarages(nextGarages);
+      writeJsonAtomic(this.emailChallengesFile, nextChallenges);
+
+      this.state.users = nextUsers;
+      this.state.garages = nextGarages;
+      this.state.emailChallenges = nextChallenges;
+      this.lastPersistError = null;
+      return true;
+    });
+    this.writeChain = task.then(
+      () => undefined,
+      (err) => {
+        this.lastPersistError = err instanceof Error ? err : new Error(String(err));
+        return undefined;
+      },
+    );
+    return task;
+  }
+
   getUserByEmail(email: string): UserRecord | undefined {
     const key = email.trim().toLowerCase();
     return this.state.users.find((user) => user.email?.trim().toLowerCase() === key);

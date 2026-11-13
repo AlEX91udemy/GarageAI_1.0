@@ -114,10 +114,10 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 #### Статус на 08.11.2026
 
-- Email-code authentication реализована в ветке `codex/email-code-authentication` и проверена локальными тестами. Для production нужны `RESEND_API_KEY`, `EMAIL_FROM` и отдельный `EMAIL_CODE_SECRET`; секреты не добавляются во frontend или Cloudflare Assets.
-- Cloudflare Worker `garageai-1-0` доступен по адресу `https://garageai-1-0.sambur91.workers.dev/` и проксирует API на canary Cloud Run `garageai-web-canary` в проекте `garage-ai-512223`. `/api/health`, регистрация, защищённые маршруты и tenant isolation проверены 08.11.2026.
-- Cloud SQL schema version 2, Secret Manager, dedicated runtime service account и backup/PITR настроены; создан pre-canary backup. Legacy import не выполнен, потому что в checkout отсутствует `data/garage_store.json`, поэтому база остаётся пустой.
-- Email-code login требует production-секреты `RESEND_API_KEY`, `EMAIL_FROM` и `EMAIL_CODE_SECRET`. Полный backup/restore в отдельную базу и длительное production-наблюдение ещё не завершены.
+- Email-code authentication реализована и проверена локальными тестами. В production `RESEND_API_KEY`, `EMAIL_FROM` и `EMAIL_CODE_SECRET` хранятся вне frontend и Cloudflare Assets.
+- Cloudflare Worker `garageai-1-0` проксирует API на canary Cloud Run `garageai-web-canary` в проекте `garage-ai-512223`. Для canary зафиксированы проверки health, регистрации, защищённых маршрутов и tenant isolation.
+- Cloud SQL schema version 2, Secret Manager, отдельный runtime service account и backup/PITR настроены. Импорт legacy-данных, PostgreSQL preflight, smoke-проверки и restore rehearsal выполнены 11.11.2026; источник legacy bundle из рабочего окружения всё ещё требует независимого подтверждения.
+- Production email-code request успешно прошёл 12.11.2026. До публичного релиза остаются реальная проверка доставки в inbox и задокументированное окно наблюдения canary.
 - Предыдущий Cloud Run сервис `garage-ai` сохранён для rollback. Нельзя обходить production gate через `GARAGE_ALLOW_EPHEMERAL_STORAGE=true`.
 - Подробный журнал текущего развёртывания: [`docs/cloud-deployment-status-2026-11-08.md`](docs/cloud-deployment-status-2026-11-08.md).
 

@@ -1,11 +1,15 @@
-import { StrictMode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import './index.css';
 import { ConnectionNotice } from './components/ConnectionNotice';
-import { LandingPage } from './LandingPage';
-import { LegalPage, type LegalKind } from './LegalPage';
+import type { LegalKind } from './LegalPage';
+
+// Each public route has a separate entry chunk. A visitor to the landing or a
+// legal page should not download the authenticated garage application upfront.
+const App = lazy(() => import('./App.tsx'));
+const LandingPage = lazy(() => import('./LandingPage').then(({ LandingPage }) => ({ default: LandingPage })));
+const LegalPage = lazy(() => import('./LegalPage').then(({ LegalPage }) => ({ default: LegalPage })));
 
 // Keep the error boundary visible for real application failures. Only suppress the
 // browser's known ResizeObserver loop notification.
@@ -31,12 +35,14 @@ const legalKind = typeof window !== 'undefined' ? legalKinds[window.location.pat
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isAppRoute ? (
+    <Suspense fallback={<main className="min-h-screen bg-neutral-100" aria-busy="true" />}>
+      {isAppRoute ? (
       <ErrorBoundary name="Garage AI">
         <ConnectionNotice />
         <App />
       </ErrorBoundary>
-    ) : legalKind ? <LegalPage kind={legalKind} /> : <LandingPage />}
+      ) : legalKind ? <LegalPage kind={legalKind} /> : <LandingPage />}
+    </Suspense>
   </StrictMode>,
 );
 

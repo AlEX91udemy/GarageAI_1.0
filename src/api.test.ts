@@ -4,6 +4,7 @@ import {
   importDatabaseBackup,
   runGarageAiAgents,
   resetDatabase,
+  deleteAccount,
   type GarageAiAgentName,
 } from "./api";
 
@@ -35,6 +36,18 @@ describe("account-scoped backup APIs", () => {
 
     await expect(importDatabaseBackup(backup)).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith("/api/backup/import", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
+  });
+
+  it("deletes an account only through the authenticated endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(deleteAccount("CurrentPassword-123!")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/account", expect.objectContaining({
+      method: "DELETE",
+      body: JSON.stringify({ password: "CurrentPassword-123!" }),
+    }));
     expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
   });
 });

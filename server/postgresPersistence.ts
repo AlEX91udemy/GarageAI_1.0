@@ -156,6 +156,17 @@ export class PostgresPersistence {
     }
   }
 
+  /** Foreign-key cascades delete the garage, sessions and email challenges atomically. */
+  async deleteUser(userId: string): Promise<boolean> {
+    this.assertInitialized();
+    const rows = await this.sql`
+      DELETE FROM garageai_users
+      WHERE id = ${userId}
+      RETURNING id
+    `;
+    return Boolean(rows[0]);
+  }
+
   async createEmailChallenge(record: import("./store").EmailAuthChallengeRecord): Promise<void> {
     this.assertInitialized();
     await this.sql.begin(async (tx) => {
