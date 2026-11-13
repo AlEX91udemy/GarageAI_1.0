@@ -18,11 +18,13 @@
 - Gitleaks заблокировал run: шесть исторических `tokenHash`/`csrfSecret` в `data/sessions.json` из коммитов `433a567` и `b24b8e5`. Эти значения не являются ложными срабатываниями и не должны добавляться в allowlist.
 - Workers Builds в Cloudflare также завершился ошибкой; локальный и CI dry run прошли, а причина требует просмотра лога в аккаунте Cloudflare.
 - 13.11.2026 read-only проверка публичного Worker вернула устаревший контракт с `storageProvider: "postgresql"`; текущая ветка это поле не выдаёт. Внешний Worker необходимо обновить проверенным SHA и затем выполнить `npm run release:verify-health`.
+- 13.11.2026 Worker опубликован штатной командой `npm run cloudflare:deploy`: версия `47687c82-a35f-4164-ba5e-01ee3a57fac1` получает 100% трафика; предыдущая версия `cc7100e9-aa51-4509-94ad-fc2531cf240f` доступна для rollback. Health gate всё ещё находит `storageProvider`, поэтому устарел именно подключённый Cloud Run API origin. Откат Worker не выполнялся: доступность не ухудшилась, а проблема не внесена этим deploy.
 
 ## Этап 1 — выпуск и наблюдение
 
 - [ ] Открыть PR, дождаться зелёного CI: Node, PostgreSQL, HTTP integration, Docker, Python audit и Gitleaks.
 - [ ] Развернуть точный проверенный SHA на private canary и выполнить Cloud SQL preflight/smoke.
+- [ ] Развернуть текущий backend SHA на Cloud Run API origin и повторить `GARAGE_PUBLIC_URL=https://garageai-1-0.sambur91.workers.dev npm run release:verify-health`.
 - [ ] Задокументировать окно наблюдения: ошибки, latency, Cloud SQL connections/CPU/storage, логи и rollback.
 - [ ] Подтвердить доставку production email-кода в независимый mailbox.
 
