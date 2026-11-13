@@ -27,6 +27,7 @@
 
 - [ ] Независимо подтвердить происхождение legacy bundle и результаты import/reconciliation.
 - [ ] Согласовать уведомления и провести coordinated Git history rewrite; до него сохранить легитимные данные вне репозитория и ротировать затронутые ключи.
+  - Runbook подготовки: [`docs/git-history-secret-remediation.md`](../docs/git-history-secret-remediation.md).
 - [ ] Утвердить реквизиты оператора, retention и процедуру обработки запросов субъектов данных.
 
 ## Этап 3 — предметные данные и AI
