@@ -96,6 +96,10 @@ Cloud SQL backups or rewrite data during the observation window.
 
 ## Execution record — 2026-11-14
 
+- Published release commit `86c92d2a8aa65578b5ab5d8db588d4f67da70412` (squashed PR #40) to Artifact Registry image `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:release-86c92d2`, digest `sha256:c54516fbfd00d605206a7338de863df4c5b1a1256b7133edc9ddad2e92bc75d7`. Cloud Build marked the build as failed only while storing logs in the legacy bucket; the image push completed and the digest was deployed.
+- Deployed Cloud Run revision `garageai-web-canary-release-86c92d2` and routed 100% of `garageai-web-canary` traffic to it after direct health and knowledge API smoke tests passed.
+- Updated Cloudflare Worker `garageai-1-0` secret `API_ORIGIN` to the new canary origin and deployed Worker version `b1c22392-f0ac-45a9-8fd0-1663de0356e0`. Public `/`, `/app`, `/api/health` and `/api/knowledge/*` smoke tests returned expected responses.
+
 - Confirmed project: garage-ai-512223, region europe-west1. The second project garageai-512320 was not used because it has no GarageAI Cloud SQL instance.
 - Artifact Registry repository garageai was created because the existing Cloud Build configuration targets it.
 - Billing budget GarageAI 300 SGD guardrail was created for numeric project 215646849370, with 25/50/75/90/100% current-spend alerts and a 75% forecast alert. The billing account currency is SGD.
