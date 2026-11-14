@@ -36,7 +36,8 @@ if ($configuredProject -ne $ProjectId) {
   throw ('gcloud is configured for ' + $configuredProject + ', expected ' + $ProjectId + '.')
 }
 
-$enabled = @(Invoke-GcloudValue @('services', 'list', '--enabled', '--format=value(config.name)') -split [Environment]::NewLine | Where-Object { $_ })
+$enabledOutput = Invoke-GcloudValue @('services', 'list', '--enabled', '--format=value(config.name)')
+$enabled = @($enabledOutput -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $requiredApis = @('run.googleapis.com', 'artifactregistry.googleapis.com', 'cloudbuild.googleapis.com', 'secretmanager.googleapis.com', 'sqladmin.googleapis.com', 'aiplatform.googleapis.com', 'logging.googleapis.com', 'monitoring.googleapis.com')
 $missingApis = @($requiredApis | Where-Object { $_ -notin $enabled })
 if ($missingApis.Count -gt 0) {
@@ -54,7 +55,12 @@ if ([string]::IsNullOrWhiteSpace($repository)) {
 }
 
 $webExists = $true
-try { [void](Invoke-GcloudValue @('run', 'services', 'describe', 'garageai-web', ('--region=' + $Region), '--format=value(metadata.name)')) } catch { $webExists = $false }
+try {
+  $webServiceOutput = Invoke-GcloudValue @('run', 'services', 'list', ('--region=' + $Region), '--format=value(metadata.name)')
+  $webServiceNames = @($webServiceOutput -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  $webExists = @('garageai-web', 'garageai-web-canary') | Where-Object { $_ -in $webServiceNames } | Measure-Object | Select-Object -ExpandProperty Count
+  $webExists = $webExists -gt 0
+} catch { $webExists = $false }
 $agentsExists = $true
 try { [void](Invoke-GcloudValue @('run', 'services', 'describe', 'garageai-agents', ('--region=' + $Region), '--format=value(metadata.name)')) } catch { $agentsExists = $false }
 
