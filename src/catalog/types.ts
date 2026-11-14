@@ -1,5 +1,62 @@
 export type CatalogCategory = "maintenance" | "engine" | "transmission" | "brakes" | "suspension" | "electrical" | "cooling" | "fuel" | "fluids" | "tires" | "diagnostics" | "commonProblems" | "safety" | "specifications";
 
+/** Public, citable source used by the instruction and recommendation layer. */
+export interface PublicKnowledgeSource {
+  id: string;
+  title: string;
+  publisher: string;
+  url: string;
+  sourceType: CatalogSource["sourceType"] | "public_safety_database";
+  scope: "global" | "manufacturer" | "market";
+  language: string;
+  retrievedAt: string;
+  notes: string;
+  verificationStatus?: "verified" | "network_unverified" | "reference_only";
+}
+
+export interface PublicKnowledgeSourceStatus {
+  sourceId: string;
+  checkedAt: string;
+  status: "reachable" | "http_error" | "network_error" | "not_checked";
+  httpStatus?: number;
+  responseUrl?: string;
+  error?: string;
+}
+
+export type RecommendationRisk = "safety" | "urgent" | "routine" | "informational";
+
+export interface RecommendationRule {
+  id: string;
+  title: string;
+  text: string;
+  category: CatalogCategory;
+  risk: RecommendationRisk;
+  sourceIds: string[];
+  appliesTo: { makes?: string[]; fuelTypes?: string[]; minMileageKm?: number; maxMileageKm?: number };
+  keywords: string[];
+}
+
+export interface VehicleRecommendation {
+  id: string;
+  title: string;
+  text: string;
+  category: CatalogCategory;
+  risk: RecommendationRisk;
+  confidence: "high" | "medium" | "low";
+  sourceIds: string[];
+  sources: PublicKnowledgeSource[];
+  applicability: string;
+}
+
+export interface KnowledgeChunkCitation {
+  locator: string;
+  documentHash: string;
+}
+
+export interface IngestedKnowledgeChunk extends KnowledgeChunk {
+  citation: KnowledgeChunkCitation;
+}
+
 export interface CatalogSource {
   id: string;
   source: string;

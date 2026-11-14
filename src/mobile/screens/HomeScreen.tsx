@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import {
   Bell,
-  Sun,
-  Moon,
-  Settings,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
@@ -20,7 +17,6 @@ import {
   ArrowRight,
   Check,
   Edit2,
-  ScanBarcode,
 } from "lucide-react";
 import { formatGarageCurrency } from "../currency";
 import { formatDistance } from "../units";
@@ -60,10 +56,8 @@ interface HomeScreenProps {
   onOpenReminders?: () => void;
   onOpenAiMechanic?: () => void;
   onOpenScanReceipt?: () => void;
-  onOpenScanBarcode?: () => void;
   onOpenAddService?: () => void;
   themeMode?: ThemeMode;
-  onToggleTheme?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -86,10 +80,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenReminders,
   onOpenAiMechanic,
   onOpenScanReceipt,
-  onOpenScanBarcode,
   onOpenAddService,
   themeMode = "light",
-  onToggleTheme,
 }) => {
   const isDark = themeMode === "dark";
   const [showQuickMileageModal, setShowQuickMileageModal] = useState(false);
@@ -142,22 +134,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   );
   const totalExpenses = totalServiceCost + totalFuelCost;
 
-  // Latest service and fuel
-  const latestService = [...vehicleServices].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  )[0];
-
-  const latestFuel = [...vehicleFuel].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  )[0];
-
-  // Format date helper
   const formatDateRu = (dateStr?: string) => {
-    if (!dateStr) return "07.06.2026";
+    if (!dateStr) return "—";
     const [y, m, d] = dateStr.split("-");
     if (d && m && y) return `${d}.${m}.${y}`;
     return dateStr;
   };
+  const formatFuelType = (fuelType?: string) => {
+    if (!fuelType) return "Тип топлива не указан";
+    const normalized = fuelType.toLowerCase();
+    if (normalized.includes("диз")) return "Дизель";
+    if (normalized.includes("элект")) return "Электро";
+    if (normalized.includes("гибрид")) return "Гибрид";
+    if (normalized === "gasoline" || normalized === "petrol") return "Бензин";
+    return fuelType;
+  };
+
+  const vehicleSchedules = oemSchedules.filter(
+    (schedule) => schedule.vehicleId === currentVehicle.id || schedule.vehicleId === "all"
+  );
+  const nextSchedule = [...vehicleSchedules]
+    .map((schedule) => {
+      const targetMileage = (schedule.lastDoneKm || 0) + schedule.intervalKm;
+      const remainingKm = targetMileage - currentVehicle.currentMileage;
+      const dueDate = schedule.lastDoneDate && schedule.intervalMonths
+        ? new Date(new Date(schedule.lastDoneDate).setMonth(new Date(schedule.lastDoneDate).getMonth() + schedule.intervalMonths))
+        : null;
+      return { schedule, targetMileage, remainingKm, dueDate };
+    })
+    .sort((a, b) => a.remainingKm - b.remainingKm)[0];
+  const urgentTaskCount = toFixTasks.filter((task) => {
+    if (task.vehicleId !== currentVehicle.id || task.status === "completed") return false;
+    const dueByMileage = task.targetMileage !== undefined && currentVehicle.currentMileage >= task.targetMileage;
+    const dueByDate = Boolean(task.dueDate && new Date(task.dueDate).getTime() <= Date.now());
+    return task.priority === "high" || dueByMileage || dueByDate;
+  }).length;
+  const overdueSchedule = Boolean(nextSchedule && (nextSchedule.remainingKm < 0 || (nextSchedule.dueDate && nextSchedule.dueDate.getTime() < Date.now())));
+  const hasVehicleData = vehicleServices.length > 0 || vehicleFuel.length > 0 || vehicleSchedules.length > 0 || toFixTasks.some((task) => task.vehicleId === currentVehicle.id);
+  const statusNeedsAttention = urgentTaskCount > 0 || overdueSchedule;
+  const statusLabel = !hasVehicleData ? "Нет данных" : statusNeedsAttention ? "Требует внимания" : "В норме";
+  const statusDescription = !hasVehicleData
+    ? "Добавьте первую запись"
+    : statusNeedsAttention
+      ? `${urgentTaskCount + (overdueSchedule ? 1 : 0)} пунктов требуют внимания`
+      : "Срочных работ нет";
+  const statusColor = !hasVehicleData ? (isDark ? "text-slate-300" : "text-slate-600") : statusNeedsAttention ? "text-brand-strong" : "text-emerald-500";
 
   return (
     <div
@@ -181,26 +202,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Barcode / VIN Camera Scanner Button */}
-          <button
-            id="home-btn-barcode-scan"
-            onClick={() => {
-              if (typeof onOpenScanBarcode === "function") {
-                onOpenScanBarcode();
-              } else if (typeof onNavigate === "function") {
-                onNavigate("scan_barcode");
-              }
-            }}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer relative active:scale-95 ${
-              isDark
-                ? "bg-[#17202e] border-[#243044] text-brand-on-dark hover:text-brand-light hover:border-brand/40"
-                : "bg-white border-neutral-200 text-brand-strong hover:bg-neutral-50 shadow-xs"
-            }`}
-            title="Сканер штрихкодов запчастей и VIN"
-          >
-            <ScanBarcode className="w-4 h-4" />
-          </button>
-
           {/* Notifications Button */}
           <button
             id="home-btn-notifications"
@@ -220,33 +221,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </button>
 
-          {/* Theme Switcher Toggle (Dark / Light) */}
-          <button
-            id="home-btn-theme-toggle"
-            onClick={onToggleTheme}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-              isDark
-                ? "bg-[#17202e] border-[#243044] text-amber-400 hover:text-amber-300"
-                : "bg-white border-neutral-200 text-slate-700 hover:bg-neutral-50 shadow-xs"
-            }`}
-            title={isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"}
-          >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-
-          {/* Settings Button */}
-          <button
-            id="home-btn-settings"
-            onClick={() => onNavigate("settings")}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-              isDark
-                ? "bg-[#17202e] border-[#243044] text-slate-300 hover:text-white"
-                : "bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50 shadow-xs"
-            }`}
-            title="Настройки"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
         </div>
       </header>
 
@@ -296,7 +270,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isDark ? "text-slate-400" : "text-slate-500"
               }`}
             >
-              {currentVehicle.year} • {currentVehicle.engine} • Бензин • {currentVehicle.driveType || "4x4"}
+              {currentVehicle.year} • {currentVehicle.engine || "Двигатель не указан"} • {formatFuelType(currentVehicle.fuelType)} • {currentVehicle.driveType || "Привод не указан"}
             </div>
           </div>
 
@@ -365,7 +339,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {formatDistance(currentVehicle.currentMileage)}
             </div>
             <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-              Обновлён 07.06.2026
+              {currentVehicle.lastMileageUpdate ? `Обновлён ${formatDateRu(currentVehicle.lastMileageUpdate)}` : "Дата обновления не указана"}
             </div>
           </button>
 
@@ -389,10 +363,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </span>
             </div>
             <div className="text-sm font-black tracking-tight leading-none">
-              Бензин
+              {formatFuelType(currentVehicle.fuelType || lastVehicleFuel?.fuelType)}
             </div>
             <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-              АИ-95
+              {lastVehicleFuel?.fuelType || "Нет записи о заправках"}
             </div>
           </button>
 
@@ -415,12 +389,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 Состояние
               </span>
             </div>
-            <div className="text-sm font-black tracking-tight text-emerald-500 leading-none flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>В норме</span>
+            <div className={`text-sm font-black tracking-tight ${statusColor} leading-none flex items-center gap-1`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${statusNeedsAttention ? "bg-brand-strong" : statusLabel === "В норме" ? "bg-emerald-500" : "bg-slate-400"}`} />
+              <span>{statusLabel}</span>
             </div>
             <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-              Нет срочных работ
+              {statusDescription}
             </div>
           </button>
         </div>
@@ -545,18 +519,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     Следующее ТО
                   </div>
                   <div className="text-base font-black tracking-tight mt-0.5">
-                    Через 4 000 км
+                    {!nextSchedule
+                      ? "Регламент не задан"
+                      : nextSchedule.remainingKm < 0
+                        ? `Просрочено на ${formatDistance(Math.abs(nextSchedule.remainingKm))}`
+                        : `Через ${formatDistance(nextSchedule.remainingKm)}`}
                   </div>
                 </div>
 
                 {/* Progress bar */}
                 <div className="mt-3">
                   <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? "bg-slate-700" : "bg-neutral-200"}`}>
-                    <div className="w-1/2 h-full bg-brand rounded-full" />
+                    <div
+                      className="h-full bg-brand rounded-full"
+                      style={{
+                        width: nextSchedule
+                          ? `${Math.max(0, Math.min(100, ((currentVehicle.currentMileage - (nextSchedule.targetMileage - nextSchedule.schedule.intervalKm)) / nextSchedule.schedule.intervalKm) * 100))}%`
+                          : "0%",
+                      }}
+                    />
                   </div>
                   <div className={`flex justify-between text-[9px] font-mono mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                    <span>202 000 км</span>
-                    <span>210 000 км</span>
+                    <span>{nextSchedule ? formatDistance(Math.max(0, nextSchedule.targetMileage - nextSchedule.schedule.intervalKm)) : "—"}</span>
+                    <span>{nextSchedule ? formatDistance(nextSchedule.targetMileage) : "—"}</span>
                   </div>
                 </div>
               </div>

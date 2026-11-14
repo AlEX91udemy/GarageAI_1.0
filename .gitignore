@@ -10,10 +10,12 @@ data/users.json
 data/garage_store.json
 data/sessions.json
 data/*.tmp
+data/email_auth_challenges.json
 
 # AI Studio debug artifacts (temporary media storage, brain artifacts)
 artifacts/
 .aistudio/
+.codex-autorouter/
 
 # Local audit exports, Python caches and generated visual/diagnostic artifacts
 *.zip

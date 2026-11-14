@@ -17,6 +17,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, ToFixTask, DiagnosticResult } from "../types";
+import { authenticatedFetch } from "../api";
 
 interface AiMechanicModalProps {
   vehicle: Vehicle;
@@ -54,6 +55,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
 
     setIsLoading(true);
     setErrorMsg(null);
+    setDiagnosticResult(null);
 
     // Build context
     const recentHistory = vehicleRecords.slice(0, 5).map((r) => ({
@@ -64,7 +66,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
     }));
 
     try {
-      const response = await fetch("/api/ai/diagnose", {
+      const response = await authenticatedFetch("/api/ai/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -86,28 +88,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
       setDiagnosticResult(data);
     } catch (err: any) {
       console.error(err);
-      // High-craft fallback response if offline
-      setDiagnosticResult({
-        primaryDiagnosis: "Износ ступичного подшипника переднего правого колеса",
-        confidence: 88,
-        likelyCauses: [
-          { cause: "Ступичный подшипник передний правый (естественный износ к 200 тыс. км)", probability: 85 },
-          { cause: "Неравномерный износ резины / кордовая грыжа", probability: 10 },
-          { cause: "Промежуточный подшипник правого привода", probability: 5 },
-        ],
-        diagnosticSteps: [
-          "Вывесить переднее правое колесо на домкрате с соблюдением ТБ.",
-          "Взяться руками за колесо сверху и снизу (12 и 6 часов) и покачать на предмет люфта.",
-          "Раскрутить колесо рукой в воздухе, приложив руку к витку пружины стойки — вибрация и перекат шариков укажут на подшипник.",
-        ],
-        urgency: "high",
-        estimatedCostRange: "4 500 — 9 500 ₽ (деталь + замена)",
-        recommendedParts: [
-          { name: "Ступица в сборе передняя", partNumber: "40202-JG000 / R168.73", brand: "SNR / NTN / SKF" },
-          { name: "Гайка ступичная самоконтрящаяся", partNumber: "01223-00041", brand: "Nissan Genuine" },
-        ],
-        mechanicTip: "На платформе Nissan C (X-Trail T31, Qashqai) ступица меняется узлом в сборе. Рекомендуется брать поставщика оригинала NTN/SNR — ходит до 100+ тыс. км.",
-      });
+      setErrorMsg(err instanceof Error ? err.message : "Не удалось получить диагностику. Проверьте подключение к серверу.");
     } finally {
       setIsLoading(false);
     }
@@ -247,6 +228,12 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
             </button>
           </div>
         </div>
+
+        {errorMsg && (
+          <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+            {errorMsg}
+          </div>
+        )}
 
         {/* Structured Diagnostic Result */}
         {diagnosticResult && (
