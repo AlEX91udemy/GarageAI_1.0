@@ -119,3 +119,10 @@ POST /api/agents/run smoke test through the tagged web revision, executed from
 Cloud Run or an approved CI identity. The new scripts/cloud-run-agent-smoke.py
 provides the private service check. Production web traffic was not changed
 during this run.
+
+## Execution record - 2026-11-14 (final release)
+
+- Built the exact `origin/main` commit `4e758250a3b127138f637a3b2263b3c57d4a4ea8` as Artifact Registry image `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:4e75825`, digest `sha256:4d7fb64645631ea386aac08d5ad5bf0399930f166a012cadbe191cee1982e96c`. Cloud Build reported a log-storage failure after the image push completed; the pushed digest was verified in Artifact Registry.
+- Deployed Cloud Run revision `garageai-web-canary-00026-diy` with the existing runtime service account, Cloud SQL socket (`/cloudsql/garage-ai-512223:europe-west1:garageai-postgres`), and Secret Manager references. The revision reached `Ready=True` and passed direct `/api/health` (200) and anonymous protected-route (401) checks.
+- Routed 100% of `garageai-web-canary` traffic to `garageai-web-canary-00026-diy`. The public Cloud Run URL, `https://garageai.site`, and the Cloudflare Worker `/api/health` endpoint returned HTTP 200 after cutover.
+- Kept the previous `garageai-web-canary-release-86c92d2` revision available for rollback. The `www.garageai.site` hostname currently has no DNS record and therefore cannot complete TLS; the apex domain and Worker remain healthy.
