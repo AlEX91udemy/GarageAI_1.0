@@ -3,10 +3,26 @@ interface Env {
   API_ORIGIN?: string;
 }
 
-function apiRequest(request: Request, origin: string): Request {
+export function apiRequest(request: Request, origin: string): Request {
   const incoming = new URL(request.url);
   const target = new URL(incoming.pathname + incoming.search, origin.endsWith("/") ? origin : origin + "/");
-  return new Request(target, request);
+  const headers = new Headers(request.headers);
+  // The browser can submit these headers directly. Strip them before the
+  // Worker forwards the request, then provide the edge-observed client address
+  // as the single trusted proxy hop expected by Express at the origin.
+  headers.delete("x-forwarded-for");
+  headers.delete("x-real-ip");
+  headers.delete("forwarded");
+  const edgeClientIp = request.headers.get("cf-connecting-ip")?.trim();
+  if (edgeClientIp && /^[0-9a-f:.]+$/i.test(edgeClientIp)) {
+    headers.set("x-forwarded-for", edgeClientIp);
+  }
+  return new Request(target, {
+    method: request.method,
+    headers,
+    body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+    redirect: "manual",
+  });
 }
 
 export default {
