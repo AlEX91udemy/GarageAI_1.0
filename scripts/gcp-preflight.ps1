@@ -56,7 +56,8 @@ if ([string]::IsNullOrWhiteSpace($repository)) {
 
 $webExists = $true
 try {
-  $webServiceNames = @(Invoke-GcloudValue @('run', 'services', 'list', ('--region=' + $Region), '--format=value(metadata.name)') -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  $webServiceOutput = Invoke-GcloudValue @('run', 'services', 'list', ('--region=' + $Region), '--format=value(metadata.name)')
+  $webServiceNames = @($webServiceOutput -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   $webExists = @('garageai-web', 'garageai-web-canary') | Where-Object { $_ -in $webServiceNames } | Measure-Object | Select-Object -ExpandProperty Count
   $webExists = $webExists -gt 0
 } catch { $webExists = $false }
