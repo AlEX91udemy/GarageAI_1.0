@@ -13,6 +13,8 @@
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});fs.rmSync('server.js',{force:true})\"",
     "lint": "tsc --noEmit",
     "test": "vitest run --environment happy-dom",
+    "test:scanner": "vitest run server/documentOcr.test.ts src/api.test.ts src/mobile/barcodeScannerService.test.ts --environment happy-dom",
+    "benchmark:ocr": "node scripts/benchmark-ocr-providers.mjs",
     "catalog:audit": "tsx scripts/catalog-audit.ts",
     "config:check": "node scripts/check-env-example.mjs",
     "release:verify-health": "tsx scripts/verify-public-health.ts",

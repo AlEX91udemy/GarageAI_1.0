@@ -6,7 +6,7 @@
 - Dry-run import completed with 18 users and 1 garage to insert, zero conflicts, zero orphan garages, and zero orphan sessions.
 - On-demand backup `1794418318391` completed successfully immediately before import.
 - Legacy JSON import completed transactionally and post-import verification passed. The database now contains 18 imported users and 18 garage rows.
-- PostgreSQL preflight passed at schema version 2 with zero active sessions.
+- PostgreSQL preflight passed at schema version 2 with zero active sessions. A new registration policy requires migration 003 before the next production rollout.
 - PostgreSQL smoke, persistence integration, and HTTP integration passed for tenant isolation, CSRF, durable CRUD, restart, logout, optimistic concurrency, and session lifecycle.
 - Cloud SQL restore rehearsal completed successfully in a temporary PostgreSQL 16 instance. The temporary instance was deleted after the rehearsal.
 - Cloud Run canary revision `garageai-web-canary-00006-dqm` is serving 100% of canary traffic from image `canary-20261111-v1`. Three health probes returned `status=ok` and `storageProvider=postgresql` with no recent Cloud Run ERROR logs.
@@ -20,7 +20,7 @@
 - The authenticated Cloudflare dashboard is available in the local browser, but the Resend dashboard is not signed in and the Cloudflare token available to Wrangler has no DNS write permission. No DNS record was fabricated or changed.
 - Remaining release gates are the short production observation window and authoritative confirmation of the legacy bundle source. Optional Resend Forge/DMARC records remain a DNS hardening item.
 
-Estimated project readiness: **97%**. The application code, tests, frontend deployment, Cloud Run canary, Cloud SQL schema, data import, backup/restore rehearsal, tenant smoke checks, and production email-code request are complete. The remaining work is concentrated in the short production observation window and confirmation that the local legacy bundle came from the live working environment.
+Estimated project readiness: **not releasable yet**. The previous canary evidence predates the email-verification registration change. Remaining work includes migration 003, HTTP/JSON/PostgreSQL auth tests, trusted proxy validation, production mailbox receipt, a new CI run on the final SHA, and observation after rollout.
 
 ## Completed
 
@@ -28,7 +28,7 @@ Estimated project readiness: **97%**. The application code, tests, frontend depl
 - Worker secret `API_ORIGIN` now points to the new Cloud Run canary service.
 - Cloud Run canary `garageai-web-canary` is running in project `garage-ai-512223`, region `europe-west1`.
 - The canary uses Cloud SQL instance `garageai-postgres` through the Cloud SQL socket, Secret Manager for `DATABASE_URL`, and a dedicated runtime service account.
-- Cloud SQL schema preflight passed at version 2. Automated backups and point-in-time recovery are enabled; a pre-canary backup was created.
+- Cloud SQL schema preflight passed at version 2. Automated backups and point-in-time recovery are enabled; a pre-canary backup was created. Migration 003 is required before the next rollout because the registration policy now stores email verification state.
 - Authenticated smoke tests passed for health, registration, protected routes, CRUD, and tenant isolation.
 
 ## Outstanding

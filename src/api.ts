@@ -37,6 +37,12 @@ export interface AuthSession {
   email?: string;
 }
 
+export interface PendingRegistration {
+  pendingEmailVerification: true;
+  email: string;
+  message?: string;
+}
+
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
@@ -46,15 +52,17 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string, email?: string): Promise<AuthSession> {
+export async function register(username: string, password: string, email: string): Promise<AuthSession | PendingRegistration> {
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password, ...(email?.trim() ? { email: email.trim() } : {}) }),
+    body: JSON.stringify({ username, password, email: email.trim() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
+  if (data.pendingEmailVerification === true && typeof data.email === "string") return data as PendingRegistration;
+  if (!data.session?.csrfToken) throw new Error("Сервер не вернул состояние регистрации");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
   setActiveUsername(data.session.username);
@@ -269,6 +277,46 @@ export async function searchTechnicalKnowledge(query: string, context: Partial<{
   const res = await authenticatedFetch(`/api/knowledge/search?${params.toString()}`);
   if (!res.ok) throw new Error("Не удалось выполнить поиск технических знаний");
   return res.json();
+}
+
+export interface VehicleRecommendationResponse {
+  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string }>;
+  sources: unknown[];
+}
+
+export async function fetchVehicleRecommendations(vehicle: Partial<Vehicle>, query = ""): Promise<VehicleRecommendationResponse> {
+  // Recommendations only need technical context. Do not put VIN, plate or images in a URL.
+  const { vin: _vin, licensePlate: _licensePlate, photoUrl: _photoUrl, model3dUrl: _model3dUrl, registrationData: _registrationData, ...technicalVehicle } = vehicle;
+  const params = new URLSearchParams({ vehicle: JSON.stringify(technicalVehicle) });
+  if (query.trim()) params.set("q", query.trim());
+  const res = await authenticatedFetch("/api/knowledge/recommendations?" + params.toString());
+  if (!res.ok) throw new Error("Не удалось загрузить рекомендации по автомобилю");
+  return res.json();
+}
+
+export async function fetchPublicKnowledgeSources(): Promise<{ sources: unknown[]; statuses?: unknown[]; generatedAt: string; note: string }> {
+  const res = await authenticatedFetch("/api/knowledge/sources");
+  if (!res.ok) throw new Error("Не удалось загрузить реестр источников");
+  return res.json();
+}
+
+export interface KnowledgeSourceRefreshResponse {
+  checkedAt: string;
+  statuses: Array<{
+    sourceId: string;
+    checkedAt: string;
+    status: "reachable" | "http_error" | "network_error" | "not_checked";
+    httpStatus?: number;
+    responseUrl?: string;
+    error?: string;
+  }>;
+}
+
+export async function refreshPublicKnowledgeSources(): Promise<KnowledgeSourceRefreshResponse> {
+  const res = await authenticatedFetch("/api/knowledge/sources/refresh", { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось проверить источники");
+  return data;
 }
 
 // Fetch all garage data

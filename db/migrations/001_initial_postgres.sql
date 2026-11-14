@@ -19,9 +19,6 @@ CREATE TABLE IF NOT EXISTS garageai_users (
 
 CREATE UNIQUE INDEX IF NOT EXISTS garageai_users_username_normalized_uq
   ON garageai_users (username_normalized);
-CREATE UNIQUE INDEX IF NOT EXISTS garageai_users_email_normalized_uq
-  ON garageai_users (lower(btrim(email))) WHERE email IS NOT NULL;
-
 CREATE TABLE IF NOT EXISTS garageai_garages (
   user_id text PRIMARY KEY REFERENCES garageai_users(id) ON DELETE CASCADE,
   data jsonb NOT NULL,

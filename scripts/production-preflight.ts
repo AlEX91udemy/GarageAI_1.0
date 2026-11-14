@@ -21,8 +21,8 @@ try {
   await db`SELECT 1`;
   const migrations = await db`SELECT version FROM garageai_schema_migrations ORDER BY version`;
   const versions = migrations.map((row) => Number(row.version));
-  if (versions.length === 0 || versions[versions.length - 1] !== 2) {
-    throw new Error("PostgreSQL schema version 2 is not applied");
+  if (versions.length === 0 || versions[versions.length - 1] !== 3) {
+    throw new Error("PostgreSQL schema version 3 is not applied");
   }
   const [users, garages, sessions] = await Promise.all([
     db`SELECT count(*)::integer AS count FROM garageai_users`,

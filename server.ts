@@ -45,6 +45,8 @@ import {
   catalogSearch,
 } from "./src/catalog/database";
 import { searchKnowledge } from "./src/catalog/knowledge";
+import { publicKnowledgeSources } from "./src/catalog/publicSources";
+import { getVehicleRecommendations } from "./src/catalog/recommendations";
 import { verifyModification } from "./src/catalog/verification";
 import {
   prepareDocumentImage,
@@ -764,6 +766,8 @@ app.use("/api", (req, res, next) => {
     req.path === "/vehicles/top100" ||
     req.path.startsWith("/catalog/modifications/") ||
     req.path === "/knowledge/search" ||
+    req.path === "/knowledge/sources" ||
+    req.path === "/knowledge/recommendations" ||
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||
@@ -922,9 +926,130 @@ app.get("/api/catalog/modifications/:id", (req, res) => {
   res.json({ modification, generation, model, brand, engine: catalogEngines.find((item) => item.id === modification.engineId) || null, transmission: catalogTransmissions.find((item) => item.id === modification.transmissionId) || null, source: catalogSources.find((item) => item.id === modification.sourceId) || null, evidence: modificationEvidence.filter((item) => item.modificationId === modification.id), verification: verifyModification(modification, modificationEvidence, catalogSources) });
 });
 app.get("/api/knowledge/search", (req, res) => {
-  const query = typeof req.query.q === "string" ? req.query.q : "";
+  if (req.query.q !== undefined && typeof req.query.q !== "string") return res.status(400).json({ error: "Параметр q должен быть строкой" });
+  const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, KNOWLEDGE_QUERY_MAX_LENGTH) : "";
   const filters = { brand: typeof req.query.brand === "string" ? req.query.brand : undefined, model: typeof req.query.model === "string" ? req.query.model : undefined, generation: typeof req.query.generation === "string" ? req.query.generation : undefined, category: typeof req.query.category === "string" ? req.query.category : undefined };
-  res.json({ chunks: searchKnowledge(query, filters as any), sources: catalogSources });
+  res.json({ chunks: searchKnowledge(query, filters as any), sources: [...catalogSources, ...publicKnowledgeSources] });
+});
+const KNOWLEDGE_QUERY_MAX_LENGTH = 200;
+const KNOWLEDGE_VEHICLE_MAX_LENGTH = 4_000;
+const KNOWLEDGE_REFRESH_LIMIT = 3;
+const KNOWLEDGE_REFRESH_WINDOW_MS = 15 * 60 * 1000;
+const knowledgeRefreshAttempts = new Map<string, { count: number; startedAt: number }>();
+const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
+const KNOWLEDGE_QUERY_KEYS = new Set(["vehicle", "q", ...KNOWLEDGE_VEHICLE_KEYS]);
+
+function parseKnowledgeVehicle(value: unknown): { vehicle?: Record<string, unknown>; error?: string } {
+  if (typeof value !== "string") return { vehicle: {} };
+  if (value.length > KNOWLEDGE_VEHICLE_MAX_LENGTH) return { error: "Профиль автомобиля слишком большой" };
+  let parsed: unknown;
+  try { parsed = JSON.parse(value); } catch { return { error: "Некорректный JSON профиля автомобиля" }; }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { error: "Профиль автомобиля должен быть объектом" };
+  const source = parsed as Record<string, unknown>;
+  const unknownKeys = Object.keys(source).filter((key) => !KNOWLEDGE_VEHICLE_KEYS.has(key));
+  if (unknownKeys.length) return { error: "Профиль содержит недопустимые поля" };
+  const vehicle: Record<string, unknown> = {};
+  for (const key of KNOWLEDGE_VEHICLE_KEYS) {
+    const raw = source[key];
+    if (raw === undefined || raw === null) continue;
+    if (["year", "currentMileage"].includes(key)) {
+      if (typeof raw !== "number" || !Number.isFinite(raw) || !Number.isInteger(raw)) return { error: "Числовое поле профиля некорректно" };
+      if (key === "year" && (raw < 1886 || raw > 2100)) return { error: "Год автомобиля вне допустимого диапазона" };
+      if (key === "currentMileage" && (raw < 0 || raw > 1_000_000)) return { error: "Пробег вне допустимого диапазона" };
+      vehicle[key] = raw;
+      continue;
+    }
+    if (typeof raw !== "string" || raw.length > 160) return { error: "Текстовое поле профиля некорректно" };
+    const text = raw.trim();
+    if (text) vehicle[key] = text;
+  }
+  return { vehicle };
+}
+
+function parseKnowledgeVehicleQuery(query: express.Request["query"]): { vehicle?: Record<string, unknown>; error?: string } {
+  const vehicle: Record<string, unknown> = {};
+  for (const key of KNOWLEDGE_VEHICLE_KEYS) {
+    const raw = query[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "string") return { error: "Параметр профиля должен быть строкой" };
+    if (["year", "currentMileage"].includes(key)) {
+      if (!/^\d+$/.test(raw)) return { error: "Числовое поле профиля некорректно" };
+      const number = Number(raw);
+      if (!Number.isSafeInteger(number)) return { error: "Числовое поле профиля некорректно" };
+      if (key === "year" && (number < 1886 || number > 2100)) return { error: "Год автомобиля вне допустимого диапазона" };
+      if (key === "currentMileage" && number > 1_000_000) return { error: "Пробег вне допустимого диапазона" };
+      vehicle[key] = number;
+      continue;
+    }
+    if (raw.length > 160) return { error: "Текстовое поле профиля некорректно" };
+    const text = raw.trim();
+    if (text) vehicle[key] = text;
+  }
+  return { vehicle };
+}
+
+async function rateLimitKnowledgeRefresh(req: express.Request, res: express.Response): Promise<boolean> {
+  const key = hashToken(req.ip || "unknown");
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("knowledge-refresh", key, KNOWLEDGE_REFRESH_LIMIT, KNOWLEDGE_REFRESH_WINDOW_MS);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        res.status(429).json({ error: "Слишком много проверок источников. Повторите позже." });
+        return true;
+      }
+      return false;
+    } catch {
+      res.status(503).json({ error: "Проверка источников временно недоступна." });
+      return true;
+    }
+  }
+  const now = Date.now();
+  const current = knowledgeRefreshAttempts.get(key);
+  if (current && now - current.startedAt < KNOWLEDGE_REFRESH_WINDOW_MS && current.count >= KNOWLEDGE_REFRESH_LIMIT) {
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((current.startedAt + KNOWLEDGE_REFRESH_WINDOW_MS - now) / 1000)));
+    res.status(429).json({ error: "Слишком много проверок источников. Повторите позже." });
+    return true;
+  }
+  const window = !current || now - current.startedAt >= KNOWLEDGE_REFRESH_WINDOW_MS ? { count: 0, startedAt: now } : current;
+  window.count += 1;
+  knowledgeRefreshAttempts.set(key, window);
+  return false;
+}
+
+app.get("/api/knowledge/sources", (_req, res) => {
+  res.json({ sources: publicKnowledgeSources, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-14", statusScope: "instance-local", note: "Реестр содержит публичные точки входа. Статусы проверки относятся к текущему экземпляру сервера и не являются доказательством содержимого документа. Для точного совета нужен документ производителя для конкретного рынка, года, двигателя и VIN." });
+});
+const publicKnowledgeSourceStatuses = new Map<string, { sourceId: string; checkedAt: string; status: "reachable" | "http_error" | "network_error" | "not_checked"; httpStatus?: number; responseUrl?: string; error?: string }>();
+async function refreshPublicKnowledgeSources() {
+  const checkedAt = new Date().toISOString();
+  await Promise.all(publicKnowledgeSources.map(async (source) => {
+    try {
+      const response = await fetch(source.url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8_000) });
+      publicKnowledgeSourceStatuses.set(source.id, { sourceId: source.id, checkedAt, status: response.ok ? "reachable" : "http_error", httpStatus: response.status, responseUrl: response.url });
+    } catch (error) {
+      publicKnowledgeSourceStatuses.set(source.id, { sourceId: source.id, checkedAt, status: "network_error", error: error instanceof Error ? error.message.slice(0, 240) : "network request failed" });
+    }
+  }));
+  return { checkedAt, statuses: Array.from(publicKnowledgeSourceStatuses.values()) };
+}
+app.post("/api/knowledge/sources/refresh", requireAuth, async (req, res) => {
+  if (await rateLimitKnowledgeRefresh(req, res)) return;
+  res.json(await refreshPublicKnowledgeSources());
+});
+app.get("/api/knowledge/recommendations", (req, res) => {
+  const unknownQueryKeys = Object.keys(req.query).filter((key) => !KNOWLEDGE_QUERY_KEYS.has(key));
+  if (unknownQueryKeys.length) return res.status(400).json({ error: "Запрос содержит недопустимые поля" });
+  if (req.query.vehicle !== undefined && typeof req.query.vehicle !== "string") return res.status(400).json({ error: "Профиль автомобиля должен быть JSON-строкой" });
+  const parsedVehicle = req.query.vehicle && typeof req.query.vehicle === "string"
+    ? parseKnowledgeVehicle(req.query.vehicle)
+    : parseKnowledgeVehicleQuery(req.query);
+  if (parsedVehicle.error) return res.status(400).json({ error: parsedVehicle.error });
+  if (req.query.q !== undefined && typeof req.query.q !== "string") return res.status(400).json({ error: "Параметр q должен быть строкой" });
+  const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (rawQuery.length > KNOWLEDGE_QUERY_MAX_LENGTH) return res.status(400).json({ error: "Запрос слишком длинный" });
+  const query = rawQuery;
+  res.json({ recommendations: getVehicleRecommendations(parsedVehicle.vehicle || {}, query), sources: publicKnowledgeSources });
 });
 
 app.get("/api/vehicles/:id", (req, res) => {
@@ -2065,6 +2190,8 @@ const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LIMIT = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const REGISTRATION_LIMIT = 5;
+const REGISTRATION_WINDOW_MS = 15 * 60 * 1000;
 const EMAIL_CODE_LIMIT = 5;
 const EMAIL_CODE_WINDOW_MS = 15 * 60 * 1000;
 const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
@@ -2072,6 +2199,7 @@ const EMAIL_VERIFY_LIMIT = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
 const loginAttempts = new Map<string, { count: number; startedAt: number }>();
+const registrationAttempts = new Map<string, { count: number; startedAt: number }>();
 const emailCodeAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
 const SESSION_COOKIE = "garagehub_session";
@@ -2131,6 +2259,9 @@ const rateLimitCleanupTimer = setInterval(() => {
     if (now - attempt.startedAt >= LOGIN_WINDOW_MS) {
       loginAttempts.delete(key);
     }
+  }
+  for (const [key, attempt] of registrationAttempts) {
+    if (now - attempt.startedAt >= REGISTRATION_WINDOW_MS) registrationAttempts.delete(key);
   }
   for (const [key, attempt] of emailCodeAttempts) {
     if (now - attempt.startedAt >= EMAIL_CODE_WINDOW_MS) emailCodeAttempts.delete(key);
@@ -2362,6 +2493,36 @@ async function rateLimitedLogin(req: express.Request, res: express.Response): Pr
   return false;
 }
 
+async function rateLimitedRegistration(req: express.Request, res: express.Response): Promise<boolean> {
+  const clientId = req.ip || "unknown";
+  const now = Date.now();
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("registration", hashToken(clientId), REGISTRATION_LIMIT, REGISTRATION_WINDOW_MS, now);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        res.status(429).json({ error: "Слишком много регистраций с этого адреса. Повторите позже." });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Registration rate-limit storage failed:", error instanceof Error ? error.message : "unknown error");
+      res.status(503).json({ error: "Сервис регистрации временно недоступен." });
+      return true;
+    }
+  }
+  const current = registrationAttempts.get(clientId);
+  if (current && now - current.startedAt < REGISTRATION_WINDOW_MS && current.count >= REGISTRATION_LIMIT) {
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((current.startedAt + REGISTRATION_WINDOW_MS - now) / 1000)));
+    res.status(429).json({ error: "Слишком много регистраций с этого адреса. Повторите позже." });
+    return true;
+  }
+  const window = !current || now - current.startedAt >= REGISTRATION_WINDOW_MS ? { count: 0, startedAt: now } : current;
+  window.count += 1;
+  registrationAttempts.set(clientId, window);
+  return false;
+}
+
 async function clearLoginAttempts(clientId: string): Promise<void> {
   if (store instanceof PostgresPersistence) {
     try {
@@ -2373,6 +2534,9 @@ async function clearLoginAttempts(clientId: string): Promise<void> {
   }
   loginAttempts.delete(clientId);
 }
+
+
+
 
 async function establishSession(req: express.Request, res: express.Response, userId: string, username: string, email?: string) {
   const { record, token } = createSession(userId);
@@ -2386,10 +2550,28 @@ async function establishSession(req: express.Request, res: express.Response, use
   return { username, email, csrfToken: record.csrfSecret };
 }
 
+async function issueEmailChallenge(userId: string, email: string): Promise<void> {
+  const secret = process.env.EMAIL_CODE_SECRET?.trim();
+  if (!secret) throw new Error("Email code secret is not configured");
+  const id = newId("email-challenge");
+  const code = generateEmailCode();
+  const createdAtMs = Date.now();
+  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs };
+  await store.createEmailChallenge(record);
+  try {
+    await sendEmailCode(email, code);
+  } catch (error) {
+    await store.consumeEmailChallenge(userId, id, Date.now());
+    throw error;
+  }
+}
+
 app.post("/api/auth/register", async (req, res) => {
-  if (await rateLimitedLogin(req, res)) return;
+  if (await rateLimitedRegistration(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Для регистрации нужен корректный email" });
   try {
     if (await store.getUserByName(credentials.username!)) {
       return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
@@ -2398,22 +2580,35 @@ app.post("/api/auth/register", async (req, res) => {
     console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
+  let createdUserId: string | undefined;
   try {
+    // Local development should remain usable without a configured mail provider.
+    // Production and test runs still require the normal email challenge flow.
+    const localEmailVerificationBypass = process.env.NODE_ENV !== "production"
+      && !process.env.EMAIL_CODE_CAPTURE_FILE?.trim()
+      && !emailDeliveryConfigured();
     const userId = newId("user");
-    const email = req.body?.email ? normalizeEmail(req.body.email) : null;
-    if (req.body?.email && !email) { res.status(400).json({ error: "Введите корректный email" }); return; }
-    if (email && (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email))) {
+    createdUserId = userId;
+    if (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email)) {
       res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
     }
-    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId, email ?? undefined);
-    await clearLoginAttempts(req.ip || "unknown");
-    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!, email ?? undefined) });
+    const created = store instanceof PostgresPersistence
+      ? await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
+      : await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
+    if (localEmailVerificationBypass) {
+      return res.status(201).json({ success: true, session: await establishSession(req, res, created.id, created.username, created.email) });
+    }
+    await issueEmailChallenge(created.id, email);
+    return res.status(202).json({ success: true, pendingEmailVerification: true, email, message: "Проверьте email и введите код подтверждения." });
   } catch (error) {
+    if (createdUserId) {
+      await store.deleteUser(createdUserId).catch(() => undefined);
+    }
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
     console.error("Registration error:", error);
-    return res.status(500).json({ error: "Не удалось создать аккаунт" });
+    return res.status(503).json({ error: "Не удалось создать аккаунт или отправить код подтверждения" });
   }
 });
 
@@ -2434,6 +2629,9 @@ app.post("/api/auth/login", async (req, res) => {
   }
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
+  }
+  if (user.email && user.emailVerifiedAt === null) {
+    return res.status(403).json({ error: "Подтвердите email кодом из письма перед входом", code: "EMAIL_NOT_VERIFIED" });
   }
   await clearLoginAttempts(req.ip || "unknown");
   try {
@@ -2497,6 +2695,12 @@ async function consumeEmailVerifyLimit(req: express.Request, email: string): Pro
 }
 
 async function sendEmailCode(email: string, code: string): Promise<void> {
+  const captureFile = process.env.EMAIL_CODE_CAPTURE_FILE?.trim();
+  if (process.env.NODE_ENV === "test" && captureFile) {
+    fs.mkdirSync(path.dirname(captureFile), { recursive: true });
+    fs.appendFileSync(captureFile, JSON.stringify({ email, code, createdAt: new Date().toISOString() }) + "\n", "utf8");
+    return;
+  }
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.EMAIL_FROM?.trim();
   if (!apiKey || !from) throw new Error("Email provider is not configured");
@@ -2505,6 +2709,10 @@ async function sendEmailCode(email: string, code: string): Promise<void> {
     body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
   });
   if (!response.ok) throw new Error("Email provider rejected the request");
+}
+
+function emailDeliveryConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim());
 }
 
 app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req, res) => {
@@ -2520,18 +2728,7 @@ app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req
     }
     const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
     if (user) {
-      const id = newId("email-challenge");
-      const code = generateEmailCode();
-      const secret = process.env.EMAIL_CODE_SECRET?.trim();
-      if (!secret) throw new Error("Email code secret is not configured");
-      const record: EmailAuthChallengeRecord = { id, userId: user.id, codeHash: hashEmailCode(id, code, secret), expiresAtMs: Date.now() + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs: Date.now() };
-      await store.createEmailChallenge(record);
-      try {
-        await sendEmailCode(email, code);
-      } catch (sendError) {
-        await store.consumeEmailChallenge(user.id, id, Date.now());
-        throw sendError;
-      }
+      await issueEmailChallenge(user.id, email);
     }
     return res.json({ success: true, message: "Если аккаунт существует, код отправлен на email." });
   } catch (error) {
@@ -2557,6 +2754,7 @@ app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, 
     if (!accepted) {
       return res.status(401).json({ error: "Неверный или просроченный код" });
     }
+    if (user.emailVerifiedAt === null) await store.markEmailVerified(user.id);
     return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch {
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
@@ -2813,6 +3011,10 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
       model: vehicleModel || undefined,
       generation: vehicleGeneration || undefined,
     }).slice(0, 5);
+    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const retrievedRecommendations = recommendationContext.length
+      ? recommendationContext.map((item) => "[" + item.risk + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + ")").join("\n")
+      : "Подходящих правил для запроса нет.";
     const retrievedContext = knowledgeContext.length
       ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source})`).join("\n")
       : "Подходящих подтверждённых фрагментов локальной базы нет. Не выдавай предположения за факт.";
@@ -2837,6 +3039,9 @@ ${userNotes ? `Дополнительные примечания: ${userNotes}` 
 
 РЕЛЕВАНТНЫЙ КОНТЕКСТ KNOWLEDGE BASE (RAG):
 ${retrievedContext}
+
+ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ:
+${retrievedRecommendations}
 
 Правила: отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если данных для точного вывода нет, скажи, что нужна проверка по официальному руководству или на СТО.
 
@@ -2935,6 +3140,10 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) {
       return res.status(400).json({ error: "Некорректное base64-изображение" });
     }
+    const decodedImage = Buffer.from(cleanBase64, "base64");
+    if (decodedImage.length === 0) {
+      return res.status(400).json({ error: "Пустое изображение чека" });
+    }
 
     const receiptPrompt = `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
 Извлеки точные данные и верни JSON со структурой:
@@ -2952,7 +3161,7 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     const documentReceiptId = process.env.DOCUMENT_AI_RECEIPT_PROCESSOR_ID;
     if (documentReceiptId && process.env.GOOGLE_CLOUD_PROJECT) {
       try {
-        const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), supportedMime, documentReceiptId);
+        const doc = await processWithDocumentAi(decodedImage, supportedMime, documentReceiptId);
         const entities = (doc?.entities || []) as Array<{ type?: string; mentionText?: string; normalizedValue?: { text?: string; moneyValue?: { currencyCode?: string; units?: string; nanos?: number } } }>;
         const totalEntity = entities.find(item => (item.type || "").toLowerCase().includes("total_amount"));
         const totalText = documentEntityValue(entities, ["total_amount", "total"]);
@@ -3021,6 +3230,7 @@ app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
     const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
     const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное изображение СТС." });
+    if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение СТС." });
     const prompt = [
       "Ты высокоточный OCR российского свидетельства о регистрации транспортного средства (СТС).",
       "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай.",
@@ -3053,6 +3263,7 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
     const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
     const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное base64-изображение." });
+    if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение документа." });
     const prepared = await prepareDocumentImage(Buffer.from(cleanBase64, "base64"));
     const documentOcrId =
       process.env.DOCUMENT_AI_OCR_PROCESSOR_ID || process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID;

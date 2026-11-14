@@ -12,7 +12,7 @@ Copy `users.json`, `garage_store.json`, and `sessions.json` to a restricted read
 
 ## 3. Apply schema
 
-Set `DATABASE_URL` only in the controlled migration shell or through Secret Manager, then run `npx tsx scripts/migrate-postgres.ts` with `DATABASE_SSL=true`. Verify schema versions 1 and 2. Keep `DATABASE_AUTO_MIGRATE=false` for the web runtime.
+Set `DATABASE_URL` only in the controlled migration shell or through Secret Manager, then run `npx tsx scripts/migrate-postgres.ts` with `DATABASE_SSL=true`. Verify schema versions 1, 2 and 3. Keep `DATABASE_AUTO_MIGRATE=false` for the web runtime.
 
 ## 4. Dry-run and apply import
 

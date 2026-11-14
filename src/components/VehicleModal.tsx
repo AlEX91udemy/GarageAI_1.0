@@ -34,9 +34,9 @@ interface VehicleModalProps {
   allVehicles: Vehicle[];
   initialMode?: "edit" | "add";
   onClose: () => void;
-  onSaveVehicle: (vehicle: Vehicle) => void;
-  onAddVehicle: (vehicle: Vehicle) => void;
-  onDeleteVehicle: (vehicleId: string) => void;
+  onSaveVehicle: (vehicle: Vehicle) => boolean | void;
+  onAddVehicle: (vehicle: Vehicle) => boolean | void;
+  onDeleteVehicle: (vehicleId: string) => boolean | void;
 }
 
 // Preset vehicle templates for quick 1-click addition
@@ -291,7 +291,6 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   onDeleteVehicle,
 }) => {
   const [mode, setMode] = useState<"edit" | "add">(initialMode);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStsScanner, setShowStsScanner] = useState(false);
 
   // Form states
@@ -478,7 +477,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         photoUrl: undefined,
         lastMileageUpdate: new Date().toLocaleDateString("ru-RU"),
       };
-      onSaveVehicle(updated);
+      if (onSaveVehicle(updated) === false) return;
     } else {
       const newV: Vehicle = {
         id: "car-" + crypto.randomUUID(),
@@ -499,7 +498,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         photoUrl: undefined,
         lastMileageUpdate: new Date().toLocaleDateString("ru-RU"),
       };
-      onAddVehicle(newV);
+      if (onAddVehicle(newV) === false) return;
     }
     onClose();
   };
@@ -588,38 +587,16 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
           {allVehicles.length > 1 && mode === "edit" && currentVehicle && (
-            showDeleteConfirm ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-neutral-500 font-medium">Точно удалить?</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onDeleteVehicle(currentVehicle.id);
-                    setShowDeleteConfirm(false);
-                    onClose();
-                  }}
-                  className="text-xs text-white bg-brand-strong hover:bg-brand-hover font-bold px-2 py-1 rounded-lg transition"
-                >
-                  Да
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="text-xs text-neutral-600 bg-neutral-100 hover:bg-neutral-200 px-2 py-1 rounded-lg transition"
-                >
-                  Отмена
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="text-xs text-brand-strong hover:text-brand-hover font-semibold flex items-center gap-1 transition cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Удалить</span>
-              </button>
-            )
+            <button
+              type="button"
+              onClick={() => {
+                if (onDeleteVehicle(currentVehicle.id) !== false) onClose();
+              }}
+              className="text-xs text-brand-strong hover:text-brand-hover font-semibold flex items-center gap-1 transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Удалить</span>
+            </button>
           )}
         </div>
       </div>

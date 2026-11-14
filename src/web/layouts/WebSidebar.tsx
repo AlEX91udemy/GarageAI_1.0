@@ -42,7 +42,7 @@ export const WebSidebar: React.FC<WebSidebarProps> = ({
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen flex flex-col border-r transition-all duration-300 z-40 ${
+      className={`hidden md:flex fixed left-0 top-0 h-screen flex-col border-r transition-all duration-300 z-40 ${
         isCollapsed ? "w-20" : "w-64"
       } ${
         isDark

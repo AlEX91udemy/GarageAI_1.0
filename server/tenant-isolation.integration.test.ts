@@ -11,6 +11,7 @@ let child: ChildProcessWithoutNullStreams | undefined;
 let baseUrl = "";
 let tempDir = "";
 let childOutput = "";
+let emailCaptureFile = "";
 
 async function freePort(): Promise<number> {
   const server = net.createServer();
@@ -42,18 +43,27 @@ async function waitForServer(): Promise<void> {
 }
 
 async function register(username: string): Promise<Auth> {
+  const email = `${username}@example.test`;
+  const ipOctet = Array.from(username).reduce((sum, char) => (sum + char.charCodeAt(0)) % 240, 1);
+  const testClientIp = `198.51.100.${ipOctet}`;
   const response = await fetch(`${baseUrl}/api/auth/register`, {
     method: "POST",
-    headers: { "content-type": "application/json", origin: baseUrl },
-    body: JSON.stringify({ username, password: "TestPassword-123!" }),
+    headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": testClientIp },
+    body: JSON.stringify({ username, password: "TestPassword-123!", email }),
   });
-  const body = await response.json() as { session?: { csrfToken?: string }; error?: string };
-  if (response.status !== 201 || !body.session?.csrfToken) {
+  const body = await response.json() as { pendingEmailVerification?: boolean; error?: string };
+  if (response.status !== 202 || !body.pendingEmailVerification) {
     throw new Error(`Registration failed for ${username}: ${response.status} ${JSON.stringify(body)}`);
   }
-  const setCookie = response.headers.get("set-cookie");
-  if (!setCookie) throw new Error("Registration did not set a session cookie");
-  return { cookie: setCookie.split(";")[0], csrfToken: body.session.csrfToken };
+  const lines = fs.existsSync(emailCaptureFile) ? fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean) : [];
+  const captured = lines.map((line) => JSON.parse(line) as { email: string; code: string }).reverse().find((item) => item.email === email);
+  if (!captured) throw new Error(`Registration did not capture an email code for ${username}`);
+  const verified = await fetch(`${baseUrl}/api/auth/email/verify`, { method: "POST", headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": testClientIp }, body: JSON.stringify({ email, code: captured.code }) });
+  const verifiedBody = await verified.json() as { session?: { csrfToken?: string }; error?: string };
+  if (verified.status !== 200 || !verifiedBody.session?.csrfToken) throw new Error(`Email verification failed for ${username}: ${verified.status} ${JSON.stringify(verifiedBody)}`);
+  const setCookie = verified.headers.get("set-cookie");
+  if (!setCookie) throw new Error("Verification did not set a session cookie");
+  return { cookie: setCookie.split(";")[0], csrfToken: verifiedBody.session.csrfToken };
 }
 
 async function request(auth: Auth, route: string, init: RequestInit = {}): Promise<Response> {
@@ -66,9 +76,10 @@ async function request(auth: Auth, route: string, init: RequestInit = {}): Promi
   return fetch(`${baseUrl}${route}`, { ...init, headers });
 }
 
-describe("HTTP tenant isolation", () => {
+describe("HTTP tenant isolation", { timeout: 15_000 }, () => {
   beforeAll(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "garageai-http-isolation-"));
+    emailCaptureFile = path.join(tempDir, "email-codes.ndjson");
     const port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;
     const spawned = spawn(
@@ -78,7 +89,7 @@ describe("HTTP tenant isolation", () => {
         cwd: process.cwd(),
         env: {
           ...process.env,
-          NODE_ENV: "production",
+          NODE_ENV: "test",
           // The HTTP integration server uses disposable test files, never real production data.
           GARAGE_ALLOW_EPHEMERAL_STORAGE: "true",
           PORT: String(port),
@@ -94,6 +105,9 @@ describe("HTTP tenant isolation", () => {
           AGENTS_API_TOKEN: "integration-test-token",
           AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation",
           ALLOWED_ORIGINS: baseUrl,
+          TRUSTED_PROXY_HOPS: "1",
+          EMAIL_CODE_SECRET: "integration-test-email-secret",
+          EMAIL_CODE_CAPTURE_FILE: emailCaptureFile,
         },
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -404,14 +418,51 @@ describe("HTTP tenant isolation", () => {
   it("returns conflict when two registrations race for the same username", async () => {
     const createAccount = () => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
-      headers: { "content-type": "application/json", origin: baseUrl },
-      body: JSON.stringify({ username: "concurrent-signup", password: "TestPassword-123!" }),
+      headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": "198.51.100.77" },
+      body: JSON.stringify({ username: "concurrent-signup", password: "TestPassword-123!", email: "concurrent-signup@example.test" }),
     });
 
     const responses = await Promise.all([createAccount(), createAccount()]);
-    expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+    expect(responses.map((response) => response.status).sort()).toEqual([202, 409]);
     const bodies = await Promise.all(responses.map((response) => response.json() as Promise<{ error?: string }>));
     expect(bodies.some((body) => body.error === "Пользователь с таким логином уже существует")).toBe(true);
+  });
+
+  it("enforces five registrations per trusted client IP without resetting the bucket", async () => {
+    const ip = "198.51.100.88";
+    const create = (index: number) => fetch(`${baseUrl}/api/auth/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": ip },
+      body: JSON.stringify({ username: `quota-${index}`, password: "TestPassword-123!", email: `quota-${index}@example.test` }),
+    });
+    const responses = await Promise.all([1, 2, 3, 4, 5].map(create));
+    expect(responses.every((response) => response.status === 202)).toBe(true);
+    const sixth = await create(6);
+    expect(sixth.status).toBe(429);
+  });
+
+  it("validates public knowledge recommendation input and exposes instance-local refresh scope", async () => {
+    const sources = await fetch(`${baseUrl}/api/knowledge/sources`);
+    expect(sources.status).toBe(200);
+    const sourceBody = await sources.json() as { statusScope?: string };
+    expect(sourceBody.statusScope).toBe("instance-local");
+
+    const nonFiniteMileage = await fetch(`${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify({ currentMileage: "NaN" }))}`);
+    expect(nonFiniteMileage.status).toBe(400);
+
+    const unsupportedField = await fetch(`${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify({ vin: "SHOULD_NOT_BE_ACCEPTED" }))}`);
+    expect(unsupportedField.status).toBe(400);
+
+    const unsupportedQuery = await fetch(`${baseUrl}/api/knowledge/recommendations?vin=SHOULD_NOT_BE_ACCEPTED`);
+    expect(unsupportedQuery.status).toBe(400);
+
+    const longQuery = await fetch(`${baseUrl}/api/knowledge/recommendations?q=${"x".repeat(201)}`);
+    expect(longQuery.status).toBe(400);
+
+    const valid = await fetch(`${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify({ make: "Lada", model: "Vesta", currentMileage: 100000 }))}`);
+    expect(valid.status).toBe(200);
+    const validBody = await valid.json() as { recommendations?: Array<{ id: string }> };
+    expect(validBody.recommendations?.some((item) => item.id === "rule-lada-manual")).toBe(true);
   });
 
   it("does not drop records when one user creates vehicles concurrently", async () => {
