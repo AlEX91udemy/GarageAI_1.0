@@ -21,6 +21,13 @@ export function asNonNegativeNumber(value: unknown, max = 1_000_000_000): number
   return num;
 }
 
+export function asStrictNonNegativeNumber(value: unknown, max = 1_000_000_000): number | null {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0 || num > max) return null;
+  return num;
+}
+
 export function validateDiagnosticResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const result = value as Record<string, unknown>;

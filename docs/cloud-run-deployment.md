@@ -1,10 +1,10 @@
 # GarageAI Cloud Run deployment runbook
 
-Status: **deployment prepared, not executed**. PostgreSQL persistence and the importer are merged, but no Google Cloud resource is claimed to have been created and no real user data has been migrated.
+Status: **canary deployment executed on 2026-11-08; legacy import and restore rehearsal completed on 2026-11-11**. The Cloudflare Worker now proxies to `garageai-web-canary` in project `garage-ai-512223`. The canary uses Cloud SQL/Secret Manager. PostgreSQL schema, legacy import, backup, restore rehearsal, tenant isolation, auth, CSRF, durable CRUD, restart, logout, concurrency, and session lifecycle checks have passed. Live email-code smoke and the observation window remain open release gates.
 
 ## Production blockers
 
-1. PostgreSQL persistence is merged to `main` behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. The dry-run/transactional JSON importer and disposable-PostgreSQL CI tests are merged and passing, but **real-data import/cutover and Cloud SQL smoke tests have not been performed**. Do not serve real user data until ownership checks, backup/restore, tenant isolation, and restart/scale tests pass.
+1. PostgreSQL persistence is merged behind `DATABASE_URL`, including shared sessions and revision-checked garage writes. The deployment record dated 2026-11-11 records a transactional legacy import, Cloud SQL preflight, smoke checks, tenant isolation, restart/session checks and a separate-instance restore rehearsal. The remaining data-release gate is independent confirmation of the legacy bundle's source plus the production observation window; use the current status log as the source of truth.
 2. **Resolved and merged:** the agent service uses `google-genai` directly and requires `opentelemetry-api>=1.45.1,<2`. CI passed the Python dependency audit with `opentelemetry-api 1.45.1` and no known vulnerabilities. Keep the agent service private regardless.
 3. The Node-to-Python service client is implemented, but actual Cloud Run OIDC/IAM, Secret Manager and live model smoke tests have not been run. Production agent calls must remain disabled until the private Cloud Run service, secrets, IAM and model permissions are verified.
 
@@ -12,7 +12,9 @@ Status: **deployment prepared, not executed**. PostgreSQL persistence and the im
 
 The Node server refuses to start in production unless `DATABASE_URL` is configured and `GARAGE_POSTGRES_READY=true` explicitly records that migration/import and restore checks have passed. PostgreSQL schema migrations are verified on startup but are not executed by the runtime service by default. This is intentional: Cloud Run's writable filesystem is ephemeral and is not shared between instances. Do not set `GARAGE_ALLOW_EPHEMERAL_STORAGE=true` for real user data. That override exists only for an explicitly approved temporary demo with disposable data; it does not make the deployment production-safe.
 
-Before production deployment, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data and restore a backup. Then enable `GARAGE_POSTGRES_READY=true` on a private canary only, with public traffic disabled, and run auth/session lifecycle, concurrent writes, tenant isolation, restart/scale and model smoke tests. Set the flag on the production service and route traffic only after the canary passes. The current runbook is not a deploy-now checklist while this gate is active.
+For a fresh import or future migration, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data and restore a backup. Then enable `GARAGE_POSTGRES_READY=true` on a private canary only, with public traffic disabled, and run auth/session lifecycle, concurrent writes, tenant isolation, restart/scale and model smoke tests. Set the flag on the production service and route traffic only after the canary passes. The recorded 2026-11-11 cutover checks do not replace these steps for a later data change.
+
+Before setting the flag, run `DATABASE_URL=... npm run preflight:production` from the controlled migration environment. The command checks connectivity, schema version 3 including email verification state, row counts and active sessions without printing credentials or user data. Set `GARAGE_POSTGRES_READY=true` only after the backup/restore and canary checks in this runbook pass.
 
 ## Suggested initial resources
 
@@ -51,7 +53,7 @@ gcloud artifacts repositories create garageai --repository-format=docker --locat
 gcloud builds submit --tag "europe-west1-docker.pkg.dev/$PROJECT_ID/garageai/garageai-web:latest" .
 ```
 
-Do not deploy the web service with real user data until the Cloud SQL schema migration, JSON import, and backup/restore tests are complete. Configure `DATABASE_URL` through Secret Manager or the approved Cloud SQL connection path. Keep `GARAGE_POSTGRES_READY` unset until cutover validation is complete.
+For a new production environment, do not deploy the web service with real user data until the Cloud SQL schema migration, JSON import, and backup/restore tests are complete. Configure `DATABASE_URL` through Secret Manager or the approved Cloud SQL connection path. Keep `GARAGE_POSTGRES_READY` unset until cutover validation is complete.
 
 ## Build the private agent container
 
@@ -101,6 +103,7 @@ Do this only after the JSON store/session persistence blockers are resolved and 
 4. On the web service, configure the same Secret Manager secret `agents-api-token` used by the agent service, plus the agent service URL/audience. Keep the service public only if the application’s own login/session controls and production database are ready. Do not disable Cloud Run IAM on the agent service.
 
 Environment settings:
+- `ALLOWED_ORIGINS`: include every browser origin that can reach the API through the Worker, including `https://garageai.site`, `https://www.garageai.site`, and `https://garageai-1-0.sambur91.workers.dev`. The Worker forwards the browser `Origin` header to Cloud Run, so omitting the Worker hostname causes legitimate state-changing requests to receive `403`.
 - `AGENTS_SERVICE_URL`: exact Cloud Run service URL returned by `gcloud run services describe`.
 - `AGENTS_SERVICE_AUDIENCE`: normally the same service URL; use a custom value only when Cloud Run is configured for that audience.
 - `AGENTS_API_TOKEN`: same high-entropy secret in both services, stored in Secret Manager. Never commit or send it to the browser.

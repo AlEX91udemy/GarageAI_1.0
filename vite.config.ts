@@ -24,11 +24,12 @@ export default defineConfig(() => {
       minify: true,
       rollupOptions: {
         output: {
-          // Three.js и React вынесены в отдельные чанки: они редко меняются
+          // Библиотеки рантайма и иконок редко меняются и кэшируются отдельно
           // и кэшируются браузером отдельно от бизнес-кода.
           manualChunks: {
             three: ['three'],
             react_vendor: ['react', 'react-dom'],
+            icons_vendor: ['lucide-react'],
           },
         },
       },

@@ -110,14 +110,17 @@ const LAT_TO_CYR_PLATE_MAP: Record<string, string> = {
 
 export function normalizeExtractedVin(raw: string | null | undefined): string | null {
   if (!raw || typeof raw !== "string") return null;
-  const cleaned = raw
+  const withoutLabel = raw.replace(/\bVIN\b\s*[:#-]?/gi, " ");
+  const cleaned = withoutLabel
     .toUpperCase()
     .replace(/[^0-9A-ZА-ЯЁ]/g, "")
     .split("")
     .map((ch) => CYR_TO_LAT_VIN_MAP[ch] || ch)
     .join("");
   const match = cleaned.match(/[A-HJ-NPR-Z0-9]{17}/);
-  return match ? match[0] : null;
+  if (!match) return null;
+  const candidate = match[0];
+  return /[IOQ]/.test(candidate) ? null : candidate;
 }
 
 export function normalizeRussianPlate(raw: string | null | undefined): string | null {

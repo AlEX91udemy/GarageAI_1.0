@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import {
   decodeVin,
   parseBarcodeOrQr,
@@ -19,6 +19,16 @@ const mockVehicle: Vehicle = {
   lastMileageUpdate: "2026-06-07",
   vin: "JN1TBNT31U0048123",
 };
+
+beforeEach(() => {
+  // These tests exercise the documented offline fallback; keep the optional
+  // availability probe from attempting localhost during the suite.
+  vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("VIN Code Parser", () => {
   it("decodes a standard 17-character Nissan VIN and identifies current vehicle", () => {

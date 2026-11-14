@@ -8,29 +8,16 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
-  HardDrive,
-  RefreshCw,
   Server,
-  Layers,
-  Lock,
-  Unlock,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-  KeyRound,
-  LogOut,
-  Sparkles,
+  Trash2,
 } from "lucide-react";
 import {
   FullGarageData,
   fetchGarageData,
   resetDatabase,
   importDatabaseBackup,
-  isAdminAuthenticated,
-  verifyAdminPassword,
-  adminLogout,
-  getAdminToken,
   authenticatedFetch,
+  deleteAccount,
 } from "../api";
 
 interface DataSyncBackupModalProps {
@@ -48,15 +35,11 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   isOnline,
   vehicleId,
 }) => {
-  const [isAdmin, setIsAdmin] = useState(() => Boolean(getAdminToken()));
-  const [passwordInput, setPasswordInput] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmAccountDeletion, setConfirmAccountDeletion] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
   const [dbStats, setDbStats] = useState<{
     vehicles: number;
     services: number;
@@ -68,10 +51,10 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setIsAdmin(Boolean(getAdminToken()));
-      setAuthError(null);
       setStatusMessage(null);
       setConfirmReset(false);
+      setConfirmAccountDeletion(false);
+      setDeletePassword("");
       loadStats();
     }
   }, [isOpen]);
@@ -88,47 +71,21 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
         lastUpdated: data.lastUpdated,
       });
     } catch (e) {
-      console.error(e);
+      setStatusMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось загрузить состояние хранилища",
+      });
     }
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordInput.trim()) {
-      setAuthError("Пожалуйста, введите ключ администратора.");
-      return;
-    }
-
-    setIsVerifying(true);
-    setAuthError(null);
-
-    const result = await verifyAdminPassword(passwordInput.trim());
-    setIsVerifying(false);
-
-    if (result.success) {
-      setIsAdmin(true);
-      setPasswordInput("");
-      loadStats();
-      setStatusMessage({ type: "success", text: "Доступ администратора успешно подтвержден!" });
-    } else {
-      // Подсказка пароля намеренно не добавляется — секрет хранится только на сервере (ADMIN_SECRET).
-      setAuthError(result.error || "Неверный пароль администратора.");
-    }
-  };
-
-  const handleAdminLogout = () => {
-    setStatusMessage({ type: "success", text: "Окно резервного копирования закрыто" });
-    onClose();
   };
 
   const dialogRef = useModalFocus(onClose, isOpen);
 
-  const handleExport = async () => {
+  const handleExport = async (scope: "account" | "vehicle" = "account") => {
     try {
-      const query = !getAdminToken() && vehicleId ? `?vehicleId=${encodeURIComponent(vehicleId)}` : "";
+      const query = scope === "vehicle" && vehicleId ? `?vehicleId=${encodeURIComponent(vehicleId)}` : "";
       const res = await authenticatedFetch(`/api/backup/export${query}`);
       if (!res.ok) {
-        throw new Error("Доступ запрещен. Требуются права администратора.");
+        throw new Error("Не удалось экспортировать данные текущего гаража.");
       }
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -140,15 +97,28 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setStatusMessage({ type: "success", text: vehicleId ? "Данные автомобиля успешно скачаны!" : "Полная резервная копия успешно скачана!" });
+      setStatusMessage({
+        type: "success",
+        text: scope === "vehicle" ? "Данные автомобиля успешно скачаны!" : "Полная резервная копия успешно скачана!",
+      });
     } catch (err: any) {
       setStatusMessage({ type: "error", text: err.message || "Ошибка экспорта" });
     }
   };
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
     if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setStatusMessage({ type: "error", text: "Файл резервной копии слишком большой. Максимальный размер — 10 МБ." });
+      return;
+    }
+
+    // Allow selecting the same file again after a failed or cancelled import.
+    e.currentTarget.value = "";
 
     setIsProcessing(true);
     setStatusMessage(null);
@@ -157,6 +127,10 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
+        if (!window.confirm("Подтвердить импорт резервной копии? Текущие данные гаража будут изменены.")) {
+          setStatusMessage({ type: "success", text: "Импорт отменён. Данные гаража не изменены." });
+          return;
+        }
         await importDatabaseBackup(json);
         const refreshed = await fetchGarageData();
         onDataReloaded(refreshed);
@@ -167,6 +141,14 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       } finally {
         setIsProcessing(false);
       }
+    };
+    reader.onerror = () => {
+      setIsProcessing(false);
+      setStatusMessage({ type: "error", text: "Не удалось прочитать файл резервной копии." });
+    };
+    reader.onabort = () => {
+      setIsProcessing(false);
+      setStatusMessage({ type: "error", text: "Чтение файла резервной копии было прервано." });
     };
     reader.readAsText(file);
   };
@@ -188,6 +170,19 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     }
   };
 
+  const handleAccountDeletion = async () => {
+    setIsProcessing(true);
+    setStatusMessage(null);
+    try {
+      await deleteAccount(deletePassword);
+      window.location.assign("/");
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: err.message || "Не удалось удалить аккаунт" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
 
   if (!isOpen) return null;
   return (
@@ -203,16 +198,12 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
         <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 shrink-0 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-neutral-900 text-white flex items-center justify-center shadow-md shrink-0">
-              {isAdmin ? (
-                <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              ) : (
-                <Lock className="w-5 h-5 text-amber-400" />
-              )}
+              <Database className="w-5 h-5 text-emerald-400" />
             </div>
             <div>
               <div className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${isAdmin ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                {isAdmin ? "Режим Администратора • Доступ открыт" : "Только для Администратора"}
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Данные текущего гаража
               </div>
               <h2 className="text-lg sm:text-xl font-extrabold text-neutral-900 tracking-tight">
                 Управление БД и бэкап
@@ -220,15 +211,6 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            {isAdmin && (
-              <button
-                onClick={handleAdminLogout}
-                className="p-2 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-brand-strong transition cursor-pointer"
-                title="Выйти из режима администратора"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
             <button
               onClick={onClose}
               className="p-2 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-neutral-700 transition cursor-pointer"
@@ -259,10 +241,10 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
             </div>
           )}
 
-          {!isAdmin && vehicleId && (
+          {vehicleId && (
             <button
               type="button"
-              onClick={handleExport}
+              onClick={() => handleExport("vehicle")}
               disabled={isProcessing}
               className="w-full flex items-center justify-between p-3.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer group"
             >
@@ -277,87 +259,10 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
             </button>
           )}
 
-          {/* ADMIN GATE: If not logged in as Admin, show Auth Prompt */}
-          {!isAdmin ? (
-            <div className="space-y-4 py-2">
-              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-amber-950 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <Lock className="w-4 h-4" />
-                </div>
-                <div className="text-xs space-y-1">
-                  <div className="font-bold text-sm text-amber-900">
-                    Требуется авторизация администратора
-                  </div>
-                  <p className="text-amber-800/90 leading-relaxed">
-                    Экспорт полного архива, загрузка резервной копии и сброс базы данных защищены для предотвращения случайной потери информации.
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleAdminLogin} className="space-y-3 pt-1">
-                <div>
-                  <label className="block text-xs font-bold text-neutral-700 mb-1.5">
-                    Пароль или секретный ключ администратора
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400">
-                      <KeyRound className="w-4 h-4" />
-                    </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={passwordInput}
-                      onChange={(e) => {
-                        setPasswordInput(e.target.value);
-                        if (authError) setAuthError(null);
-                      }}
-                      placeholder="Введите пароль администратора"
-                      autoFocus
-                      className="w-full pl-9 pr-10 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:bg-white transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 cursor-pointer"
-                      title={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {authError && (
-                    <div className="text-xs text-brand-strong font-semibold mt-1.5 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{authError}</span>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isVerifying}
-                  className="w-full mt-2 py-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl text-xs font-extrabold transition shadow-sm cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Unlock className="w-4 h-4 text-emerald-400" />
-                  <span>{isVerifying ? "Проверка..." : "Войти как администратор"}</span>
-                </button>
-              </form>
-            </div>
-          ) : (
-            /* ADMIN CONTROLS: Unlocked mode */
-            <>
-              {/* Admin Session Banner */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="font-bold">Вы авторизованы как Администратор</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAdminLogout}
-                  className="text-[11px] text-emerald-800 underline hover:text-emerald-950 font-semibold cursor-pointer"
-                >
-                  Заблокировать
-                </button>
-              </div>
+          {/* Backup actions are scoped to the authenticated user garage. */}
+          <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-xs text-emerald-900">
+            Экспорт, импорт и сброс работают только с данными текущего аккаунта.
+          </div>
 
               {/* Database Status Card */}
               <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-2.5">
@@ -367,7 +272,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                     <span>Хранилище Garage AI Engine</span>
                   </div>
                   <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md font-bold">
-                    JSON Persistence • data/garage_store.json
+                    Серверное хранилище • только данные текущего аккаунта
                   </span>
                 </div>
 
@@ -387,13 +292,61 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                     </div>
                   </div>
                 )}
+
+                {confirmAccountDeletion ? (
+                  <div className="p-3.5 bg-brand-soft border border-brand-border rounded-2xl text-xs space-y-2.5">
+                    <div className="font-bold text-brand-hover">Удаление аккаунта необратимо. Сначала скачайте резервную копию, затем введите текущий пароль.</div>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(event) => setDeletePassword(event.target.value)}
+                      autoComplete="current-password"
+                      placeholder="Текущий пароль"
+                      className="w-full rounded-xl border border-brand-border bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAccountDeletion}
+                        disabled={isProcessing || !deletePassword}
+                        className="px-3.5 py-1.5 bg-brand-strong hover:bg-brand-hover text-white font-bold rounded-xl transition disabled:opacity-50"
+                      >
+                        Удалить аккаунт и данные
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setConfirmAccountDeletion(false); setDeletePassword(""); }}
+                        disabled={isProcessing}
+                        className="px-3.5 py-1.5 bg-white border border-neutral-300 hover:bg-neutral-100 text-neutral-700 font-semibold rounded-xl transition"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmAccountDeletion(true)}
+                    disabled={isProcessing}
+                    className="w-full flex items-center justify-between p-3.5 bg-brand-soft/60 hover:bg-brand-soft text-brand-hover border border-brand-border/80 rounded-2xl text-xs font-bold transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-brand-soft-strong flex items-center justify-center"><Trash2 className="w-4 h-4 text-brand-strong" /></div>
+                      <div className="text-left">
+                        <div className="font-extrabold">Удалить аккаунт</div>
+                        <div className="text-[11px] text-brand-strong font-normal">Удалить профиль, гараж и активные сессии</div>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-brand-strong font-mono">Удалить</span>
+                  </button>
+                )}
               </div>
 
               {/* Action Controls */}
               <div className="space-y-3">
                 {/* Export button */}
                 <button
-                  onClick={handleExport}
+                  onClick={() => handleExport("account")}
                   disabled={isProcessing}
                   className="w-full flex items-center justify-between p-3.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl text-xs font-bold transition shadow-sm cursor-pointer group"
                 >
@@ -481,13 +434,11 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
                   </button>
                 )}
               </div>
-            </>
-          )}
         </div>
 
         {/* Fixed Footer */}
         <div className="p-3.5 sm:px-6 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-400 shrink-0 bg-neutral-50/80">
-          <span>Garage AI Server v2.4 • Защита администратора активна</span>
+          <span>Garage AI Server v2.4 • Данные защищены сессией владельца</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-neutral-200/80 hover:bg-neutral-200 text-neutral-800 rounded-xl font-bold transition cursor-pointer"

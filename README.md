@@ -2,6 +2,13 @@
 
 Garage AI — веб-приложение для ведения цифрового гаража: автомобили, пробег, обслуживание, заправки, склад запчастей, напоминания и проекты тюнинга. Приложение работает в веб- и мобильном режиме, поддерживает гостевое локальное использование и авторизацию с отдельным гаражом для каждого аккаунта.
 
+## Ссылки
+
+* **Приложение:** https://garageai-1-0.sambur91.workers.dev/
+* **Репозиторий:** https://github.com/AlEX91udemy/GarageAI_1.0
+
+Ссылка на приложение проверена 29.10.2026: frontend отвечает с HTTP 200, а `/api/health` возвращает `status: ok`.
+
 ## Возможности
 
 * карточки автомобилей с VIN, пробегом, фотографиями и 3D-моделями;
@@ -27,7 +34,7 @@ Garage AI — веб-приложение для ведения цифровог
 * Исправлено обновление service worker-кэша; при открытии локального файла file-протокола выполняется переход на серверный адрес localhost:3000.
 * Исправлены дублирующиеся обработчики в настройках и контракт рендера моделей каталога.
 
-Проверки последнего цикла: npm run lint — успешно; npm test — 12 файлов и 75 тестов успешно; npm run build — успешно. Тестовое окружение выводит сообщения об отказе API-запросов к localhost:3000, но все тесты завершаются успешно.
+Проверки последнего цикла: `npm run lint` — успешно; `npm test` — 23 файла и 132 теста успешно; `npm run build` — успешно. Тестовое окружение выводит сообщения об отказе API-запросов к localhost:3000, но все тесты завершаются успешно.
 
 ### Краткий анализ сканирования и OCR
 
@@ -105,6 +112,21 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 ### Публикация frontend через Cloudflare
 
+#### Статус на 08.11.2026
+
+- Email-code authentication реализована и проверена локальными тестами. В production `RESEND_API_KEY`, `EMAIL_FROM` и `EMAIL_CODE_SECRET` хранятся вне frontend и Cloudflare Assets.
+- Cloudflare Worker `garageai-1-0` проксирует API на canary Cloud Run `garageai-web-canary` в проекте `garage-ai-512223`. Для canary зафиксированы проверки health, регистрации, защищённых маршрутов и tenant isolation.
+- Cloud SQL schema version 2, Secret Manager, отдельный runtime service account и backup/PITR настроены. Импорт legacy-данных, PostgreSQL preflight, smoke-проверки и restore rehearsal выполнены 11.11.2026; источник legacy bundle из рабочего окружения всё ещё требует независимого подтверждения.
+- Production email-code request успешно прошёл 12.11.2026. До публичного релиза остаются реальная проверка доставки в inbox и задокументированное окно наблюдения canary.
+- Предыдущий Cloud Run сервис `garage-ai` сохранён для rollback. Нельзя обходить production gate через `GARAGE_ALLOW_EPHEMERAL_STORAGE=true`.
+- Подробный журнал текущего развёртывания: [`docs/cloud-deployment-status-2026-11-08.md`](docs/cloud-deployment-status-2026-11-08.md).
+
+#### Email-code authentication
+
+Для регистрации можно указать email, после чего пользователь выбирает вход по одноразовому коду в `AuthGate`. API маршруты: `POST /api/auth/email/request` и `POST /api/auth/email/verify` (также поддерживаются варианты с суффиксом `-code`). Код действует 10 минут, имеет ограничение попыток и rate limits по IP/email. Ответ запроса кода не раскрывает наличие аккаунта.
+
+Локальные переменные: `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_CODE_SECRET`. В Cloud Run их следует хранить в Secret Manager. Не логируйте код, ключ Resend или содержимое писем.
+
 Проект подготовлен к схеме «Cloudflare Worker + Assets для frontend и Cloud Run для Node/Express API». Worker проксирует запросы `/api/*` на Cloud Run через переменную `API_ORIGIN`, поэтому HttpOnly-сессии и CSRF остаются same-origin для браузера.
 
 ```powershell
@@ -115,6 +137,8 @@ npm run cloudflare:deploy
 ```
 
 В `API_ORIGIN` укажите полный HTTPS-адрес развёрнутого Node/Express API Cloud Run. Ключи Gemini, OpenRouter, Document AI и service account не добавляйте в Cloudflare Assets или клиентский код: они должны оставаться переменными окружения API-сервиса.
+
+Для Cloud Run задайте `TRUSTED_PROXY_HOPS=1`, поскольку перед приложением стоит один доверенный reverse proxy. Значение по умолчанию — `0`, чтобы при прямом доступе к Express клиент не мог подделывать IP через `X-Forwarded-For`.
 
 #### Настройки Cloudflare Workers Builds
 
@@ -176,7 +200,7 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 #### 🔴 Критические исправления (Backend & Security)
 *   **Конфигурация Gemini:** Убраны захардкоженные имена моделей в `server.ts`. Теперь версия модели управляется через переменную окружения `GEMINI_MODEL` в `.env`.
-*   **Безопасность UI:** Удалена кнопка-подсказка с демо-паролем администратора (`admin123`) из `DataSyncBackupModal.tsx`. Мастер-ключ задаётся только на сервере.
+*   **Резервное копирование:** Экспорт, импорт и сброс в `DataSyncBackupModal.tsx` работают в рамках текущего авторизованного аккаунта. Сервер проверяет сессию и изоляцию владельца для каждой операции.
 *   **Синхронизация данных:** Исправлена потеря данных при перезагрузке страницы.
     *   Добавлена загрузка этапов тюнинга (`tuningStages`) с сервера.
     *   Настроена отправка обновлений регламента ТО (OEM Schedule) на бэкенд.
@@ -201,13 +225,21 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
 
 ## Запуск проекта
 
-**Требования:** Node.js (v18+)
+**Требования:** Node.js 22 LTS и npm. Версия 22 используется в Docker и GitHub Actions.
 
 1.  Установите зависимости:
     ```bash
-    npm install
+    npm ci
     ```
-2.  Настройте переменные окружения в `.env`:
+2.  Создайте локальный файл окружения из безопасного шаблона:
+    ```powershell
+    Copy-Item .env.example .env
+    npm run config:check
+    ```
+
+    Не коммитьте `.env`. Для локального старта ключи AI не обязательны: связанные функции останутся отключены. Для production задавайте секреты только через Secret Manager/настройки платформы.
+
+3.  Настройте при необходимости переменные окружения в `.env`:
     *   `GEMINI_API_KEY` — ключ API Google Gemini.
     *   `GEMINI_MODEL` — (опционально) модель по умолчанию.
     *   `OPENROUTER_API_KEY` — общий резервный ключ OpenRouter.
@@ -216,12 +248,15 @@ DOCUMENT_AI_FORM_PROCESSOR_ID=<id Form Parser>
     *   `GARAGE_DB_FILE` — (опционально) путь к изолированному JSON-хранилищу.
 
 При первом запуске приложение открывает гараж в гостевом режиме без обязательного входа. Данные сохраняются локально; авторизация доступна из профиля для синхронизации с сервером. После входа каждый аккаунт получает свою сессию в HttpOnly cookie и отдельный гараж, данные разных аккаунтов не смешиваются. Исторические версии data/garage_store.json могут оставаться в истории Git; не используйте их как источник актуальных пользовательских данных. Перед импортом используйте только проверенную резервную копию и следуйте docs/postgres-persistence-migration.md.
-3.  Запустите сервер разработки:
+4.  Запустите сервер разработки:
     ```bash
     npm run dev
     ```
 
 ## Проверка кода
+*   **Конфигурация окружения:** `npm run config:check` — проверяет полноту `.env.example` и отсутствие credential defaults.
 *   **Линтинг/Типизация:** `npm run lint` (TypeScript)
 *   **Тесты:** `npm test` (Vitest)
+*   **Production build:** `npm run build`
+*   **Post-deploy health contract:** после release задайте `GARAGE_PUBLIC_URL=https://<ваш-домен>` и запустите `npm run release:verify-health`. Команда принимает только HTTPS и проверяет, что публичный health endpoint не раскрывает конфигурацию или tenant-данные.
 

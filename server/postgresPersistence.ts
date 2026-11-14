@@ -21,13 +21,16 @@ export class ConcurrentGarageUpdateError extends Error {
 
 export interface PostgresPersistenceOptions {
   connectionString: string;
+  /** Optional Cloud SQL socket or host override for managed runtimes. */
+  host?: string;
+  port?: number;
   maxConnections?: number;
   ssl?: "require" | false;
   migrationsDirectory?: string;
   runMigrations?: boolean;
 }
 
-const MIGRATION_FILES = ["001_initial_postgres.sql"] as const;
+const MIGRATION_FILES = ["001_initial_postgres.sql", "002_email_auth_challenges.sql", "003_email_verification_state.sql"] as const;
 
 /**
  * PostgreSQL repository primitives for the Cloud Run persistence cutover.
@@ -45,6 +48,8 @@ export class PostgresPersistence {
     }
     this.sql = postgres(options.connectionString, {
       max: Math.max(1, Math.min(options.maxConnections ?? 5, 20)),
+      ...(options.host?.trim() ? { host: options.host.trim() } : {}),
+      ...(options.port && Number.isInteger(options.port) ? { port: options.port } : {}),
       connect_timeout: 10,
       idle_timeout: 20,
       max_lifetime: 60 * 30,
@@ -70,9 +75,9 @@ export class PostgresPersistence {
       // Production runtime identities should not need DDL privileges. Apply
       // migrations from a controlled one-off job before deploying the revision.
       const rows = await this.sql`
-        SELECT version FROM garageai_schema_migrations WHERE version = 1 LIMIT 1
+        SELECT version FROM garageai_schema_migrations WHERE version = 3 LIMIT 1
       `;
-      if (!rows[0]) throw new Error("PostgreSQL schema migration 001 is missing; run the controlled migration job first");
+      if (!rows[0]) throw new Error("PostgreSQL schema migration 003 is missing; run the controlled migration job first");
     }
     this.initialized = true;
   }
@@ -89,7 +94,7 @@ export class PostgresPersistence {
   async getUserByName(username: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE username_normalized = ${username.trim().toLowerCase()}
       LIMIT 1
@@ -97,10 +102,16 @@ export class PostgresPersistence {
     return rows[0] as UserRecord | undefined;
   }
 
+  async getUserByEmail(email: string): Promise<UserRecord | undefined> {
+    this.assertInitialized();
+    const rows = await this.sql`SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt" FROM garageai_users WHERE lower(btrim(email)) = ${email.trim().toLowerCase()} LIMIT 1`;
+    return rows[0] as UserRecord | undefined;
+  }
+
   async getUserById(id: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE id = ${id}
       LIMIT 1
@@ -111,7 +122,7 @@ export class PostgresPersistence {
   async listUsers(): Promise<UserRecord[]> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       ORDER BY created_at, id
     `;
@@ -124,14 +135,19 @@ export class PostgresPersistence {
     return Number(rows[0]?.count ?? 0);
   }
 
-  async createUser(username: string, passwordHash: string, id: string): Promise<UserRecord> {
+  async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
+    // Legacy repository callers represent already trusted/imported accounts.
+    return this.createUserWithEmailState(username, passwordHash, id, email, email ? new Date().toISOString() : undefined);
+  }
+
+  async createUserWithEmailState(username: string, passwordHash: string, id: string, email?: string, emailVerifiedAt?: string | null): Promise<UserRecord> {
     this.assertInitialized();
     try {
       return await this.sql.begin(async (tx) => {
         const rows = await tx`
-          INSERT INTO garageai_users (id, username, password_hash)
-          VALUES (${id}, ${username.trim()}, ${passwordHash})
-          RETURNING id, username, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+          INSERT INTO garageai_users (id, username, email, email_verified_at, password_hash)
+          VALUES (${id}, ${username.trim()}, ${email ?? null}, ${email ? emailVerifiedAt ?? null : null}, ${passwordHash})
+          RETURNING id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
         `;
         await tx`
           INSERT INTO garageai_garages (user_id, data)
@@ -143,6 +159,52 @@ export class PostgresPersistence {
       if (isUniqueViolation(error)) throw new UserAlreadyExistsError();
       throw error;
     }
+  }
+
+  async markEmailVerified(userId: string, verifiedAt = new Date().toISOString()): Promise<boolean> {
+    this.assertInitialized();
+    const rows = await this.sql`UPDATE garageai_users SET email_verified_at = ${verifiedAt} WHERE id = ${userId} AND email IS NOT NULL RETURNING id`;
+    return Boolean(rows[0]);
+  }
+
+  /** Foreign-key cascades delete the garage, sessions and email challenges atomically. */
+  async deleteUser(userId: string): Promise<boolean> {
+    this.assertInitialized();
+    const rows = await this.sql`
+      DELETE FROM garageai_users
+      WHERE id = ${userId}
+      RETURNING id
+    `;
+    return Boolean(rows[0]);
+  }
+  async createEmailChallenge(record: import("./store").EmailAuthChallengeRecord): Promise<void> {
+    this.assertInitialized();
+    await this.sql.begin(async (tx) => {
+      await tx`UPDATE garageai_email_auth_challenges SET consumed_at_ms = ${record.createdAtMs} WHERE user_id = ${record.userId} AND consumed_at_ms IS NULL`;
+      await tx`INSERT INTO garageai_email_auth_challenges (id, user_id, code_hash, expires_at_ms, attempts, consumed_at_ms, created_at_ms) VALUES (${record.id}, ${record.userId}, ${record.codeHash}, ${record.expiresAtMs}, 0, NULL, ${record.createdAtMs})`;
+    });
+  }
+
+  async consumeEmailChallenge(userId: string, challengeId: string, now = Date.now()): Promise<void> {
+    this.assertInitialized();
+    await this.sql`
+      UPDATE garageai_email_auth_challenges
+      SET consumed_at_ms = ${now}
+      WHERE id = ${challengeId} AND user_id = ${userId} AND consumed_at_ms IS NULL
+    `;
+  }
+
+  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+    this.assertInitialized();
+    return this.sql.begin(async (tx) => {
+      const rows = await tx`SELECT id, code_hash, attempts, expires_at_ms FROM garageai_email_auth_challenges WHERE user_id = ${userId} AND consumed_at_ms IS NULL ORDER BY created_at_ms DESC LIMIT 1 FOR UPDATE`;
+      const row = rows[0];
+      if (!row || Number(row.expires_at_ms) <= now || Number(row.attempts) >= maxAttempts) return false;
+      const { hashEmailCode } = await import("./emailCodeAuth");
+      const accepted = row.code_hash === hashEmailCode(String(row.id), code, secret);
+      await tx`UPDATE garageai_email_auth_challenges SET attempts = attempts + 1, consumed_at_ms = CASE WHEN ${accepted} THEN ${now} ELSE consumed_at_ms END WHERE id = ${row.id}`;
+      return accepted;
+    }) as Promise<boolean>;
   }
 
   async snapshotForUser(userId: string, create = false): Promise<GarageData> {
