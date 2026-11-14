@@ -96,6 +96,13 @@ Cloud SQL backups or rewrite data during the observation window.
 
 ## Execution record — 2026-11-14
 
+- Current release commit `3f8224298b42bda984cea89babf43a6cd28d5e36` was built as Artifact Registry image `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:3f82242`, digest `sha256:99187c607e1812b33142a5570aa65d8dea73e65e4ac3f108c3508dff864fd74e`. Cloud Build reported a logging-bucket failure after the image push completed; the image digest was verified in Artifact Registry before deployment.
+- Deployed Cloud Run revision `garageai-web-canary-00016-jom` with the current image and routed 100% of `garageai-web-canary` traffic to it. The tagged canary URL returned 200 from `/api/health`; startup, Cloud SQL socket configuration, production readiness flags and Secret Manager bindings were verified, and no revision-level ERROR logs were present during the smoke window.
+- Published the current frontend build to Cloudflare Worker `garageai-1-0`; Worker version `444d938a-d77c-45fd-aa42-ba539ba29ce8` is active. Public health checks returned 200 through the Worker, the Cloud Run service URL and `https://garageai.site`.
+
+
+- The previous `829cc69` deployment remains available as the tagged rollback revision `garageai-web-canary-00014-yuy`.
+
 - Confirmed project: garage-ai-512223, region europe-west1. The second project garageai-512320 was not used because it has no GarageAI Cloud SQL instance.
 - Artifact Registry repository garageai was created because the existing Cloud Build configuration targets it.
 - Billing budget GarageAI 300 SGD guardrail was created for numeric project 215646849370, with 25/50/75/90/100% current-spend alerts and a 75% forecast alert. The billing account currency is SGD.
@@ -104,14 +111,14 @@ Cloud SQL backups or rewrite data during the observation window.
 - Web smoke revision garageai-web-canary-00011-xit has AGENTS_SERVICE_URL, AGENTS_SERVICE_AUDIENCE, the Secret Manager token reference, and an admin allowlist. It returns 200 from /api/health and 401 for an anonymous /api/agents/run request. It is tagged agents-smoke and receives no production traffic.
 - A full web-to-agent POST could not be executed from this operator shell because minting an OIDC token for the web runtime would require temporary roles/iam.serviceAccountTokenCreator. That escalation was blocked by the automatic safety review; run the authenticated smoke from Cloud Run or an already-approved CI identity instead.
 - Local validation completed with 28 Vitest files and 161 tests passing, TypeScript typecheck passing, Vite production build passing, server bundle build passing, environment contract passing, PostgreSQL schema contract passing, and git diff --check passing.
-- Web revision 00012-pox was rejected by the production storage safety gate after an incomplete no-traffic env update; it receives no traffic and production remains on revision 00008-hal. Do not promote 00012-pox.
+- Web revisions `00012-pox` and `00013-pec` were rejected by the production storage safety gate after incomplete environment updates; they receive no traffic and must not be promoted.
 - Added scripts/cloud-run-agent-smoke.py for an internal Cloud Run Job or approved CI identity. It obtains the metadata-server OIDC token, reads AGENTS_API_TOKEN only from the mounted environment, calls the private /agents/run endpoint once, checks HTTP 200 and the qa result key, and prints no model response or secret.
 
-## Current blocker
+## Remaining release gates
 
-The infrastructure steps above have been executed with an authenticated Google
-Cloud session. The remaining cloud action is one authenticated live
-POST /api/agents/run smoke test through the tagged web revision, executed from
-Cloud Run or an approved CI identity. The new scripts/cloud-run-agent-smoke.py
-provides the private service check. Production web traffic was not changed
-during this run.
+The infrastructure rollout is complete for the current commit. The remaining
+release gates are application-level evidence: one authenticated live
+POST `/api/agents/run` through the web revision from Cloud Run or an approved
+CI identity, independent mailbox receipt for the email-code flow, scanner and
+OCR acceptance evidence, legacy-data provenance/privacy review, and the agreed
+post-release observation window for 5xx, latency, Cloud SQL, email and spend.
