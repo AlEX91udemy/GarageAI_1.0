@@ -196,7 +196,7 @@ export function LandingPage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex min-w-0 items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => setIsDark((prev) => !prev)}
@@ -208,9 +208,10 @@ export function LandingPage() {
             </button>
             <a
               href="/app?view=mobile"
-              className="garage-btn-anim inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#991B1B] whitespace-nowrap"
+              className="garage-btn-anim inline-flex min-w-0 max-w-full items-center justify-center gap-2 rounded-lg bg-[#B91C1C] px-2.5 py-2.5 text-xs font-semibold text-white hover:bg-[#991B1B] sm:px-4 sm:text-sm"
             >
-              <span>Открыть GarageAI</span>
+              <span className="hidden sm:inline">Открыть мобильное приложение</span>
+              <span className="sm:hidden">Открыть приложение</span>
               <ArrowRight className="h-4 w-4 shrink-0" />
             </a>
           </div>
@@ -236,7 +237,7 @@ export function LandingPage() {
               </div>
 
               <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[40px] lg:leading-[1.15]">
-                Сфотографируйте заказ-наряд или чек АЗС{" "}
+                Сфотографируйте заказ-наряд СТО или чек АЗС{" "}
                 <span className="text-[#EF3038]">и проверьте готовую запись</span>
               </h1>
 
@@ -464,7 +465,7 @@ export function LandingPage() {
                 href="/app?view=web"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#B91C1C] hover:underline dark:text-[#EF3038]"
               >
-                <span>Перейти в рабочее пространство</span>
+                <span>Открыть рабочее пространство</span>
                 <ArrowRight className="h-4 w-4" />
               </a>
             </div>
@@ -486,7 +487,7 @@ export function LandingPage() {
                       <CarFront className="h-5 w-5" />
                     </span>
                     <span className="font-mono text-xs font-semibold text-[#536171] dark:text-[#94A3B8]">
-                      Сводка по автомобилю
+                      Сводка по авто
                     </span>
                   </div>
                   <h3 className="mt-3 text-base font-bold text-[#0F172A] dark:text-[#F8FAFC]">
@@ -708,13 +709,13 @@ export function LandingPage() {
                   className="garage-btn-anim inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#991B1B]"
                 >
                   <ArrowRight className="h-4 w-4" />
-                  <span>Открыть GarageAI</span>
+                  <span>Открыть приложение</span>
                 </a>
                 <a
                   href="/app?view=mobile"
                   className="garage-btn-anim inline-flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-2.5 text-sm font-semibold text-[#0F172A] hover:bg-[#F8FAFC] dark:border-[#243044] dark:bg-[#17202E] dark:text-[#F8FAFC] dark:hover:bg-[#1E293B]"
                 >
-                  <span>Мобильная версия</span>
+                  <span>Приложение</span>
                   <Smartphone className="h-4 w-4" />
                 </a>
               </div>
