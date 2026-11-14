@@ -132,7 +132,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5F8] text-[#0F172A] dark:bg-[#0D131D] dark:text-[#F8FAFC] transition-colors">
+    <div className="landing-page min-h-screen w-full max-w-full overflow-x-clip bg-[#F4F5F8] text-[#0F172A] dark:bg-[#0D131D] dark:text-[#F8FAFC] transition-colors">
       {/* Шапка */}
       <header className="sticky top-0 z-40 border-b border-[#E2E8F0] bg-[#FFFFFF] dark:border-[#243044] dark:bg-[#17202E]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
