@@ -563,8 +563,8 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
 
       {/* Main Content Area */}
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 ${
-          isSidebarCollapsed ? "ml-20" : "ml-64"
+        className={`min-w-0 flex-1 flex flex-col transition-all duration-300 ${
+          isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
         }`}
       >
         {/* Top Bar */}
@@ -583,8 +583,8 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
         />
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto px-6 py-6">
+        <main className="min-w-0 w-full flex-1 overflow-y-auto">
+          <div className="box-border w-full max-w-[1600px] mx-auto px-6 py-6">
             <div className="mb-5 flex items-center justify-between gap-4">
               <h1 className="text-xl font-black tracking-tight">
                 {VIEW_TITLES[activeView]}

@@ -29,6 +29,9 @@ export interface PartAvailabilityInfo {
   fastestDeliveryDays: number;
   suppliers: SupplierOffer[];
   lastCheckedTime: string;
+  dataSource?: "demo" | "live";
+  isLive?: boolean;
+  notice?: string;
 }
 
 export interface AutoPartItemData {
@@ -724,8 +727,8 @@ export async function checkPartAvailabilityAPI(
       }
       return data;
     }
-  } catch (err) {
-    console.warn("API check availability error, using offline local fallback:", err);
+  } catch {
+    // Offline mode is expected when the API is unavailable; use the local catalog fallback.
   }
 
   // 3. Fallback simulation using local data + catalog
@@ -791,6 +794,9 @@ export async function checkPartAvailabilityAPI(
     totalSuppliersStock: suppliers.reduce((sum, s) => sum + s.inStock, 0),
     fastestDeliveryDays: 1,
     suppliers,
+    dataSource: "demo",
+    isLive: false,
+    notice: "Цены, остатки и сроки являются демонстрационными и не подтверждают наличие у поставщика.",
     lastCheckedTime: new Date().toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",

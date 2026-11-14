@@ -3,6 +3,7 @@ import path from "node:path";
 
 const schemaPath = path.resolve("db/migrations/001_initial_postgres.sql");
 const sql = fs.readFileSync(schemaPath, "utf8");
+const verificationMigration = fs.readFileSync(path.resolve("db/migrations/003_email_verification_state.sql"), "utf8");
 const required = [
   /CREATE TABLE IF NOT EXISTS garageai_users/i,
   /username_normalized text GENERATED ALWAYS AS \(lower\(btrim\(username\)\)\) STORED/i,
@@ -26,6 +27,7 @@ const required = [
 ];
 
 const missing = required.filter((pattern) => !pattern.test(sql));
+if (!/email_verified_at timestamptz/i.test(verificationMigration) || !/VALUES\s*\(3\)/i.test(verificationMigration)) missing.push(/003_email_verification_state/);
 if (missing.length) {
   console.error("PostgreSQL schema contract failed; missing requirements:");
   for (const pattern of missing) console.error(`- ${pattern}`);

@@ -22,10 +22,17 @@ page.on("console", (message) => {
 
 const username = `palette_qa_${Date.now()}`;
 const password = "palette-qa-password-123";
+const email = `${username}@example.test`;
+const emailCaptureFile = process.env.EMAIL_CODE_CAPTURE_FILE;
 const register = await context.request.post(`${BASE}/api/auth/register`, {
-  data: { username, password },
+  data: { username, password, email },
 });
-if (!register.ok()) throw new Error(`register failed: ${register.status()} ${await register.text()}`);
+if (register.status() !== 202 || !emailCaptureFile) throw new Error(`registration now requires email-code verification and EMAIL_CODE_CAPTURE_FILE: ${register.status()} ${await register.text()}`);
+const capturedLines = fs.existsSync(emailCaptureFile) ? fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean) : [];
+const captured = capturedLines.map((line) => JSON.parse(line)).reverse().find((item) => item.email === email);
+if (!captured) throw new Error("email verification code was not captured");
+const verified = await context.request.post(`${BASE}/api/auth/email/verify`, { data: { email, code: captured.code } });
+if (!verified.ok()) throw new Error(`email verification failed: ${verified.status()} ${await verified.text()}`);
 
 const sessionResponse = await context.request.get(`${BASE}/api/auth/session`);
 if (!sessionResponse.ok()) throw new Error(`session failed: ${sessionResponse.status()}`);

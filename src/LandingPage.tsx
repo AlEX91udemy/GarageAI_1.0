@@ -12,6 +12,7 @@ import {
   Fuel,
   Moon,
   ScanLine,
+  Smartphone,
   Sun,
 } from "lucide-react";
 import {
@@ -57,7 +58,7 @@ const SCAN_PRESETS: ScanDemoPreset[] = [
       { name: "Колодки передние Advics", code: "SN135", price: "6 100 ₽" },
     ],
     total: "14 900 ₽",
-    targetBadge: "→ В сервисную книжку",
+    targetBadge: "Проверьте запись",
     targetColor: "text-[#3B82F6]",
   },
   {
@@ -80,7 +81,7 @@ const SCAN_PRESETS: ScanDemoPreset[] = [
       { name: "АЗС Лукойл №412 · ТРК №4", code: "Пробег: 85 120 км", price: "Чек ФНС" },
     ],
     total: "2 650 ₽",
-    targetBadge: "→ В учёт топлива и расходов",
+    targetBadge: "Проверьте запись",
     targetColor: "text-[#10B981]",
   },
 ];
@@ -92,6 +93,29 @@ export function LandingPage() {
 
   const [activePresetId, setActivePresetId] = useState<ScanDemoPreset["id"]>("service");
   const [scanCycle, setScanCycle] = useState(0);
+  const [activeNavHash, setActiveNavHash] = useState<string | null>(null);
+  const [navAnimationCycle, setNavAnimationCycle] = useState(0);
+
+  const navigateToSection = (hash: string) => {
+    setActiveNavHash(hash);
+    setNavAnimationCycle((cycle) => cycle + 1);
+  };
+
+  const navLinkClass = (hash: string, isFeatured = false) => {
+    const isActive = activeNavHash === hash;
+
+    return [
+      "inline-flex items-center gap-1.5 -mx-2 whitespace-nowrap rounded-md px-2 py-1 transition-colors",
+      isFeatured ? "font-semibold" : "",
+      isActive
+        ? "bg-[#EF3038]/10 text-[#B91C1C] ring-1 ring-inset ring-[#EF3038]/30 dark:bg-[#EF3038]/15 dark:text-[#FCA5A5] dark:ring-[#EF3038]/40"
+        : isFeatured
+          ? "hover:text-[#EF3038] dark:hover:text-[#EF3038]"
+          : "hover:text-[#0F172A] dark:hover:text-[#F8FAFC]",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
 
   useEffect(() => {
     const next = isDark ? "dark" : "light";
@@ -133,32 +157,46 @@ export function LandingPage() {
           >
             <a
               href="#ocr-scanner"
-              className="inline-flex items-center gap-1.5 transition-colors hover:text-[#EF3038] dark:hover:text-[#EF3038] whitespace-nowrap font-semibold"
+              onClick={() => navigateToSection("#ocr-scanner")}
+              aria-current={activeNavHash === "#ocr-scanner" ? "location" : undefined}
+              className={navLinkClass("#ocr-scanner", true)}
             >
-              <ScanLine className="h-4 w-4 text-[#EF3038]" />
+              <ScanLine
+                className={`h-4 w-4 ${
+                  activeNavHash === "#ocr-scanner"
+                    ? "text-[#B91C1C] dark:text-[#FCA5A5]"
+                    : "text-[#EF3038]"
+                }`}
+              />
               <span>OCR-сканер</span>
             </a>
             <a
               href="#workspace"
-              className="transition-colors hover:text-[#0F172A] dark:hover:text-[#F8FAFC] whitespace-nowrap"
+              onClick={() => navigateToSection("#workspace")}
+              aria-current={activeNavHash === "#workspace" ? "location" : undefined}
+              className={navLinkClass("#workspace")}
             >
               Возможности
             </a>
             <a
               href="#ai-mechanic"
-              className="transition-colors hover:text-[#0F172A] dark:hover:text-[#F8FAFC] whitespace-nowrap"
+              onClick={() => navigateToSection("#ai-mechanic")}
+              aria-current={activeNavHash === "#ai-mechanic" ? "location" : undefined}
+              className={navLinkClass("#ai-mechanic")}
             >
               AI-механик
             </a>
             <a
               href="#how-it-works"
-              className="transition-colors hover:text-[#0F172A] dark:hover:text-[#F8FAFC] whitespace-nowrap"
+              onClick={() => navigateToSection("#how-it-works")}
+              aria-current={activeNavHash === "#how-it-works" ? "location" : undefined}
+              className={navLinkClass("#how-it-works")}
             >
               Как это работает
             </a>
           </nav>
 
-          <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-2.5">
+          <div className="flex min-w-0 items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => setIsDark((prev) => !prev)}
@@ -170,7 +208,7 @@ export function LandingPage() {
             </button>
             <a
               href="/app?view=mobile"
-              className="garage-btn-anim inline-flex min-w-0 max-w-full items-center justify-center gap-1.5 rounded-lg bg-[#B91C1C] px-2.5 py-2.5 text-xs font-semibold text-white hover:bg-[#991B1B] sm:gap-2 sm:px-4 sm:text-sm"
+              className="garage-btn-anim inline-flex min-w-0 max-w-full items-center justify-center gap-2 rounded-lg bg-[#B91C1C] px-2.5 py-2.5 text-xs font-semibold text-white hover:bg-[#991B1B] sm:px-4 sm:text-sm"
             >
               <span className="hidden sm:inline">Открыть мобильное приложение</span>
               <span className="sm:hidden">Открыть приложение</span>
@@ -195,16 +233,16 @@ export function LandingPage() {
             >
               <div className="inline-flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] px-3 py-1.5 text-xs font-semibold text-[#EF3038] dark:border-[#243044] dark:bg-[#17202E]">
                 <ScanLine className="h-3.5 w-3.5" />
-                <span>Умный OCR-сканер заказ-нарядов и чеков</span>
+                <span>Умный OCR-сканер</span>
               </div>
 
               <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-4xl lg:text-[40px] lg:leading-[1.15]">
-                Сфотографируйте заказ-наряд СТО или чек АЗС —{" "}
-                <span className="text-[#EF3038]">данные сами встанут в учёт</span>
+                Сфотографируйте заказ-наряд СТО или чек АЗС{" "}
+                <span className="text-[#EF3038]">и проверьте готовую запись</span>
               </h1>
 
               <p className="mt-3.5 text-sm leading-relaxed text-[#536171] dark:text-[#94A3B8] sm:text-base">
-                GarageAI помогает вести обслуживание, расходы, топливо и детали, а AI-механик подсказывает, что проверить дальше.
+                GarageAI помогает вести обслуживание, расходы, топливо и детали, а AI-механик подсказывает, что проверить дальше, с учётом истории автомобиля.
               </p>
 
               {/* 3 коротких факта */}
@@ -222,7 +260,7 @@ export function LandingPage() {
                     1 клик
                   </div>
                   <div className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
-                    Сохранение в историю авто
+                    Проверьте данные и добавьте запись одним кликом.
                   </div>
                 </div>
                 <div className="rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] p-3.5 shadow-sm dark:border-[#243044] dark:bg-[#17202E]">
@@ -238,10 +276,15 @@ export function LandingPage() {
 
             {/* Правая колонка: Интерактивный демо-сканер документов */}
             <motion.div
+              key={
+                activeNavHash === "#ocr-scanner"
+                  ? "ocr-scanner-" + navAnimationCycle
+                  : "ocr-scanner"
+              }
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className="lg:col-span-7"
+              className="scroll-mt-24 lg:col-span-7"
               id="ocr-scanner"
             >
               <div
@@ -282,19 +325,6 @@ export function LandingPage() {
                 <div className="grid grid-cols-1 gap-4 p-4 sm:p-5 md:grid-cols-12">
                   {/* Левая часть: Фото документа с простой линией сканера */}
                   <div className="md:col-span-5 flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 relative overflow-hidden dark:border-[#243044] dark:bg-[#1E293B]">
-                    {/* Спокойная линия сканирования */}
-                    <motion.div
-                      key={`beam-${activePreset.id}-${scanCycle}`}
-                      initial={{ y: 0, opacity: 0.7 }}
-                      animate={{ y: [0, 195, 0] }}
-                      transition={{
-                        duration: 3.2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                      className="pointer-events-none absolute left-3 right-3 top-9 h-0.5 bg-[#EF3038]/80"
-                    />
-
                     <div>
                       <div className="flex items-center justify-between text-[11px] font-semibold text-[#536171] dark:text-[#94A3B8]">
                         <span className="flex items-center gap-1.5">
@@ -305,7 +335,19 @@ export function LandingPage() {
                       </div>
 
                       {/* Имитация бумажного чека / заказ-наряда */}
-                      <div className="mt-2.5 rounded-lg border border-dashed border-[#E2E8F0] bg-[#FFFFFF] p-3 font-mono text-[11px] leading-relaxed text-[#0F172A] dark:border-[#243044] dark:bg-[#17202E] dark:text-[#F8FAFC]">
+                      <div className="relative mt-2.5 overflow-hidden rounded-lg border border-dashed border-[#E2E8F0] bg-[#FFFFFF] p-3 font-mono text-[11px] leading-relaxed text-[#0F172A] dark:border-[#243044] dark:bg-[#17202E] dark:text-[#F8FAFC]">
+                        {/* Луч начинается сразу под Fit Service и проходит по строкам 1–4. */}
+                        <motion.div
+                          key={`beam-${activePreset.id}-${scanCycle}`}
+                          initial={{ y: 0, opacity: 0.7 }}
+                          animate={{ y: [0, 138, 0] }}
+                          transition={{
+                            duration: 3.2,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }}
+                          className="pointer-events-none absolute left-0 right-0 top-9 z-10 h-0.5 bg-[#EF3038]/80"
+                        />
                         <div className="border-b border-[#E2E8F0] pb-1.5 font-bold text-[#EF3038] dark:border-[#243044]">
                           {activePreset.merchant}
                         </div>
@@ -336,7 +378,7 @@ export function LandingPage() {
                           <div>
                             <div className="flex items-center gap-1.5 text-xs font-bold text-[#10B981]">
                               <CheckCircle2 className="h-4 w-4" />
-                              <span>Распознано автоматически</span>
+                              <span>Данные распознаны</span>
                             </div>
                             <p className="mt-0.5 text-xs font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
                               {activePreset.docType} • {activePreset.date}
@@ -400,6 +442,11 @@ export function LandingPage() {
           className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-12 dark:border-[#243044] dark:bg-[#17202E]"
         >
           <motion.div
+            key={
+              activeNavHash === "#workspace" || activeNavHash === "#ai-mechanic"
+                ? "workspace-" + navAnimationCycle
+                : "workspace"
+            }
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.18 }}
@@ -411,15 +458,29 @@ export function LandingPage() {
                   Все модули в одной системе
                 </span>
                 <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC] sm:text-3xl">
-                  От скана документа до полного контроля авто
+                  От фото документа до контроля обслуживания
                 </h2>
               </div>
+              <a
+                href="/app?view=web"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#B91C1C] hover:underline dark:text-[#EF3038]"
+              >
+                <span>Открыть рабочее пространство</span>
+                <ArrowRight className="h-4 w-4" />
+              </a>
             </div>
 
             {/* 5 карточек модулей в едином формате */}
             <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* 1. Рабочее пространство */}
-              <article className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 dark:border-[#243044] dark:bg-[#1E293B]">
+              <motion.article
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.04, ease: "easeOut" }}
+                className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 dark:border-[#243044] dark:bg-[#1E293B]"
+              >
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#FFFFFF] text-[#EF3038] border border-[#E2E8F0] dark:bg-[#17202E] dark:border-[#243044]">
@@ -437,13 +498,16 @@ export function LandingPage() {
                   </p>
                 </div>
 
-                
-
-</article>
+              </motion.article>
 
               {/* 2. Сервисная книжка */}
-              <article
+              <motion.article
                 id="service-book"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
                 className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 dark:border-[#243044] dark:bg-[#1E293B]"
               >
                 <div>
@@ -459,17 +523,20 @@ export function LandingPage() {
                     Сервисная книжка
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
-                    Хронология всех ТО с быстрым поиском по артикулам запчастей, прикреплёнными заказ-нарядами и экспортом в PDF.
+                    История всех работ и ТО с поиском по артикулам, прикреплёнными документами и экспортом в PDF.
                   </p>
                 </div>
 
-                
-
-</article>
+              </motion.article>
 
               {/* 3. Учёт топлива и расходов */}
-              <article
+              <motion.article
                 id="expenses-fuel"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.16, ease: "easeOut" }}
                 className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 dark:border-[#243044] dark:bg-[#1E293B]"
               >
                 <div>
@@ -485,17 +552,20 @@ export function LandingPage() {
                     Учёт топлива и расходов
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
-                    Учёт заправок до полного бака, реальный расход по сезонам и расчёт полной стоимости 1 км пробега.
+                    Средний расход по заправкам до полного бака и полная стоимость 1 км пробега.
                   </p>
                 </div>
 
-                
-
-</article>
+              </motion.article>
 
               {/* 4. AI-механик */}
-              <article
+              <motion.article
                 id="ai-mechanic"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.22, ease: "easeOut" }}
                 className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 dark:border-[#243044] dark:bg-[#1E293B]"
               >
                 <div>
@@ -511,17 +581,20 @@ export function LandingPage() {
                     AI-механик
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
-                    Разбор симптомов, стуков и кодов OBD-II с учётом вашего двигателя, текущего пробега и прошлых замен.
+                    Разбор симптомов, стуков и кодов OBD-II с учётом двигателя, пробега и прошлых замен. Рекомендации не заменяют осмотр специалиста.
                   </p>
                 </div>
 
-                
-
-</article>
+              </motion.article>
 
               {/* 5. Напоминания и регламент ТО */}
-              <article
+              <motion.article
                 id="reminders"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.28, ease: "easeOut" }}
                 className="garage-card-anim flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-5 md:col-span-2 lg:col-span-2 dark:border-[#243044] dark:bg-[#1E293B]"
               >
                 <div>
@@ -537,13 +610,11 @@ export function LandingPage() {
                     Напоминания и регламент ТО
                   </h3>
                   <p className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
-                    Автоматический расчёт остатка пробега до замены масла, фильтров, колодок, ГРМ и напоминания по датам страховки.
+                    Расчёт остатка пробега до замены масла, фильтров, колодок и ГРМ, а также напоминания по датам страховки.
                   </p>
                 </div>
 
-                
-
-</article>
+              </motion.article>
             </div>
           </motion.div>
         </section>
@@ -556,13 +627,18 @@ export function LandingPage() {
           className="border-t border-[#E2E8F0] bg-[#F4F5F8] py-12 dark:border-[#243044] dark:bg-[#0D131D]"
         >
           <motion.div
+            key={
+              activeNavHash === "#how-it-works"
+                ? "how-it-works-" + navAnimationCycle
+                : "how-it-works"
+            }
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.18 }}
             transition={{ duration: 0.45, delay: 0.08, ease: "easeOut" }}
             className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <h2 className="text-2xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
-              Как работает приложение
+              Как это работает
             </h2>
 
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -579,12 +655,17 @@ export function LandingPage() {
                 },
                 {
                   step: "03",
-                  title: "Сохраните запись в историю авто",
-                  text: "Подтвердите данные — заказ-наряд сразу пополнит сервисную книжку, а чек с заправки обновит статистику топлива и расходов.",
+                  title: "Сохраните в историю авто",
+                  text: "Проверьте данные и добавьте запись одним кликом.",
                 },
-              ].map((item) => (
-                <div
+              ].map((item, index) => (
+                <motion.div
                   key={item.step}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  whileHover={{ y: -2 }}
+                  viewport={{ once: true, amount: 0.2 }}
+                  transition={{ duration: 0.4, delay: index * 0.08, ease: "easeOut" }}
                   className="garage-card-anim rounded-xl border border-[#E2E8F0] bg-[#FFFFFF] p-5 dark:border-[#243044] dark:bg-[#17202E]"
                 >
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#B91C1C] font-mono text-xs font-bold text-white">
@@ -596,30 +677,79 @@ export function LandingPage() {
                   <p className="mt-1 text-xs leading-relaxed text-[#536171] dark:text-[#94A3B8]">
                     {item.text}
                   </p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </motion.div>
         </section>
 
+        {/* =================================================================
+            ФИНАЛЬНЫЙ ПЕРЕХОД В ПРИЛОЖЕНИЕ
+           ================================================================= */}
+        <section className="border-t border-[#E2E8F0] bg-[#FFFFFF] py-10 dark:border-[#243044] dark:bg-[#17202E]">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 32, scale: 0.98 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: false, amount: 0.35 }}
+              transition={{ duration: 0.6, delay: 0.12, ease: "easeOut" }}
+              className="flex flex-col items-start justify-between gap-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-6 sm:flex-row sm:items-center dark:border-[#243044] dark:bg-[#1E293B]"
+            >
+              <div>
+                <h2 className="text-xl font-extrabold tracking-tight text-[#0F172A] dark:text-[#F8FAFC]">
+                  Перенесите историю автомобиля в GarageAI
+                </h2>
+                <p className="mt-1 text-xs sm:text-sm text-[#536171] dark:text-[#94A3B8]">
+                  Добавьте автомобиль, сканируйте заказ-наряды и чеки АЗС, контролируйте расходы и регламент ТО в одном месте.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <a
+                  href="/app?view=web"
+                  className="garage-btn-anim inline-flex items-center gap-2 rounded-lg bg-[#B91C1C] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#991B1B]"
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  <span>Открыть приложение</span>
+                </a>
+                <a
+                  href="/app?view=mobile"
+                  className="garage-btn-anim inline-flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-[#FFFFFF] px-4 py-2.5 text-sm font-semibold text-[#0F172A] hover:bg-[#F8FAFC] dark:border-[#243044] dark:bg-[#17202E] dark:text-[#F8FAFC] dark:hover:bg-[#1E293B]"
+                >
+                  <span>Приложение</span>
+                  <Smartphone className="h-4 w-4" />
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        </section>
       </main>
 
-      <footer className="border-t border-[#E2E8F0] bg-[#F4F5F8] py-5 dark:border-[#243044] dark:bg-[#0D131D]">
+      <motion.footer
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.1 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="border-t border-[#E2E8F0] bg-[#F4F5F8] py-5 dark:border-[#243044] dark:bg-[#0D131D]"
+      >
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 text-xs text-[#536171] dark:text-[#94A3B8] sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <div className="flex items-center gap-2.5 font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
             <img
               src="/garage-ai-mark.png"
-              alt="GarageAI"
+              alt=""
               className="h-6 w-6 rounded-md border border-[#E2E8F0] bg-white object-contain p-0.5 dark:border-[#243044]"
             />
             <span>GarageAI — умный OCR-сканер документов и цифровая сервисная книжка</span>
           </div>
           <span className="text-[11px] text-[#536171] dark:text-[#94A3B8]">
-            © {new Date().getFullYear()} GarageAI
+            © 2026 GarageAI
           </span>
         </div>
-      </footer>
-
+        <div className="mx-auto mt-3 flex max-w-7xl flex-wrap gap-x-4 gap-y-1 px-4 text-[11px] text-[#536171] dark:text-[#94A3B8] sm:px-6 lg:px-8">
+          <a href="/privacy" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Политика конфиденциальности</a>
+          <a href="/terms" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Условия использования</a>
+          <a href="/cookies" className="hover:text-[#B91C1C] hover:underline dark:hover:text-[#F87171]">Политика cookie</a>
+        </div>
+      </motion.footer>
     </div>
   );
 }

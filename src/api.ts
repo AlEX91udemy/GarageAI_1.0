@@ -12,10 +12,35 @@ import {
 
 let csrfToken: string | null = null;
 let authSessionActive = false;
+const ACTIVE_USER_KEY = "garagehub_active_user";
+
+export function getActiveUsername(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setActiveUsername(username: string | undefined): void {
+  try {
+    if (username) localStorage.setItem(ACTIVE_USER_KEY, username.trim().toLowerCase());
+    else localStorage.removeItem(ACTIVE_USER_KEY);
+  } catch {
+    // Storage can be unavailable in private or embedded browsers.
+  }
+}
 
 export interface AuthSession {
   username: string;
   csrfToken: string;
+  email?: string;
+}
+
+export interface PendingRegistration {
+  pendingEmailVerification: true;
+  email: string;
+  message?: string;
 }
 
 export async function authenticatedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -27,17 +52,20 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string): Promise<AuthSession> {
+export async function register(username: string, password: string, email: string): Promise<AuthSession | PendingRegistration> {
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email: email.trim() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
+  if (data.pendingEmailVerification === true && typeof data.email === "string") return data as PendingRegistration;
+  if (!data.session?.csrfToken) throw new Error("Сервер не вернул состояние регистрации");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
@@ -52,22 +80,81 @@ export async function login(username: string, password: string): Promise<AuthSes
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
   csrfToken = data.session.csrfToken;
   authSessionActive = true;
+  setActiveUsername(data.session.username);
+  return data.session;
+}
+
+export async function requestEmailCode(email: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/email/request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось отправить код");
+}
+
+export async function verifyEmailCode(email: string, code: string): Promise<AuthSession> {
+  const res = await authenticatedFetch("/api/auth/email/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось войти по коду");
+  csrfToken = data.session.csrfToken;
+  authSessionActive = true;
+  setActiveUsername(data.session.username);
   return data.session;
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {
-  const res = await authenticatedFetch("/api/auth/session", { credentials: "same-origin" });
-  if (!res.ok) { csrfToken = null; authSessionActive = false; return null; }
-  const data = await res.json();
-  csrfToken = data.csrfToken;
-  authSessionActive = true;
-  return data as AuthSession;
+  try {
+    const res = await authenticatedFetch("/api/auth/session", { credentials: "same-origin" });
+    if (!res.ok) { csrfToken = null; authSessionActive = false; setActiveUsername(undefined); return null; }
+    const data = await res.json();
+    csrfToken = data.csrfToken;
+    authSessionActive = true;
+    setActiveUsername(data.username);
+    return data as AuthSession;
+  } catch {
+    // The API may be unavailable in guest/offline mode; that is not an auth error.
+    csrfToken = null;
+    authSessionActive = false;
+    setActiveUsername(undefined);
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {
   await authenticatedFetch("/api/auth/logout", { method: "POST" });
   csrfToken = null;
   authSessionActive = false;
+  setActiveUsername(undefined);
+}
+
+export async function deleteAccount(password: string): Promise<void> {
+  const username = getActiveUsername();
+  const res = await authenticatedFetch("/api/auth/account", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось удалить аккаунт");
+  try {
+    if (username) {
+      const prefix = `garagehub:${username}:`;
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(prefix)) localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // Storage cleanup is best effort; the deleted server account cannot be restored.
+  }
+  csrfToken = null;
+  authSessionActive = false;
+  setActiveUsername(undefined);
 }
 
 export interface FullGarageData {
@@ -192,6 +279,46 @@ export async function searchTechnicalKnowledge(query: string, context: Partial<{
   return res.json();
 }
 
+export interface VehicleRecommendationResponse {
+  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string }>;
+  sources: unknown[];
+}
+
+export async function fetchVehicleRecommendations(vehicle: Partial<Vehicle>, query = ""): Promise<VehicleRecommendationResponse> {
+  // Recommendations only need technical context. Do not put VIN, plate or images in a URL.
+  const { vin: _vin, licensePlate: _licensePlate, photoUrl: _photoUrl, model3dUrl: _model3dUrl, registrationData: _registrationData, ...technicalVehicle } = vehicle;
+  const params = new URLSearchParams({ vehicle: JSON.stringify(technicalVehicle) });
+  if (query.trim()) params.set("q", query.trim());
+  const res = await authenticatedFetch("/api/knowledge/recommendations?" + params.toString());
+  if (!res.ok) throw new Error("Не удалось загрузить рекомендации по автомобилю");
+  return res.json();
+}
+
+export async function fetchPublicKnowledgeSources(): Promise<{ sources: unknown[]; statuses?: unknown[]; generatedAt: string; note: string }> {
+  const res = await authenticatedFetch("/api/knowledge/sources");
+  if (!res.ok) throw new Error("Не удалось загрузить реестр источников");
+  return res.json();
+}
+
+export interface KnowledgeSourceRefreshResponse {
+  checkedAt: string;
+  statuses: Array<{
+    sourceId: string;
+    checkedAt: string;
+    status: "reachable" | "http_error" | "network_error" | "not_checked";
+    httpStatus?: number;
+    responseUrl?: string;
+    error?: string;
+  }>;
+}
+
+export async function refreshPublicKnowledgeSources(): Promise<KnowledgeSourceRefreshResponse> {
+  const res = await authenticatedFetch("/api/knowledge/sources/refresh", { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "Не удалось проверить источники");
+  return data;
+}
+
 // Fetch all garage data
 export async function fetchGarageData(): Promise<FullGarageData> {
   const res = await authenticatedFetch("/api/data");
@@ -204,12 +331,7 @@ export async function fetchGarageData(): Promise<FullGarageData> {
 // Health check
 export async function checkBackendHealth(): Promise<{
   status: string;
-  hasApiKey: boolean;
-  hasAiConfigured: boolean;
-  hasGeminiConfigured: boolean;
-  vertexAiEnabled: boolean;
-  vehiclesCount: number;
-  serviceRecordsCount: number;
+  timestamp: string;
 }> {
   const res = await authenticatedFetch("/api/health");
   if (!res.ok) {
@@ -454,7 +576,51 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось распознать чек");
   }
-  return res.json();
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Сервис OCR вернул некорректный ответ");
+  }
+  return data;
+}
+
+export interface VehicleDocumentOcrResult {
+  make?: string;
+  model?: string;
+  generation?: string;
+  year?: number;
+  licensePlate?: string;
+  vin?: string;
+  engine?: string;
+  engineDisplacementCc?: number;
+  enginePowerKw?: number;
+  enginePowerHp?: number;
+  fuelType?: string;
+  bodyType?: string;
+  maxMassKg?: number;
+  massKg?: number;
+  seats?: number;
+  registrationDate?: string;
+  stsNumber?: string;
+  stsIssueDate?: string;
+  confidence?: Record<string, number>;
+  rawText?: string;
+}
+
+export async function requestVehicleDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<VehicleDocumentOcrResult> {
+  const res = await authenticatedFetch("/api/ai/scan-vehicle-document", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageBase64, mimeType }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Не удалось распознать СТС");
+  }
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Сервис OCR СТС вернул некорректный ответ");
+  }
+  return data as VehicleDocumentOcrResult;
 }
 
 export async function requestDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<{ text: string; sources?: { vision: string | null; local: string; confidence: number }; preprocessing?: { variants: string[]; mimeType: string }; warning?: string | null }> {
@@ -467,7 +633,11 @@ export async function requestDocumentOcr(imageBase64: string, mimeType = "image/
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось распознать документ");
   }
-  return res.json();
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data) || typeof (data as Record<string, unknown>).text !== "string") {
+    throw new Error("Сервис OCR документа вернул некорректный ответ");
+  }
+  return data as { text: string; sources?: { vision: string | null; local: string; confidence: number }; preprocessing?: { variants: string[]; mimeType: string }; warning?: string | null };
 }
 
 export async function requestOemScheduleAi(payload: {
@@ -486,7 +656,11 @@ export async function requestOemScheduleAi(payload: {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось загрузить OEM регламент");
   }
-  return res.json();
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data) || !Array.isArray((data as Record<string, unknown>).items)) {
+    throw new Error("Сервис OEM-регламента вернул некорректный ответ");
+  }
+  return data;
 }
 
 export async function requestPartLookupAi(payload: {
@@ -503,7 +677,46 @@ export async function requestPartLookupAi(payload: {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || "Не удалось подобрать кроссы детали");
   }
-  return res.json();
+  const data: unknown = await res.json().catch(() => null);
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Сервис подбора вернул некорректный ответ");
+  }
+  const source = data as Record<string, unknown>;
+  const text = (value: unknown, maxLength: number): string => {
+    if (typeof value !== "string") return "";
+    return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+  };
+  const standardName = text(source.standardName, 160);
+  if (!standardName) throw new Error("Сервис подбора вернул некорректный ответ");
+  const recommendedBrands = (Array.isArray(source.recommendedBrands) ? source.recommendedBrands : [])
+    .slice(0, 100)
+    .flatMap((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+      const candidate = item as Record<string, unknown>;
+      const brand = text(candidate.brand, 80);
+      const partNumber = text(candidate.partNumber, 80);
+      const approxPriceRub = typeof candidate.approxPriceRub === "number"
+        ? Number.isFinite(candidate.approxPriceRub) && candidate.approxPriceRub > 0 && candidate.approxPriceRub <= 100_000_000
+          ? String(candidate.approxPriceRub)
+          : ""
+        : text(candidate.approxPriceRub, 80);
+      const priceValues = approxPriceRub.match(/\d+(?:[.,]\d+)?/g)?.map((token) => Number(token.replace(",", "."))) || [];
+      if (!brand || !partNumber || !priceValues.length || priceValues.some((amount) => !Number.isFinite(amount) || amount <= 0 || amount > 100_000_000)) return [];
+      return [{
+        tier: text(candidate.tier, 80) || "Рекомендованный вариант",
+        brand,
+        partNumber,
+        approxPriceRub,
+        rating: text(candidate.rating, 120) || "Без оценки",
+      }];
+    });
+  return {
+    standardName,
+    oemArticle: text(source.oemArticle, 80),
+    recommendedBrands,
+    replacementTip: text(source.replacementTip, 500),
+    intervalsAdvice: text(source.intervalsAdvice, 300),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -544,88 +757,26 @@ export async function deleteTuningStage(id: string): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Admin Authentication & Session Management
-// ---------------------------------------------------------------------------
-
-const ADMIN_TOKEN_KEY = "garagehub_admin_token";
-
-export function getAdminToken(): string | null {
-  try {
-    return sessionStorage.getItem(ADMIN_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function setAdminToken(token: string | null): void {
-  try {
-    if (token) {
-      sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
-    } else {
-      sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-    }
-  } catch {
-    // ignore storage quota errors
-  }
-}
-
-export function isAdminAuthenticated(): boolean {
-  return authSessionActive;
-}
-
-export function adminLogout(): void {
-  setAdminToken(null);
-}
-
-export async function verifyAdminPassword(password: string): Promise<{ success: boolean; token?: string; error?: string }> {
-  try {
-    const res = await authenticatedFetch("/api/admin/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
-    });
-    const data = await res.json();
-    if (res.ok && data.success && data.token) {
-      setAdminToken(data.token);
-      return { success: true, token: data.token };
-    }
-    return { success: false, error: data.error || "Неверный пароль администратора" };
-  } catch (err: any) {
-    return { success: false, error: "Ошибка соединения с сервером при проверке прав: " + (err.message || "") };
-  }
-}
-
-// Backup & Reset APIs (Admin Restricted)
-export async function resetDatabase(customToken?: string): Promise<FullGarageData> {
-  const token = customToken || getAdminToken() || "";
+// Backup and reset APIs. The server scopes these operations to the authenticated account.
+export async function resetDatabase(): Promise<FullGarageData> {
   const res = await authenticatedFetch("/api/backup/reset", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-key": token,
-    },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Не удалось сбросить базу данных. Требуются права администратора.");
+    throw new Error(err.error || "Не удалось сбросить данные текущего аккаунта.");
   }
   const data = await res.json();
   return data.data;
 }
 
-export async function importDatabaseBackup(backupData: any, customToken?: string): Promise<void> {
-  const token = customToken || getAdminToken() || "";
+export async function importDatabaseBackup(backupData: FullGarageData): Promise<void> {
   const res = await authenticatedFetch("/api/backup/import", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-admin-key": token,
-    },
     body: JSON.stringify(backupData),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Не удалось восстановить базу данных. Требуются права администратора.");
+    throw new Error(err.error || "Не удалось импортировать данные текущего аккаунта.");
   }
 }

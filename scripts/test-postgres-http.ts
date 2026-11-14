@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import net from "node:net";
@@ -33,17 +35,20 @@ async function stopServer(child: ChildProcess): Promise<void> {
   });
 }
 
-async function startServer(port: number, connectionString: string): Promise<ChildProcess> {
+async function startServer(port: number, connectionString: string, emailCaptureFile: string): Promise<ChildProcess> {
   const child = spawn(process.execPath, ["dist/server.cjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      NODE_ENV: "production",
+      NODE_ENV: "test",
       PORT: String(port),
       DATABASE_URL: connectionString,
       GARAGE_POSTGRES_READY: "true",
       DATABASE_AUTO_MIGRATE: "false",
       DATABASE_SSL: process.env.DATABASE_SSL ?? "false",
+      EMAIL_CODE_SECRET: "postgres-http-test-email-secret",
+      EMAIL_CODE_CAPTURE_FILE: emailCaptureFile,
+      TRUSTED_PROXY_HOPS: "0",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -59,12 +64,10 @@ async function startServer(port: number, connectionString: string): Promise<Chil
     try {
       const response = await fetch(baseUrl + "/api/health", { signal: AbortSignal.timeout(1_000) });
       if (response.ok) {
-        const body = await response.json() as Record<string, unknown>;
-        if (body.storageProvider !== "postgresql") throw new Error("Server did not select PostgreSQL storage");
         return child;
       }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("did not select PostgreSQL")) throw error;
+    } catch {
+      // The server has not started listening yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -84,16 +87,21 @@ async function requestJson(baseUrl: string, route: string, init: RequestInit = {
   return { response, body };
 }
 
-async function register(baseUrl: string, username: string, password: string) {
+async function register(baseUrl: string, username: string, password: string, emailCaptureFile: string) {
+  const email = `${username}@example.test`;
   const { response, body } = await requestJson(baseUrl, "/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email }),
   });
-  assert(response.status === 201, "registration failed with HTTP " + response.status);
-  const cookie = (response.headers.get("set-cookie") || "").split(";")[0];
-  assert(cookie.startsWith("garagehub_session="), "registration did not set session cookie");
-  assert(typeof body.session?.csrfToken === "string", "registration did not return CSRF token");
-  return { cookie, csrfToken: body.session.csrfToken as string };
+  assert(response.status === 202 && body.pendingEmailVerification === true, "registration failed with HTTP " + response.status);
+  const lines = fs.existsSync(emailCaptureFile) ? fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean) : [];
+  const captured = lines.map((line) => JSON.parse(line) as { email: string; code: string }).reverse().find((item) => item.email === email);
+  assert(captured, "registration did not capture email code");
+  const verified = await requestJson(baseUrl, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email, code: captured.code }) });
+  assert(verified.response.status === 200 && typeof verified.body.session?.csrfToken === "string", "email verification failed with HTTP " + verified.response.status);
+  const cookie = (verified.response.headers.get("set-cookie") || "").split(";")[0];
+  assert(cookie.startsWith("garagehub_session="), "verification did not set session cookie");
+  return { cookie, csrfToken: verified.body.session.csrfToken as string };
 }
 
 async function main() {
@@ -104,6 +112,7 @@ async function main() {
   const userB = { username: `httpb-${suffix}`, password: "GarageAI-test-password-2026" };
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
+  const emailCaptureFile = path.join(process.env.TEMP || process.env.TMP || ".", `garageai-email-codes-${suffix}.ndjson`);
   const db = postgres(connectionString, {
     max: 1, prepare: false,
     ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
@@ -111,8 +120,8 @@ async function main() {
   let child: ChildProcess | undefined;
 
   try {
-    child = await startServer(port, connectionString);
-    const authA = await register(baseUrl, userA.username, userA.password);
+    child = await startServer(port, connectionString, emailCaptureFile);
+    const authA = await register(baseUrl, userA.username, userA.password, emailCaptureFile);
     const initialA = await requestJson(baseUrl, "/api/vehicles", { headers: { cookie: authA.cookie } });
     assert(initialA.response.status === 200 && Array.isArray(initialA.body) && initialA.body.length === 0,
       "new account should have an empty garage");
@@ -133,13 +142,24 @@ async function main() {
     const vehicleId = created.body.id;
     assert(typeof vehicleId === "string", "created vehicle has no ID");
 
-    const authB = await register(baseUrl, userB.username, userB.password);
+    const authB = await register(baseUrl, userB.username, userB.password, emailCaptureFile);
     const garageB = await requestJson(baseUrl, "/api/vehicles", { headers: { cookie: authB.cookie } });
     assert(garageB.response.status === 200 && Array.isArray(garageB.body) && garageB.body.length === 0,
       "user B must not see user A vehicle");
 
+    const deleteB = await requestJson(baseUrl, "/api/auth/account", {
+      method: "DELETE",
+      headers: { cookie: authB.cookie, "x-csrf-token": authB.csrfToken },
+      body: JSON.stringify({ password: userB.password }),
+    });
+    assert(deleteB.response.status === 200, "account deletion failed with HTTP " + deleteB.response.status);
+    const deletedUserRows = await db`SELECT count(*)::integer AS count FROM garageai_users WHERE username = ${userB.username}`;
+    assert(Number(deletedUserRows[0]?.count ?? -1) === 0, "deleted account remained in PostgreSQL");
+    const deletedSession = await requestJson(baseUrl, "/api/auth/session", { headers: { cookie: authB.cookie } });
+    assert(deletedSession.response.status === 401, "deleted account session remained active");
+
     await stopServer(child);
-    child = await startServer(port, connectionString);
+    child = await startServer(port, connectionString, emailCaptureFile);
     const login = await requestJson(baseUrl, "/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ username: userA.username, password: userA.password }),
@@ -172,6 +192,7 @@ async function main() {
     if (child) await stopServer(child);
     await db`DELETE FROM garageai_users WHERE username IN (${userA.username}, ${userB.username})`.catch(() => undefined);
     await db.end({ timeout: 5 });
+    fs.rmSync(emailCaptureFile, { force: true });
   }
 }
 

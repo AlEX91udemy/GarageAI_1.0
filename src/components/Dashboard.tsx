@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord, ToFixTask, OemScheduleItem } from "../types";
 import { getWorkHint } from "../workHints";
+import { KnowledgeRecommendationsPanel } from "./KnowledgeRecommendationsPanel";
 
 interface DashboardProps {
   vehicle: Vehicle;
@@ -281,6 +282,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </button>
       </div>
+
+      <KnowledgeRecommendationsPanel vehicle={vehicle} />
 
       {/* AI Quick Receipt Scanner Banner (OCR) */}
       <div className="bg-gradient-to-r from-neutral-900 via-neutral-850 to-neutral-900 text-white p-4 sm:p-5 rounded-3xl border border-neutral-800 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

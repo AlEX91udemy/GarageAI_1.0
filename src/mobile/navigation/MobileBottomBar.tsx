@@ -1,7 +1,7 @@
 import React from "react";
 import {
   Home,
-  Plus,
+  Camera,
   BookOpen,
   Wallet,
   User,
@@ -103,9 +103,9 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
             className={`w-12 h-12 rounded-full bg-brand-strong hover:bg-brand active:scale-95 text-white flex items-center justify-center shadow-lg shadow-brand-strong/35 transition-all cursor-pointer border-4 ${
               isDark ? "border-[#0d131d]" : "border-[#F4F5F8]"
             }`}
-            title="Добавить запись"
+            title="Сканировать или добавить запись"
           >
-            <Plus className="w-6 h-6 stroke-[3]" />
+            <Camera className="w-6 h-6 stroke-[2.5]" />
           </button>
         </div>
 
@@ -144,4 +144,3 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
     </div>
   );
 };
-
