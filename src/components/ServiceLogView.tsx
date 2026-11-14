@@ -126,6 +126,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
           </button>
           <button
             onClick={onAddRecord}
+            data-modal-trigger="service-add"
             className="flex-1 sm:flex-initial px-4 py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-2xl transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-strong/30 active:scale-95"
           >
             <Plus className="w-4 h-4" />

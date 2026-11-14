@@ -18,7 +18,7 @@ File: `db/migrations/001_initial_postgres.sql`
 
 The SQL creates the schema-migrations ledger, user/garage/session tables, a normalized unique username index, ownership foreign keys, JSON object validation, expiry indexes, and a garage revision for optimistic concurrency. It is intentionally additive and does not import or delete application data.
 
-Apply with `DATABASE_URL=... npx tsx scripts/migrate-postgres.ts` from a controlled migration environment after a verified backup. The runtime service account should not have schema-owner privileges. Production app startup verifies migration 001 but does not run DDL by default; `DATABASE_AUTO_MIGRATE=true` is an explicit override and should not be used for normal production rollout.
+Apply with `DATABASE_URL=... npx tsx scripts/migrate-postgres.ts` from a controlled migration environment after a verified backup. The runtime service account should not have schema-owner privileges. Production app startup verifies migration 003 (including email verification state) but does not run DDL by default; `DATABASE_AUTO_MIGRATE=true` is an explicit override and should not be used for normal production rollout.
 
 ## JSON import requirements
 
@@ -41,7 +41,7 @@ The importer in `scripts/import-legacy-json.ts` is dry-run by default and requir
 
 File: `scripts/import-legacy-json.ts`
 
-The importer is dry-run by default and requires `--apply` for writes. It reads `users.json`, `garage_store.json`, and optional `sessions.json` from `data/` (override with `--source-dir=/path/to/data`). It requires migration 001 to already exist.
+The importer is dry-run by default and requires `--apply` for writes. It reads `users.json`, `garage_store.json`, and optional `sessions.json` from `data/` (override with `--source-dir=/path/to/data`). It requires migration 003 to already exist.
 
 Example sequence:
 

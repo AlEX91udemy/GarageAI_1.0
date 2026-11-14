@@ -127,6 +127,10 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
+        if (!window.confirm("Подтвердить импорт резервной копии? Текущие данные гаража будут изменены.")) {
+          setStatusMessage({ type: "success", text: "Импорт отменён. Данные гаража не изменены." });
+          return;
+        }
         await importDatabaseBackup(json);
         const refreshed = await fetchGarageData();
         onDataReloaded(refreshed);

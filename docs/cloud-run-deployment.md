@@ -14,7 +14,7 @@ The Node server refuses to start in production unless `DATABASE_URL` is configur
 
 For a fresh import or future migration, run the importer in dry-run mode, review conflicts/orphan counts, take and verify a backup, then apply transactionally. Validate row counts and per-user data and restore a backup. Then enable `GARAGE_POSTGRES_READY=true` on a private canary only, with public traffic disabled, and run auth/session lifecycle, concurrent writes, tenant isolation, restart/scale and model smoke tests. Set the flag on the production service and route traffic only after the canary passes. The recorded 2026-11-11 cutover checks do not replace these steps for a later data change.
 
-Before setting the flag, run `DATABASE_URL=... npm run preflight:production` from the controlled migration environment. The command checks connectivity, schema version 2, row counts and active sessions without printing credentials or user data. Set `GARAGE_POSTGRES_READY=true` only after the backup/restore and canary checks in this runbook pass.
+Before setting the flag, run `DATABASE_URL=... npm run preflight:production` from the controlled migration environment. The command checks connectivity, schema version 3 including email verification state, row counts and active sessions without printing credentials or user data. Set `GARAGE_POSTGRES_READY=true` only after the backup/restore and canary checks in this runbook pass.
 
 ## Suggested initial resources
 

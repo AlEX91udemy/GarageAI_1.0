@@ -30,7 +30,7 @@ export interface PostgresPersistenceOptions {
   runMigrations?: boolean;
 }
 
-const MIGRATION_FILES = ["001_initial_postgres.sql", "002_email_auth_challenges.sql"] as const;
+const MIGRATION_FILES = ["001_initial_postgres.sql", "002_email_auth_challenges.sql", "003_email_verification_state.sql"] as const;
 
 /**
  * PostgreSQL repository primitives for the Cloud Run persistence cutover.
@@ -75,9 +75,9 @@ export class PostgresPersistence {
       // Production runtime identities should not need DDL privileges. Apply
       // migrations from a controlled one-off job before deploying the revision.
       const rows = await this.sql`
-        SELECT version FROM garageai_schema_migrations WHERE version = 2 LIMIT 1
+        SELECT version FROM garageai_schema_migrations WHERE version = 3 LIMIT 1
       `;
-      if (!rows[0]) throw new Error("PostgreSQL schema migration 001 is missing; run the controlled migration job first");
+      if (!rows[0]) throw new Error("PostgreSQL schema migration 003 is missing; run the controlled migration job first");
     }
     this.initialized = true;
   }
@@ -94,7 +94,7 @@ export class PostgresPersistence {
   async getUserByName(username: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE username_normalized = ${username.trim().toLowerCase()}
       LIMIT 1
@@ -104,14 +104,14 @@ export class PostgresPersistence {
 
   async getUserByEmail(email: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
-    const rows = await this.sql`SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt" FROM garageai_users WHERE lower(btrim(email)) = ${email.trim().toLowerCase()} LIMIT 1`;
+    const rows = await this.sql`SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt" FROM garageai_users WHERE lower(btrim(email)) = ${email.trim().toLowerCase()} LIMIT 1`;
     return rows[0] as UserRecord | undefined;
   }
 
   async getUserById(id: string): Promise<UserRecord | undefined> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       WHERE id = ${id}
       LIMIT 1
@@ -122,7 +122,7 @@ export class PostgresPersistence {
   async listUsers(): Promise<UserRecord[]> {
     this.assertInitialized();
     const rows = await this.sql`
-      SELECT id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+      SELECT id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
       FROM garageai_users
       ORDER BY created_at, id
     `;
@@ -136,13 +136,18 @@ export class PostgresPersistence {
   }
 
   async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
+    // Legacy repository callers represent already trusted/imported accounts.
+    return this.createUserWithEmailState(username, passwordHash, id, email, email ? new Date().toISOString() : undefined);
+  }
+
+  async createUserWithEmailState(username: string, passwordHash: string, id: string, email?: string, emailVerifiedAt?: string | null): Promise<UserRecord> {
     this.assertInitialized();
     try {
       return await this.sql.begin(async (tx) => {
         const rows = await tx`
-          INSERT INTO garageai_users (id, username, email, password_hash)
-          VALUES (${id}, ${username.trim()}, ${email ?? null}, ${passwordHash})
-          RETURNING id, username, email, password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
+          INSERT INTO garageai_users (id, username, email, email_verified_at, password_hash)
+          VALUES (${id}, ${username.trim()}, ${email ?? null}, ${email ? emailVerifiedAt ?? null : null}, ${passwordHash})
+          RETURNING id, username, email, to_char(email_verified_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "emailVerifiedAt", password_hash AS "passwordHash", to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt"
         `;
         await tx`
           INSERT INTO garageai_garages (user_id, data)
@@ -156,6 +161,12 @@ export class PostgresPersistence {
     }
   }
 
+  async markEmailVerified(userId: string, verifiedAt = new Date().toISOString()): Promise<boolean> {
+    this.assertInitialized();
+    const rows = await this.sql`UPDATE garageai_users SET email_verified_at = ${verifiedAt} WHERE id = ${userId} AND email IS NOT NULL RETURNING id`;
+    return Boolean(rows[0]);
+  }
+
   /** Foreign-key cascades delete the garage, sessions and email challenges atomically. */
   async deleteUser(userId: string): Promise<boolean> {
     this.assertInitialized();
@@ -166,7 +177,6 @@ export class PostgresPersistence {
     `;
     return Boolean(rows[0]);
   }
-
   async createEmailChallenge(record: import("./store").EmailAuthChallengeRecord): Promise<void> {
     this.assertInitialized();
     await this.sql.begin(async (tx) => {

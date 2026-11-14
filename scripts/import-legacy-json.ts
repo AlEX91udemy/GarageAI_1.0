@@ -124,8 +124,8 @@ async function loadBundle(sourceDir: string): Promise<LegacyBundle> {
 }
 
 async function verifySchema(db: any) {
-  const rows = await db`SELECT version FROM garageai_schema_migrations WHERE version = 1 LIMIT 1`;
-  if (!rows[0]) throw new Error("PostgreSQL migration 001 is missing; run scripts/migrate-postgres.ts first");
+  const rows = await db`SELECT version FROM garageai_schema_migrations WHERE version = 3 LIMIT 1`;
+  if (!rows[0]) throw new Error("PostgreSQL migration 003 is missing; run scripts/migrate-postgres.ts first");
 }
 
 async function inspectConflicts(db: any, bundle: LegacyBundle) {

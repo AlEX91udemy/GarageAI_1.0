@@ -194,7 +194,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
     );
   };
 
-  const dialogRef = useModalFocus(onClose);
+  const dialogRef = useModalFocus(onClose, true, '[data-modal-trigger="service-add"]');
 
   return (
     <div

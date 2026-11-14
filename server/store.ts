@@ -27,6 +27,8 @@ export interface UserRecord {
   passwordHash: string;
   createdAt: string;
   email?: string;
+  /** Null means a newly registered email still needs confirmation. Undefined is legacy and treated as verified. */
+  emailVerifiedAt?: string | null;
 }
 
 export interface EmailAuthChallengeRecord {
@@ -277,6 +279,11 @@ export class GarageStore {
   }
 
   async createUser(username: string, passwordHash: string, id: string, email?: string): Promise<UserRecord> {
+    // Legacy repository callers represent already trusted/imported accounts.
+    return this.createUserWithEmailState(username, passwordHash, id, email, email ? new Date().toISOString() : undefined);
+  }
+
+  async createUserWithEmailState(username: string, passwordHash: string, id: string, email?: string, emailVerifiedAt?: string | null): Promise<UserRecord> {
     const task = this.writeChain.then(() => {
       const normalizedUsername = username.trim().toLowerCase();
       if (this.state.users.some((user) => user.username.trim().toLowerCase() === normalizedUsername)) {
@@ -291,6 +298,7 @@ export class GarageStore {
         passwordHash,
         createdAt: new Date().toISOString(),
         ...(email ? { email } : {}),
+        ...(email ? { emailVerifiedAt: emailVerifiedAt ?? null } : {}),
       };
       const nextUsers = [...this.state.users, created];
       const nextGarage = emptyGarage();
@@ -353,6 +361,17 @@ export class GarageStore {
     return this.state.users.find((user) => user.email?.trim().toLowerCase() === key);
   }
 
+  async markEmailVerified(userId: string, verifiedAt = new Date().toISOString()): Promise<boolean> {
+    const task = this.writeChain.then(() => {
+      const user = this.state.users.find((item) => item.id === userId);
+      if (!user) return false;
+      user.emailVerifiedAt = verifiedAt;
+      this.persistUsers(this.state.users);
+      return true;
+    });
+    this.writeChain = task.then(() => undefined, () => undefined);
+    return task;
+  }
   async createEmailChallenge(record: EmailAuthChallengeRecord): Promise<void> {
     const task = this.writeChain.then(() => {
       const next = this.state.emailChallenges.filter((item) => item.userId !== record.userId || item.consumedAtMs || item.expiresAtMs <= Date.now());

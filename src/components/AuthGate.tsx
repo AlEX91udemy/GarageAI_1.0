@@ -48,6 +48,12 @@ export const AuthGate: React.FC<
         const next = emailMode
           ? (codeRequested ? await verifyEmailCode(email, emailCode) : (await requestEmailCode(email), setCodeRequested(true), null))
           : (mode === "login" ? await login(username, password) : await register(username, password, email));
+        if (next && "pendingEmailVerification" in next) {
+          setEmail(next.email);
+          setEmailMode(true);
+          setCodeRequested(true);
+          return;
+        }
         if (!next) return;
         setSession(next);
         onAuthenticated?.();
@@ -111,8 +117,8 @@ export const AuthGate: React.FC<
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />
             {codeRequested && <input inputMode="numeric" pattern="[0-9]{6}" value={emailCode} onChange={(e) => setEmailCode(e.target.value)} placeholder="Код из письма" className="mt-2 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />}
           </label> : <>{mode === "register" && <label className="block text-sm text-slate-300">
-            Email для входа по коду (необязательно)
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" />
+            Email для подтверждения регистрации
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />
           </label>}<label className="block text-sm text-slate-300">
             Логин
             <input

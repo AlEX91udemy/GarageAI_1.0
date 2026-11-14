@@ -109,7 +109,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           : (await requestEmailCode(authEmail.trim()), setEmailCodeRequested(true), null))
         : authMode === "login"
           ? await login(authUsername.trim(), authPassword)
-          : await register(authUsername.trim(), authPassword, authEmail.trim() || undefined);
+          : await register(authUsername.trim(), authPassword, authEmail.trim());
+      if (session && "pendingEmailVerification" in session) {
+        setAuthEmail(session.email);
+        setEmailMode(true);
+        setEmailCodeRequested(true);
+        return;
+      }
       if (!session) return;
       setIsAuthenticated(true);
       setSessionUsername(session.username);
@@ -170,10 +176,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
 
         {!isAuthenticated && (
-          <div className="rounded-3xl bg-white border border-neutral-200/90 shadow-xs p-4 space-y-3">
+          <div className="rounded-[24px] bg-white border border-neutral-200/90 shadow-xs p-4 space-y-3">
             <div>
-              <h3 className="text-sm font-black text-neutral-900">Синхронизация гаража</h3>
-              <p className="mt-1 text-xs text-neutral-500">
+              <h3 className="text-[13px] font-black text-neutral-900">Синхронизация гаража</h3>
+              <p className="mt-1 text-[12px] leading-[1.35] text-neutral-500">
                 Данные сохранены на этом устройстве. Войдите или создайте аккаунт, чтобы синхронизировать гараж.
               </p>
             </div>
@@ -201,10 +207,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             ) : (
               <form onSubmit={submitAuth} className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-neutral-700">
+                  <span className="text-[12px] font-bold text-neutral-800">
                     {authMode === "login" ? "Вход в аккаунт" : "Новый аккаунт"}
                   </span>
-                  <button type="button" onClick={() => { setAuthMode(null); setEmailMode(false); setEmailCodeRequested(false); setAuthError(null); }} className="text-xs font-semibold text-neutral-500 hover:text-neutral-900">
+                  <button type="button" onClick={() => { setAuthMode(null); setEmailMode(false); setEmailCodeRequested(false); setAuthError(null); }} className="text-[12px] font-semibold text-neutral-500 hover:text-neutral-900">
                     Отмена
                   </button>
                 </div>
@@ -217,7 +223,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       placeholder="Email"
                       autoComplete="email"
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                     {emailCodeRequested && (
                       <input
@@ -228,7 +234,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         placeholder="Код из письма"
                         autoComplete="one-time-code"
                         required
-                        className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                        className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                       />
                     )}
                   </>
@@ -241,7 +247,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       placeholder="Email"
                       autoComplete="email"
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                     <input
                       type="password"
@@ -251,7 +257,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       autoComplete="new-password"
                       minLength={8}
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                     <input
                       value={authUsername}
@@ -259,7 +265,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       placeholder="Логин"
                       autoComplete="username"
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                   </>
                 ) : (
@@ -270,7 +276,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       placeholder="Логин"
                       autoComplete="username"
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                     <input
                       type="password"
@@ -280,12 +286,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       autoComplete="current-password"
                       minLength={8}
                       required
-                      className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-brand-strong"
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
                   </>
                 )}
-                {authError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{authError}</p>}
-                <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-xs font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
+                {authError && <p role="alert" className="rounded-xl border border-red-100 bg-red-50/80 px-3 py-2 text-[12px] font-semibold leading-[1.25] text-red-700">{authError}</p>}
+                <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-[12px] font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
                   {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : emailMode ? (emailCodeRequested ? "Войти" : "Отправить код") : authMode === "login" ? "Войти" : "Создать аккаунт"}
                 </button>
               </form>

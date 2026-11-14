@@ -122,4 +122,12 @@ describe("GarageStore tenant isolation and persistence", () => {
     await expect(store.deleteUser("user-a")).resolves.toBe(false);
   });
 
+  it("keeps API-created email accounts pending until the challenge is verified", async () => {
+    const store = makeStore();
+    await store.createUserWithEmailState("pending", "hash", "user-pending", "pending@example.test", null);
+    expect(store.getUserByEmail("pending@example.test")?.emailVerifiedAt).toBeNull();
+    await expect(store.markEmailVerified("user-pending", "2026-11-14T00:00:00.000Z")).resolves.toBe(true);
+    expect(store.getUserByEmail("pending@example.test")?.emailVerifiedAt).toBe("2026-11-14T00:00:00.000Z");
+  });
+
 });
