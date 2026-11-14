@@ -45,6 +45,8 @@ import {
   catalogSearch,
 } from "./src/catalog/database";
 import { searchKnowledge } from "./src/catalog/knowledge";
+import { publicKnowledgeSources } from "./src/catalog/publicSources";
+import { getVehicleRecommendations } from "./src/catalog/recommendations";
 import { verifyModification } from "./src/catalog/verification";
 import {
   prepareDocumentImage,
@@ -53,12 +55,13 @@ import {
   normalizeExtractedVin,
   normalizeRussianPlate,
 } from "./server/documentOcr";
-import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData } from "./server/store";
+import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData, type EmailAuthChallengeRecord } from "./server/store";
 import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
 import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
+import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
 import { classifyReceiptText } from "./server/receiptClassification";
 import {
@@ -74,6 +77,7 @@ import {
 } from "./server/security";
 import {
   asNonNegativeNumber,
+  asStrictNonNegativeNumber,
   asTrimmedString,
   isValidDate,
   isValidYear,
@@ -81,10 +85,35 @@ import {
   validateDiagnosticResult,
 } from "./server/validation";
 
-dotenv.config();
+// Production logs must stay focused on request and startup failures.
+dotenv.config({ quiet: true });
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
+
+// Express 4 does not forward rejected promises from async route handlers.
+// Wrap route registration once so unexpected failures reach the JSON error
+// middleware instead of becoming unhandled rejections.
+const asyncRoute = (handler: (...args: any[]) => unknown) =>
+  (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    Promise.resolve()
+      .then(() => handler(req, res, next))
+      .catch(next);
+  };
+
+// Express route methods accept callback arrays as well as individual handlers.
+// Preserve that overload while wrapping every non-error callback.
+const wrapRouteHandler = (handler: unknown): unknown => {
+  if (Array.isArray(handler)) return handler.map(wrapRouteHandler);
+  if (typeof handler !== "function" || handler.length === 4) return handler;
+  return asyncRoute(handler as (...args: any[]) => unknown);
+};
+for (const method of ["get", "post", "put", "patch", "delete"] as const) {
+  const original = app[method].bind(app) as (...args: any[]) => unknown;
+  (app as any)[method] = (pathOrPaths: unknown, ...handlers: Array<(...args: any[]) => unknown>) =>
+    original(pathOrPaths, ...handlers.map(wrapRouteHandler));
+}
+
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const PAID_VISION_MODEL = "google/gemini-2.5-flash";
 function resolveVisionModel(value: string | undefined): string {
@@ -119,13 +148,16 @@ async function processWithDocumentAi(content: Buffer, mimeType: string, processo
   return result.document;
 }
 
-app.set("trust proxy", 1);
+// Trust only the configured reverse-proxy hop count. This keeps client IP
+// based rate limits from being bypassed by spoofed X-Forwarded-For headers.
+const trustedProxyHops = Number.parseInt(process.env.TRUSTED_PROXY_HOPS || "0", 10);
+app.set("trust proxy", Number.isInteger(trustedProxyHops) && trustedProxyHops >= 0 ? trustedProxyHops : 0);
 
 // Middleware for parsing JSON with a 10mb limit for receipt photos
 app.use(express.json({ limit: "10mb" }));
 
 const ALLOWED_ORIGIN_HOSTS = new Set(
-  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://www.garageai.site,http://localhost:3000,http://localhost:8080")
+  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://www.garageai.site,https://garageai-1-0.sambur91.workers.dev,http://localhost:3000,http://localhost:8080")
     .split(",")
     .map((item) => {
       try {
@@ -148,13 +180,8 @@ app.use((req, res, next) => {
     } catch {
       return res.status(403).json({ error: "Некорректный Origin" });
     }
-    const forwardedHost =
-      typeof req.headers["x-forwarded-host"] === "string"
-        ? req.headers["x-forwarded-host"].split(",")[0].trim()
-        : undefined;
     const hostMatches =
       originHost === req.headers.host ||
-      (forwardedHost !== undefined && originHost === forwardedHost) ||
       ALLOWED_ORIGIN_HOSTS.has(originHost);
     if (!hostMatches) {
       return res.status(403).json({ error: "Запрос отклонён: несовпадение origin" });
@@ -204,6 +231,10 @@ function uniqueId(preferred: unknown, prefix: string, existing: { id: string }[]
   return existing.some((item) => item.id === candidate) ? newId(prefix) : candidate;
 }
 
+function hasVehicle(vehicleId: unknown): vehicleId is string {
+  return typeof vehicleId === "string" && dbMemory.vehicles.some((vehicle) => vehicle.id === vehicleId);
+}
+
 function getInitialDatabase(): GarageDatabase {
   return {
     vehicles: clone(INITIAL_VEHICLES),
@@ -237,6 +268,8 @@ assertProductionStorageSafe(process.env);
 const store = process.env.DATABASE_URL?.trim()
   ? new PostgresPersistence({
       connectionString: process.env.DATABASE_URL,
+      host: process.env.DATABASE_HOST?.trim() || undefined,
+      port: Number.isInteger(Number(process.env.DATABASE_PORT)) ? Number(process.env.DATABASE_PORT) : undefined,
       maxConnections: Number(process.env.DATABASE_POOL_MAX) || 5,
       ssl: process.env.DATABASE_SSL === "true" ? "require" : false,
       runMigrations: process.env.NODE_ENV !== "production" || process.env.DATABASE_AUTO_MIGRATE === "true",
@@ -622,6 +655,97 @@ function parseJsonSafely<T = any>(text: string | undefined | null, fallback: T):
   return fallback;
 }
 
+const PART_LOOKUP_PLACEHOLDER_RE = /^(?:n\/?a|нет|не указано|не указан|unknown|н\/д|[-—])$/i;
+
+function normalizePartLookupText(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  const normalized = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  if (!normalized || PART_LOOKUP_PLACEHOLDER_RE.test(normalized)) return "";
+  return normalized.slice(0, maxLength);
+}
+
+function normalizePartLookupPrice(value: unknown): string {
+  const price = typeof value === "number" && Number.isFinite(value) ? String(value) : normalizePartLookupText(value, 80);
+  if (!price || !/\d/.test(price)) return "";
+  const numericValues = price.match(/\d+(?:[.,]\d+)?/g)?.map((token) => Number(token.replace(",", "."))) || [];
+  if (!numericValues.length || numericValues.some((amount) => !Number.isFinite(amount) || amount <= 0 || amount > 100_000_000)) return "";
+  return price;
+}
+
+function normalizePartLookupResponse(value: unknown): {
+  standardName: string;
+  oemArticle: string;
+  recommendedBrands: Array<{ tier: string; brand: string; partNumber: string; approxPriceRub: string; rating: string }>;
+  replacementTip: string;
+  intervalsAdvice: string;
+} | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const standardName = normalizePartLookupText(source.standardName, 160);
+  if (!standardName) return null;
+
+  const recommendedBrands = (Array.isArray(source.recommendedBrands) ? source.recommendedBrands : [])
+    .slice(0, 100)
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const candidate = item as Record<string, unknown>;
+      const brand = normalizePartLookupText(candidate.brand, 80);
+      const partNumber = normalizePartLookupText(candidate.partNumber, 80);
+      const approxPriceRub = normalizePartLookupPrice(candidate.approxPriceRub);
+      if (!brand || !partNumber || !approxPriceRub) return null;
+      return {
+        tier: normalizePartLookupText(candidate.tier, 80) || "Рекомендованный вариант",
+        brand,
+        partNumber,
+        approxPriceRub,
+        rating: normalizePartLookupText(candidate.rating, 120) || "Без оценки",
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  return {
+    standardName,
+    oemArticle: normalizePartLookupText(source.oemArticle, 80),
+    recommendedBrands,
+    replacementTip: normalizePartLookupText(source.replacementTip, 500),
+    intervalsAdvice: normalizePartLookupText(source.intervalsAdvice, 300),
+  };
+}
+
+function normalizeOemScheduleResponse(value: unknown): {
+  items: Array<{ title: string; category: string; intervalKm: number; intervalMonths: number; description: string; oemPartHint: string }>;
+  criticalWeakPoints: string[];
+} | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const items = (Array.isArray(source.items) ? source.items : [])
+    .slice(0, 100)
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+      const candidate = item as Record<string, unknown>;
+      const title = normalizePartLookupText(candidate.title, 160);
+      const intervalKm = Number(candidate.intervalKm);
+      const intervalMonths = Number(candidate.intervalMonths);
+      if (!title || !Number.isFinite(intervalKm) || intervalKm <= 0 || intervalKm > 1_000_000 || !Number.isFinite(intervalMonths) || intervalMonths <= 0 || intervalMonths > 240) return null;
+      return {
+        title,
+        category: normalizePartLookupText(candidate.category, 100) || "ТО и замена жидкостей",
+        intervalKm: Math.round(intervalKm),
+        intervalMonths: Math.round(intervalMonths),
+        description: normalizePartLookupText(candidate.description, 500),
+        oemPartHint: normalizePartLookupText(candidate.oemPartHint, 200),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null && item.intervalKm > 0 && item.intervalMonths > 0);
+  if (!items.length) return null;
+
+  const criticalWeakPoints = (Array.isArray(source.criticalWeakPoints) ? source.criticalWeakPoints : [])
+    .slice(0, 10)
+    .map((item) => normalizePartLookupText(item, 300))
+    .filter(Boolean);
+  return { items, criticalWeakPoints };
+}
+
 // ---------------------------------------------------------------------------
 // REST API Routes
 // ---------------------------------------------------------------------------
@@ -642,9 +766,15 @@ app.use("/api", (req, res, next) => {
     req.path === "/vehicles/top100" ||
     req.path.startsWith("/catalog/modifications/") ||
     req.path === "/knowledge/search" ||
+    req.path === "/knowledge/sources" ||
+    req.path === "/knowledge/recommendations" ||
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||
+    req.path === "/auth/email/request" ||
+    req.path === "/auth/email/request-code" ||
+    req.path === "/auth/email/verify" ||
+    req.path === "/auth/email/verify-code" ||
     req.path.startsWith("/auth/session");
   if (isPublic) return next();
   if (req.path === "/health" || !fullPath) return next();
@@ -653,30 +783,15 @@ app.use("/api", (req, res, next) => {
 
 // 1. Health and Meta Check
 app.get("/api/health", async (_req, res) => {
-  const garage = requestContext.getStore()?.garage;
   if (store instanceof PostgresPersistence) {
     try {
       await store.healthCheck();
     } catch {
-      return res.status(503).json({ status: "degraded", storageProvider: "postgresql", timestamp: new Date().toISOString() });
+      return res.status(503).json({ status: "degraded", timestamp: new Date().toISOString() });
     }
   }
   res.json({
     status: "ok",
-    storageProvider: store instanceof PostgresPersistence ? "postgresql" : "local-json",
-    // Keep the legacy field for older clients, but expose explicit provider
-    // state so Vertex AI/ADC is not misreported as a missing API key.
-    hasApiKey: Boolean(process.env.GEMINI_API_KEY),
-    hasAiConfigured: hasAiConfiguration(process.env),
-    hasGeminiConfigured: hasGeminiConfiguration(process.env),
-    vertexAiEnabled: process.env.GOOGLE_GENAI_USE_VERTEXAI === "true",
-    authenticated: Boolean(garage),
-    vehiclesCount: garage ? dbMemory.vehicles.length : 0,
-    serviceRecordsCount: garage ? dbMemory.serviceRecords.length : 0,
-    fuelRecordsCount: garage ? dbMemory.fuelRecords.length : 0,
-    partsCount: garage ? dbMemory.garageParts.length : 0,
-    toFixCount: garage ? dbMemory.toFixTasks.length : 0,
-    lastUpdated: garage ? dbMemory.lastUpdated : null,
     timestamp: new Date().toISOString(),
   });
 });
@@ -811,9 +926,130 @@ app.get("/api/catalog/modifications/:id", (req, res) => {
   res.json({ modification, generation, model, brand, engine: catalogEngines.find((item) => item.id === modification.engineId) || null, transmission: catalogTransmissions.find((item) => item.id === modification.transmissionId) || null, source: catalogSources.find((item) => item.id === modification.sourceId) || null, evidence: modificationEvidence.filter((item) => item.modificationId === modification.id), verification: verifyModification(modification, modificationEvidence, catalogSources) });
 });
 app.get("/api/knowledge/search", (req, res) => {
-  const query = typeof req.query.q === "string" ? req.query.q : "";
+  if (req.query.q !== undefined && typeof req.query.q !== "string") return res.status(400).json({ error: "Параметр q должен быть строкой" });
+  const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, KNOWLEDGE_QUERY_MAX_LENGTH) : "";
   const filters = { brand: typeof req.query.brand === "string" ? req.query.brand : undefined, model: typeof req.query.model === "string" ? req.query.model : undefined, generation: typeof req.query.generation === "string" ? req.query.generation : undefined, category: typeof req.query.category === "string" ? req.query.category : undefined };
-  res.json({ chunks: searchKnowledge(query, filters as any), sources: catalogSources });
+  res.json({ chunks: searchKnowledge(query, filters as any), sources: [...catalogSources, ...publicKnowledgeSources] });
+});
+const KNOWLEDGE_QUERY_MAX_LENGTH = 200;
+const KNOWLEDGE_VEHICLE_MAX_LENGTH = 4_000;
+const KNOWLEDGE_REFRESH_LIMIT = 3;
+const KNOWLEDGE_REFRESH_WINDOW_MS = 15 * 60 * 1000;
+const knowledgeRefreshAttempts = new Map<string, { count: number; startedAt: number }>();
+const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
+const KNOWLEDGE_QUERY_KEYS = new Set(["vehicle", "q", ...KNOWLEDGE_VEHICLE_KEYS]);
+
+function parseKnowledgeVehicle(value: unknown): { vehicle?: Record<string, unknown>; error?: string } {
+  if (typeof value !== "string") return { vehicle: {} };
+  if (value.length > KNOWLEDGE_VEHICLE_MAX_LENGTH) return { error: "Профиль автомобиля слишком большой" };
+  let parsed: unknown;
+  try { parsed = JSON.parse(value); } catch { return { error: "Некорректный JSON профиля автомобиля" }; }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { error: "Профиль автомобиля должен быть объектом" };
+  const source = parsed as Record<string, unknown>;
+  const unknownKeys = Object.keys(source).filter((key) => !KNOWLEDGE_VEHICLE_KEYS.has(key));
+  if (unknownKeys.length) return { error: "Профиль содержит недопустимые поля" };
+  const vehicle: Record<string, unknown> = {};
+  for (const key of KNOWLEDGE_VEHICLE_KEYS) {
+    const raw = source[key];
+    if (raw === undefined || raw === null) continue;
+    if (["year", "currentMileage"].includes(key)) {
+      if (typeof raw !== "number" || !Number.isFinite(raw) || !Number.isInteger(raw)) return { error: "Числовое поле профиля некорректно" };
+      if (key === "year" && (raw < 1886 || raw > 2100)) return { error: "Год автомобиля вне допустимого диапазона" };
+      if (key === "currentMileage" && (raw < 0 || raw > 1_000_000)) return { error: "Пробег вне допустимого диапазона" };
+      vehicle[key] = raw;
+      continue;
+    }
+    if (typeof raw !== "string" || raw.length > 160) return { error: "Текстовое поле профиля некорректно" };
+    const text = raw.trim();
+    if (text) vehicle[key] = text;
+  }
+  return { vehicle };
+}
+
+function parseKnowledgeVehicleQuery(query: express.Request["query"]): { vehicle?: Record<string, unknown>; error?: string } {
+  const vehicle: Record<string, unknown> = {};
+  for (const key of KNOWLEDGE_VEHICLE_KEYS) {
+    const raw = query[key];
+    if (raw === undefined) continue;
+    if (typeof raw !== "string") return { error: "Параметр профиля должен быть строкой" };
+    if (["year", "currentMileage"].includes(key)) {
+      if (!/^\d+$/.test(raw)) return { error: "Числовое поле профиля некорректно" };
+      const number = Number(raw);
+      if (!Number.isSafeInteger(number)) return { error: "Числовое поле профиля некорректно" };
+      if (key === "year" && (number < 1886 || number > 2100)) return { error: "Год автомобиля вне допустимого диапазона" };
+      if (key === "currentMileage" && number > 1_000_000) return { error: "Пробег вне допустимого диапазона" };
+      vehicle[key] = number;
+      continue;
+    }
+    if (raw.length > 160) return { error: "Текстовое поле профиля некорректно" };
+    const text = raw.trim();
+    if (text) vehicle[key] = text;
+  }
+  return { vehicle };
+}
+
+async function rateLimitKnowledgeRefresh(req: express.Request, res: express.Response): Promise<boolean> {
+  const key = hashToken(req.ip || "unknown");
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("knowledge-refresh", key, KNOWLEDGE_REFRESH_LIMIT, KNOWLEDGE_REFRESH_WINDOW_MS);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        res.status(429).json({ error: "Слишком много проверок источников. Повторите позже." });
+        return true;
+      }
+      return false;
+    } catch {
+      res.status(503).json({ error: "Проверка источников временно недоступна." });
+      return true;
+    }
+  }
+  const now = Date.now();
+  const current = knowledgeRefreshAttempts.get(key);
+  if (current && now - current.startedAt < KNOWLEDGE_REFRESH_WINDOW_MS && current.count >= KNOWLEDGE_REFRESH_LIMIT) {
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((current.startedAt + KNOWLEDGE_REFRESH_WINDOW_MS - now) / 1000)));
+    res.status(429).json({ error: "Слишком много проверок источников. Повторите позже." });
+    return true;
+  }
+  const window = !current || now - current.startedAt >= KNOWLEDGE_REFRESH_WINDOW_MS ? { count: 0, startedAt: now } : current;
+  window.count += 1;
+  knowledgeRefreshAttempts.set(key, window);
+  return false;
+}
+
+app.get("/api/knowledge/sources", (_req, res) => {
+  res.json({ sources: publicKnowledgeSources, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-14", statusScope: "instance-local", note: "Реестр содержит публичные точки входа. Статусы проверки относятся к текущему экземпляру сервера и не являются доказательством содержимого документа. Для точного совета нужен документ производителя для конкретного рынка, года, двигателя и VIN." });
+});
+const publicKnowledgeSourceStatuses = new Map<string, { sourceId: string; checkedAt: string; status: "reachable" | "http_error" | "network_error" | "not_checked"; httpStatus?: number; responseUrl?: string; error?: string }>();
+async function refreshPublicKnowledgeSources() {
+  const checkedAt = new Date().toISOString();
+  await Promise.all(publicKnowledgeSources.map(async (source) => {
+    try {
+      const response = await fetch(source.url, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(8_000) });
+      publicKnowledgeSourceStatuses.set(source.id, { sourceId: source.id, checkedAt, status: response.ok ? "reachable" : "http_error", httpStatus: response.status, responseUrl: response.url });
+    } catch (error) {
+      publicKnowledgeSourceStatuses.set(source.id, { sourceId: source.id, checkedAt, status: "network_error", error: error instanceof Error ? error.message.slice(0, 240) : "network request failed" });
+    }
+  }));
+  return { checkedAt, statuses: Array.from(publicKnowledgeSourceStatuses.values()) };
+}
+app.post("/api/knowledge/sources/refresh", requireAuth, async (req, res) => {
+  if (await rateLimitKnowledgeRefresh(req, res)) return;
+  res.json(await refreshPublicKnowledgeSources());
+});
+app.get("/api/knowledge/recommendations", (req, res) => {
+  const unknownQueryKeys = Object.keys(req.query).filter((key) => !KNOWLEDGE_QUERY_KEYS.has(key));
+  if (unknownQueryKeys.length) return res.status(400).json({ error: "Запрос содержит недопустимые поля" });
+  if (req.query.vehicle !== undefined && typeof req.query.vehicle !== "string") return res.status(400).json({ error: "Профиль автомобиля должен быть JSON-строкой" });
+  const parsedVehicle = req.query.vehicle && typeof req.query.vehicle === "string"
+    ? parseKnowledgeVehicle(req.query.vehicle)
+    : parseKnowledgeVehicleQuery(req.query);
+  if (parsedVehicle.error) return res.status(400).json({ error: parsedVehicle.error });
+  if (req.query.q !== undefined && typeof req.query.q !== "string") return res.status(400).json({ error: "Параметр q должен быть строкой" });
+  const rawQuery = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (rawQuery.length > KNOWLEDGE_QUERY_MAX_LENGTH) return res.status(400).json({ error: "Запрос слишком длинный" });
+  const query = rawQuery;
+  res.json({ recommendations: getVehicleRecommendations(parsedVehicle.vehicle || {}, query), sources: publicKnowledgeSources });
 });
 
 app.get("/api/vehicles/:id", (req, res) => {
@@ -1031,24 +1267,35 @@ app.post("/api/services", async (req, res) => {
   if (!dbMemory.vehicles.some((vehicle) => vehicle.id === body.vehicleId)) {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(body.date) || !Number.isFinite(Number(body.mileage)) || Number(body.mileage) < 0) {
+  const mileage = asStrictNonNegativeNumber(body.mileage, 1_000_000_000);
+  if (!isValidDate(body.date) || mileage === null) {
     return res.status(400).json({ error: "Некорректная дата или пробег" });
   }
 
-  const parts = Array.isArray(body.parts)
-    ? body.parts.map((p, idx) => ({
+  let parts: ServiceRecord["parts"] = [];
+  if (Array.isArray(body.parts)) {
+    const normalizedParts = body.parts.map((p, idx) => {
+      const quantity = asStrictNonNegativeNumber(p?.quantity, 1_000_000);
+      const unitPrice = asStrictNonNegativeNumber(p?.unitPrice, 1_000_000_000);
+      if (quantity === null || quantity <= 0 || unitPrice === null) return null;
+      return {
         id: typeof p?.id === "string" && p.id.trim() ? p.id.trim() : `part-${Date.now()}-${idx}`,
         name: asTrimmedString(p?.name, 200),
         brand: asTrimmedString(p?.brand, 100),
         partNumber: asTrimmedString(p?.partNumber, 100),
-        quantity: Math.max(1, Number(p?.quantity) || 1),
-        unitPrice: Math.max(0, Number(p?.unitPrice) || 0),
-      }))
-    : [];
+        quantity,
+        unitPrice,
+      };
+    });
+    if (normalizedParts.some((part) => part === null)) {
+      return res.status(400).json({ error: "Количество и цена запчастей должны быть корректными" });
+    }
+    parts = normalizedParts as NonNullable<typeof normalizedParts[number]>[];
+  }
   const partsCost = parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0);
-  const laborCost = body.laborCost !== undefined ? Number(body.laborCost) : 0;
-  const totalCost = body.totalCost !== undefined ? Number(body.totalCost) : laborCost + partsCost;
-  if (![laborCost, totalCost, partsCost].every((value) => Number.isFinite(value) && value >= 0)) {
+  const laborCost = body.laborCost === undefined ? 0 : asStrictNonNegativeNumber(body.laborCost, 1_000_000_000);
+  const totalCost = body.totalCost === undefined ? (laborCost === null ? null : laborCost + partsCost) : asStrictNonNegativeNumber(body.totalCost, 1_000_000_000);
+  if (laborCost === null || totalCost === null) {
     return res.status(400).json({ error: "Стоимость должна быть неотрицательным числом" });
   }
 
@@ -1056,7 +1303,7 @@ app.post("/api/services", async (req, res) => {
     id: uniqueId(body.id, "rec", dbMemory.serviceRecords),
     vehicleId: body.vehicleId.trim(),
     date: body.date.trim(),
-    mileage: Number(body.mileage) || 0,
+    mileage,
     category: body.category || "ТО и замена жидкостей",
     title: body.title.trim(),
     description: asTrimmedString(body.description, 2000),
@@ -1127,17 +1374,40 @@ app.put("/api/services/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.serviceRecords[index];
   const body = (req.body || {}) as Partial<ServiceRecord>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
-  const parts = Array.isArray(body.parts)
-    ? body.parts.map((p, i) => ({
+  if (body.date !== undefined && !isValidDate(body.date)) {
+    return res.status(400).json({ error: "Некорректная дата записи" });
+  }
+  const mileage = body.mileage === undefined ? current.mileage : asStrictNonNegativeNumber(body.mileage, 1_000_000_000);
+  const laborCost = body.laborCost === undefined ? current.laborCost : asStrictNonNegativeNumber(body.laborCost, 1_000_000_000);
+  const totalCost = body.totalCost === undefined ? current.totalCost : asStrictNonNegativeNumber(body.totalCost, 1_000_000_000);
+  if (mileage === null || laborCost === null || totalCost === null) {
+    return res.status(400).json({ error: "Пробег и стоимость должны быть неотрицательными числами" });
+  }
+
+  let parts = current.parts;
+  if (Array.isArray(body.parts)) {
+    const normalizedParts = body.parts.map((p, i) => {
+      const quantity = asStrictNonNegativeNumber(p?.quantity, 1_000_000);
+      const unitPrice = asStrictNonNegativeNumber(p?.unitPrice, 1_000_000_000);
+      if (quantity === null || quantity <= 0 || unitPrice === null) return null;
+      return {
         id: typeof p?.id === "string" ? p.id : `part-${Date.now()}-${i}`,
         name: typeof p?.name === "string" ? p.name : "",
         brand: typeof p?.brand === "string" ? p.brand : "",
         partNumber: typeof p?.partNumber === "string" ? p.partNumber : "",
-        quantity: Number(p?.quantity) || 1,
-        unitPrice: Number(p?.unitPrice) || 0,
-      }))
-    : current.parts;
+        quantity,
+        unitPrice,
+      };
+    });
+    if (normalizedParts.some((part) => part === null)) {
+      return res.status(400).json({ error: "Количество и цена запчастей должны быть корректными" });
+    }
+    parts = normalizedParts as NonNullable<typeof normalizedParts[number]>[];
+  }
 
   dbMemory.serviceRecords[index] = {
     ...current,
@@ -1146,16 +1416,16 @@ app.put("/api/services/:id", async (req, res) => {
         ? body.vehicleId
         : current.vehicleId,
     date: typeof body.date === "string" && body.date.trim() ? body.date : current.date,
-    mileage: body.mileage !== undefined ? Number(body.mileage) || 0 : current.mileage,
+    mileage,
     category:
       typeof body.category === "string" && body.category.trim()
         ? (body.category as ServiceRecord["category"])
         : current.category,
     title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
     description: typeof body.description === "string" ? body.description : current.description,
-    laborCost: body.laborCost !== undefined ? Number(body.laborCost) || 0 : current.laborCost,
+    laborCost,
     parts,
-    totalCost: body.totalCost !== undefined ? Number(body.totalCost) || 0 : current.totalCost,
+    totalCost,
     serviceCenter:
       typeof body.serviceCenter === "string" ? body.serviceCenter : current.serviceCenter,
     receiptImages: Array.isArray(body.receiptImages)
@@ -1207,16 +1477,29 @@ app.post("/api/fuel", async (req, res) => {
     return res.status(400).json({ error: "vehicleId, корректная date (YYYY-MM-DD) и liters обязательны" });
   }
 
-  const liters = Number(body.liters) || 0;
-  if (liters <= 0 || !Number.isFinite(liters)) {
+  const liters = asStrictNonNegativeNumber(body.liters, 5_000);
+  if (liters === null || liters <= 0) {
     return res.status(400).json({ error: "Объём топлива должен быть больше нуля" });
   }
   if (!dbMemory.vehicles.some((vehicle) => vehicle.id === body.vehicleId)) {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
-  const pricePerLiter = Number(body.pricePerLiter) || 0;
-  const totalCost = body.totalCost ? Number(body.totalCost) : Math.round(liters * pricePerLiter);
-  const mileage = Number(body.mileage) || 0;
+  const pricePerLiter = body.pricePerLiter === undefined
+    ? 0
+    : asStrictNonNegativeNumber(body.pricePerLiter, 100_000);
+  if (pricePerLiter === null) {
+    return res.status(400).json({ error: "Цена топлива должна быть неотрицательным числом" });
+  }
+  const totalCost = body.totalCost === undefined
+    ? Math.round(liters * pricePerLiter)
+    : asStrictNonNegativeNumber(body.totalCost, 1_000_000_000);
+  if (totalCost === null) {
+    return res.status(400).json({ error: "Сумма заправки должна быть неотрицательным числом" });
+  }
+  const mileage = body.mileage === undefined ? 0 : asStrictNonNegativeNumber(body.mileage, 1_000_000_000);
+  if (mileage === null) {
+    return res.status(400).json({ error: "Пробег должен быть неотрицательным числом" });
+  }
 
   // Calculate fuel consumption if there's a previous full tank record
   let calculatedConsumption: number | undefined = undefined;
@@ -1301,6 +1584,9 @@ app.post("/api/inventory", async (req, res) => {
     typeof body.partNumber === "string" && body.partNumber.trim()
       ? body.partNumber.trim().toUpperCase()
       : `SKU-${Date.now().toString().slice(-6)}`;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   const newPart: GaragePart = {
     id: uniqueId(body.id, "gp", dbMemory.garageParts),
@@ -1308,13 +1594,23 @@ app.post("/api/inventory", async (req, res) => {
     name: body.name.trim(),
     brand: body.brand?.trim() || "OEM",
     partNumber,
-    quantity: Number(body.quantity) || 1,
-    purchasePrice: Number(body.purchasePrice) || 0,
+    quantity: body.quantity === undefined ? 1 : asStrictNonNegativeNumber(body.quantity, 1_000_000) || 0,
+    purchasePrice: body.purchasePrice === undefined ? 0 : asStrictNonNegativeNumber(body.purchasePrice, 1_000_000_000) || 0,
     purchaseDate: body.purchaseDate || new Date().toISOString().split("T")[0],
     location: body.location?.trim() || "Стеллаж в гараже",
     status: body.status || "in_stock",
     category: body.category || "ТО и замена жидкостей",
   };
+
+  if (newPart.quantity <= 0) {
+    return res.status(400).json({ error: "Количество детали должно быть больше нуля" });
+  }
+  if (body.quantity !== undefined && asStrictNonNegativeNumber(body.quantity, 1_000_000) === null) {
+    return res.status(400).json({ error: "Количество детали должно быть неотрицательным числом" });
+  }
+  if (body.purchasePrice !== undefined && asStrictNonNegativeNumber(body.purchasePrice, 1_000_000_000) === null) {
+    return res.status(400).json({ error: "Цена детали должна быть неотрицательным числом" });
+  }
 
   dbMemory.garageParts.unshift(newPart);
   if (!(await saveDatabase())) return;
@@ -1330,6 +1626,9 @@ app.put("/api/inventory/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.garageParts[index];
   const body = (req.body || {}) as Partial<GaragePart>;
+  if (body.vehicleId !== undefined && body.vehicleId !== "all" && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
   dbMemory.garageParts[index] = {
     ...current,
@@ -1340,8 +1639,8 @@ app.put("/api/inventory/:id", async (req, res) => {
       typeof body.partNumber === "string" && body.partNumber.trim()
         ? body.partNumber.trim().toUpperCase()
         : current.partNumber,
-    quantity: body.quantity !== undefined ? Math.max(0, Number(body.quantity) || 0) : current.quantity,
-    purchasePrice: body.purchasePrice !== undefined ? Number(body.purchasePrice) || 0 : current.purchasePrice,
+    quantity: body.quantity !== undefined ? asStrictNonNegativeNumber(body.quantity, 1_000_000) ?? current.quantity : current.quantity,
+    purchasePrice: body.purchasePrice !== undefined ? asStrictNonNegativeNumber(body.purchasePrice, 1_000_000_000) ?? current.purchasePrice : current.purchasePrice,
     purchaseDate: typeof body.purchaseDate === "string" ? body.purchaseDate : current.purchaseDate,
     location: typeof body.location === "string" ? body.location : current.location,
     status:
@@ -1471,6 +1770,9 @@ app.post("/api/parts/check-availability", (req, res) => {
     totalSuppliersStock: totalStock,
     fastestDeliveryDays: 1,
     suppliers,
+    dataSource: "demo",
+    isLive: false,
+    notice: "Цены, остатки и сроки являются демонстрационными и не подтверждают наличие у поставщика.",
     lastCheckedTime: new Date().toLocaleTimeString("ru-RU", {
       hour: "2-digit",
       minute: "2-digit",
@@ -1505,20 +1807,30 @@ app.post("/api/to-fix", async (req, res) => {
   if (!dbMemory.vehicles.some((vehicle) => vehicle.id === body.vehicleId)) {
     return res.status(404).json({ error: "Автомобиль не найден" });
   }
+  const estimatedCost = body.estimatedCost === undefined ? 0 : asStrictNonNegativeNumber(body.estimatedCost, 1_000_000_000);
+  const targetMileage = body.targetMileage === undefined ? undefined : asStrictNonNegativeNumber(body.targetMileage, 1_000_000_000);
+  if (estimatedCost === null || (body.targetMileage !== undefined && targetMileage === null)) {
+    return res.status(400).json({ error: "Стоимость и целевой пробег должны быть неотрицательными числами" });
+  }
+  if (body.dueDate !== undefined && body.dueDate !== "" && !isValidDate(body.dueDate)) {
+    return res.status(400).json({ error: "Некорректная дата задачи" });
+  }
+  const priority = body.priority === "high" || body.priority === "medium" || body.priority === "low" ? body.priority : "medium";
+  const status = body.status === "pending" || body.status === "in_progress" || body.status === "completed" ? body.status : "pending";
 
   const newTask: ToFixTask = {
     id: body.id || `tf-${Date.now()}`,
     vehicleId: body.vehicleId,
     title: body.title.trim(),
-    priority: body.priority || "medium",
-    estimatedCost: Number(body.estimatedCost) || 0,
-    targetMileage: body.targetMileage ? Number(body.targetMileage) : undefined,
+    priority,
+    estimatedCost,
+    targetMileage: targetMileage ?? undefined,
     category: body.category || "ТО и замена жидкостей",
     description: body.description?.trim() || "",
     linkedPartSku: body.linkedPartSku?.trim() || "",
     dueDate: body.dueDate || "",
     createdAt: new Date().toISOString(),
-    status: body.status || "pending",
+    status,
   };
 
   dbMemory.toFixTasks.unshift(newTask);
@@ -1535,6 +1847,17 @@ app.put("/api/to-fix/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.toFixTasks[index];
   const body = (req.body || {}) as Partial<ToFixTask>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
+  const estimatedCost = body.estimatedCost === undefined ? current.estimatedCost ?? 0 : asStrictNonNegativeNumber(body.estimatedCost, 1_000_000_000);
+  const targetMileage = body.targetMileage === undefined ? current.targetMileage : asStrictNonNegativeNumber(body.targetMileage, 1_000_000_000);
+  if (estimatedCost === null || (body.targetMileage !== undefined && targetMileage === null)) {
+    return res.status(400).json({ error: "Стоимость и целевой пробег должны быть неотрицательными числами" });
+  }
+  if (body.dueDate !== undefined && body.dueDate !== "" && !isValidDate(body.dueDate)) {
+    return res.status(400).json({ error: "Некорректная дата задачи" });
+  }
 
   dbMemory.toFixTasks[index] = {
     ...current,
@@ -1544,8 +1867,8 @@ app.put("/api/to-fix/:id", async (req, res) => {
       body.priority === "high" || body.priority === "medium" || body.priority === "low"
         ? body.priority
         : current.priority,
-    estimatedCost: body.estimatedCost !== undefined ? Number(body.estimatedCost) || 0 : current.estimatedCost,
-    targetMileage: body.targetMileage !== undefined ? Number(body.targetMileage) || undefined : current.targetMileage,
+    estimatedCost,
+    targetMileage: targetMileage ?? undefined,
     category:
       typeof body.category === "string" && body.category.trim()
         ? (body.category as ToFixTask["category"])
@@ -1607,23 +1930,43 @@ app.post("/api/oem-schedule", async (req, res) => {
   if (!vehicleId || !Array.isArray(items)) {
     return res.status(400).json({ error: "vehicleId и items обязательны" });
   }
+  if (!hasVehicle(vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
 
-  // Remove existing or merge
+  const formatted: OemScheduleItem[] = [];
+  for (const [index, item] of items.entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return res.status(400).json({ error: `Некорректный пункт регламента №${index + 1}` });
+    }
+    const title = asTrimmedString(item.title, 200);
+    const intervalKm = asStrictNonNegativeNumber(item.intervalKm, 1_000_000);
+    // Keep the API compatible with older clients that only sent the mileage interval.
+    const intervalMonths = item.intervalMonths === undefined ? 12 : asStrictNonNegativeNumber(item.intervalMonths, 240);
+    const lastDoneKm = item.lastDoneKm === undefined ? undefined : asStrictNonNegativeNumber(item.lastDoneKm, 1_000_000_000);
+    if (!title || intervalKm === null || intervalKm <= 0 || intervalMonths === null || intervalMonths <= 0 || (item.lastDoneKm !== undefined && lastDoneKm === null)) {
+      return res.status(400).json({ error: `Некорректные данные пункта регламента №${index + 1}` });
+    }
+    if (item.lastDoneDate !== undefined && item.lastDoneDate !== "" && !isValidDate(item.lastDoneDate)) {
+      return res.status(400).json({ error: `Некорректная дата пункта регламента №${index + 1}` });
+    }
+    formatted.push({
+      id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : `oem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      vehicleId,
+      title,
+      category: asTrimmedString(item.category, 100) || "ТО и замена жидкостей",
+      intervalKm,
+      intervalMonths,
+      lastDoneKm: lastDoneKm ?? undefined,
+      lastDoneDate: typeof item.lastDoneDate === "string" && item.lastDoneDate ? item.lastDoneDate : undefined,
+      description: asTrimmedString(item.description, 500),
+      oemPartHint: asTrimmedString(item.oemPartHint, 200),
+      notes: asTrimmedString(item.notes, 1000),
+    });
+  }
+
+  // Replace existing schedules only after the complete replacement list passes validation.
   dbMemory.oemSchedules = dbMemory.oemSchedules.filter((s) => s.vehicleId !== vehicleId);
-  const formatted: OemScheduleItem[] = items.map((item: any) => ({
-    id: item.id || `oem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    vehicleId,
-    title: item.title,
-    category: item.category || "ТО и замена жидкостей",
-    intervalKm: Number(item.intervalKm) || 10000,
-    intervalMonths: Number(item.intervalMonths) || 12,
-    lastDoneKm: item.lastDoneKm ? Number(item.lastDoneKm) : undefined,
-    lastDoneDate: item.lastDoneDate || undefined,
-    description: item.description || "",
-    oemPartHint: item.oemPartHint || "",
-    notes: item.notes || "",
-  }));
-
   dbMemory.oemSchedules.push(...formatted);
   if (!(await saveDatabase())) return;
   res.status(201).json(formatted);
@@ -1638,15 +1981,28 @@ app.put("/api/oem-schedule/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.oemSchedules[index];
   const body = (req.body || {}) as Partial<OemScheduleItem>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
+
+  const intervalKm = body.intervalKm === undefined ? current.intervalKm : asStrictNonNegativeNumber(body.intervalKm, 1_000_000);
+  const intervalMonths = body.intervalMonths === undefined ? current.intervalMonths : asStrictNonNegativeNumber(body.intervalMonths, 240);
+  const lastDoneKm = body.lastDoneKm === undefined ? current.lastDoneKm : asStrictNonNegativeNumber(body.lastDoneKm, 1_000_000_000);
+  if (intervalKm === null || intervalKm <= 0 || intervalMonths === null || intervalMonths <= 0 || (body.lastDoneKm !== undefined && lastDoneKm === null)) {
+    return res.status(400).json({ error: "Интервалы регламента и пробег должны быть корректными положительными числами" });
+  }
+  if (body.lastDoneDate !== undefined && body.lastDoneDate !== "" && !isValidDate(body.lastDoneDate)) {
+    return res.status(400).json({ error: "Некорректная дата последнего обслуживания" });
+  }
 
   dbMemory.oemSchedules[index] = {
     ...current,
     vehicleId: typeof body.vehicleId === "string" && body.vehicleId.trim() ? body.vehicleId : current.vehicleId,
     title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : current.title,
     category: typeof body.category === "string" && body.category.trim() ? body.category : current.category,
-    intervalKm: body.intervalKm !== undefined ? Number(body.intervalKm) || 0 : current.intervalKm,
-    intervalMonths: body.intervalMonths !== undefined ? Number(body.intervalMonths) || 0 : current.intervalMonths,
-    lastDoneKm: body.lastDoneKm !== undefined ? Number(body.lastDoneKm) || undefined : current.lastDoneKm,
+    intervalKm,
+    intervalMonths,
+    lastDoneKm: body.lastDoneKm !== undefined ? lastDoneKm ?? undefined : current.lastDoneKm,
     lastDoneDate: typeof body.lastDoneDate === "string" ? body.lastDoneDate : current.lastDoneDate,
     description: typeof body.description === "string" ? body.description : current.description,
     oemPartHint: typeof body.oemPartHint === "string" ? body.oemPartHint : current.oemPartHint,
@@ -1673,9 +2029,18 @@ app.get("/api/tuning", (req, res) => {
 
 app.post("/api/tuning", async (req, res) => {
   const body = req.body as Partial<TuningStage>;
-  if (!body.vehicleId || !body.title) {
+  if (typeof body.vehicleId !== "string" || !body.vehicleId.trim() || typeof body.title !== "string" || !body.title.trim()) {
     return res.status(400).json({ error: "vehicleId и title обязательны" });
   }
+  if (!hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
+  const estimatedBudget = body.estimatedBudget === undefined ? 0 : asStrictNonNegativeNumber(body.estimatedBudget, 1_000_000_000);
+  const actualCost = body.actualCost === undefined ? 0 : asStrictNonNegativeNumber(body.actualCost, 1_000_000_000);
+  if (estimatedBudget === null || actualCost === null) {
+    return res.status(400).json({ error: "Бюджет и фактическая стоимость должны быть неотрицательными числами" });
+  }
+  const status = body.status === "planned" || body.status === "in_progress" || body.status === "completed" ? body.status : "planned";
 
   const newStage: TuningStage = {
     id: body.id || `ts-${Date.now()}`,
@@ -1685,9 +2050,9 @@ app.post("/api/tuning", async (req, res) => {
     brand: body.brand?.trim() || "",
     sku: body.sku?.trim() || "",
     description: body.description?.trim() || "",
-    status: body.status || "planned",
-    estimatedBudget: Number(body.estimatedBudget) || 0,
-    actualCost: Number(body.actualCost) || 0,
+    status,
+    estimatedBudget,
+    actualCost,
     parts: Array.isArray(body.parts) ? body.parts : [],
   };
 
@@ -1705,6 +2070,14 @@ app.put("/api/tuning/:id", async (req, res) => {
   // Валидация и белым списком разрешённые поля вместо слепого ...req.body
   const current = dbMemory.tuningStages[index];
   const body = (req.body || {}) as Partial<TuningStage>;
+  if (body.vehicleId !== undefined && !hasVehicle(body.vehicleId)) {
+    return res.status(404).json({ error: "Автомобиль не найден" });
+  }
+  const estimatedBudget = body.estimatedBudget === undefined ? current.estimatedBudget : asStrictNonNegativeNumber(body.estimatedBudget, 1_000_000_000);
+  const actualCost = body.actualCost === undefined ? current.actualCost : asStrictNonNegativeNumber(body.actualCost, 1_000_000_000);
+  if (estimatedBudget === null || actualCost === null) {
+    return res.status(400).json({ error: "Бюджет и фактическая стоимость должны быть неотрицательными числами" });
+  }
 
   dbMemory.tuningStages[index] = {
     ...current,
@@ -1718,8 +2091,8 @@ app.put("/api/tuning/:id", async (req, res) => {
       body.status === "planned" || body.status === "in_progress" || body.status === "completed"
         ? body.status
         : current.status,
-    estimatedBudget: body.estimatedBudget !== undefined ? Number(body.estimatedBudget) || 0 : current.estimatedBudget,
-    actualCost: body.actualCost !== undefined ? Number(body.actualCost) || 0 : current.actualCost,
+    estimatedBudget,
+    actualCost,
     parts: Array.isArray(body.parts) ? body.parts : current.parts,
     id: req.params.id,
   };
@@ -1754,7 +2127,7 @@ app.get("/api/stats/:vehicleId", (req, res) => {
 
   const services = dbMemory.serviceRecords.filter((s) => s.vehicleId === vId);
   const fuel = dbMemory.fuelRecords.filter((f) => f.vehicleId === vId);
-  const parts = dbMemory.garageParts.filter((p) => p.vehicleId === vId);
+  const parts = dbMemory.garageParts.filter((p) => p.vehicleId === vId || p.vehicleId === "all");
   const tasks = dbMemory.toFixTasks.filter((t) => t.vehicleId === vId);
   const schedules = dbMemory.oemSchedules.filter((s) => s.vehicleId === vId);
 
@@ -1764,7 +2137,7 @@ app.get("/api/stats/:vehicleId", (req, res) => {
   const totalInvested = totalServiceCost + totalFuelCost + totalPartsCost;
 
   const totalFuelLiters = fuel.reduce((sum, f) => sum + (f.liters || 0), 0);
-  const avgFuelPrice = fuel.length > 0 ? (totalFuelCost / totalFuelLiters).toFixed(2) : "0";
+  const avgFuelPrice = totalFuelLiters > 0 ? (totalFuelCost / totalFuelLiters).toFixed(2) : "0";
 
   // Fuel consumption calculation from logged entries with consumption
   const recordedConsumptions = fuel
@@ -1777,6 +2150,7 @@ app.get("/api/stats/:vehicleId", (req, res) => {
 
   // Upcoming maintenance checklist calculations
   const upcomingAlerts = schedules
+    .filter((s) => Number.isFinite(Number(s.intervalKm)) && Number(s.intervalKm) > 0)
     .map((s) => {
       const lastKm = s.lastDoneKm || 0;
       const kmSince = vehicle.currentMileage - lastKm;
@@ -1816,9 +2190,17 @@ const AI_RATE_LIMIT = 20;
 const AI_RATE_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_LIMIT = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const REGISTRATION_LIMIT = 5;
+const REGISTRATION_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_LIMIT = 5;
+const EMAIL_CODE_WINDOW_MS = 15 * 60 * 1000;
+const EMAIL_CODE_TTL_MS = 10 * 60 * 1000;
+const EMAIL_VERIFY_LIMIT = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 const aiRequestWindows = new Map<string, { count: number; startedAt: number }>();
 const loginAttempts = new Map<string, { count: number; startedAt: number }>();
+const registrationAttempts = new Map<string, { count: number; startedAt: number }>();
+const emailCodeAttempts = new Map<string, { count: number; startedAt: number }>();
 const sessions = new Map<string, SessionRecord>();
 const SESSION_COOKIE = "garagehub_session";
 
@@ -1878,6 +2260,12 @@ const rateLimitCleanupTimer = setInterval(() => {
       loginAttempts.delete(key);
     }
   }
+  for (const [key, attempt] of registrationAttempts) {
+    if (now - attempt.startedAt >= REGISTRATION_WINDOW_MS) registrationAttempts.delete(key);
+  }
+  for (const [key, attempt] of emailCodeAttempts) {
+    if (now - attempt.startedAt >= EMAIL_CODE_WINDOW_MS) emailCodeAttempts.delete(key);
+  }
   if (store instanceof PostgresPersistence) {
     void Promise.all([
       store.deleteExpiredSessions(now),
@@ -1905,7 +2293,13 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (index === -1) continue;
     const key = part.slice(0, index).trim();
     const value = part.slice(index + 1).trim();
-    if (key) jar[key] = decodeURIComponent(value);
+    if (key) {
+      try {
+        jar[key] = decodeURIComponent(value);
+      } catch {
+        // Ignore malformed cookie values instead of failing session lookup.
+      }
+    }
   }
   return jar;
 }
@@ -1970,7 +2364,7 @@ async function requireAuth(req: express.Request, res: express.Response, next: ex
     const garageWritePrefixes = [
       "/api/vehicles", "/api/reminders", "/api/services", "/api/fuel",
       "/api/inventory", "/api/to-fix", "/api/oem-schedule", "/api/tuning",
-      "/api/backup/import", "/api/backup/reset",
+      "/api/backup/import", "/api/backup/reset", "/api/auth/account",
     ];
     const isGarageWrite =
       ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
@@ -2099,6 +2493,36 @@ async function rateLimitedLogin(req: express.Request, res: express.Response): Pr
   return false;
 }
 
+async function rateLimitedRegistration(req: express.Request, res: express.Response): Promise<boolean> {
+  const clientId = req.ip || "unknown";
+  const now = Date.now();
+  if (store instanceof PostgresPersistence) {
+    try {
+      const result = await store.consumeRateLimit("registration", hashToken(clientId), REGISTRATION_LIMIT, REGISTRATION_WINDOW_MS, now);
+      if (!result.allowed) {
+        res.setHeader("Retry-After", Math.max(1, Math.ceil(result.retryAfterMs / 1000)));
+        res.status(429).json({ error: "Слишком много регистраций с этого адреса. Повторите позже." });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Registration rate-limit storage failed:", error instanceof Error ? error.message : "unknown error");
+      res.status(503).json({ error: "Сервис регистрации временно недоступен." });
+      return true;
+    }
+  }
+  const current = registrationAttempts.get(clientId);
+  if (current && now - current.startedAt < REGISTRATION_WINDOW_MS && current.count >= REGISTRATION_LIMIT) {
+    res.setHeader("Retry-After", Math.max(1, Math.ceil((current.startedAt + REGISTRATION_WINDOW_MS - now) / 1000)));
+    res.status(429).json({ error: "Слишком много регистраций с этого адреса. Повторите позже." });
+    return true;
+  }
+  const window = !current || now - current.startedAt >= REGISTRATION_WINDOW_MS ? { count: 0, startedAt: now } : current;
+  window.count += 1;
+  registrationAttempts.set(clientId, window);
+  return false;
+}
+
 async function clearLoginAttempts(clientId: string): Promise<void> {
   if (store instanceof PostgresPersistence) {
     try {
@@ -2111,7 +2535,10 @@ async function clearLoginAttempts(clientId: string): Promise<void> {
   loginAttempts.delete(clientId);
 }
 
-async function establishSession(req: express.Request, res: express.Response, userId: string, username: string) {
+
+
+
+async function establishSession(req: express.Request, res: express.Response, userId: string, username: string, email?: string) {
   const { record, token } = createSession(userId);
   if (store instanceof PostgresPersistence) {
     await store.putSession(record);
@@ -2120,13 +2547,31 @@ async function establishSession(req: express.Request, res: express.Response, use
     await persistSessions();
   }
   res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
-  return { username, csrfToken: record.csrfSecret };
+  return { username, email, csrfToken: record.csrfSecret };
+}
+
+async function issueEmailChallenge(userId: string, email: string): Promise<void> {
+  const secret = process.env.EMAIL_CODE_SECRET?.trim();
+  if (!secret) throw new Error("Email code secret is not configured");
+  const id = newId("email-challenge");
+  const code = generateEmailCode();
+  const createdAtMs = Date.now();
+  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs };
+  await store.createEmailChallenge(record);
+  try {
+    await sendEmailCode(email, code);
+  } catch (error) {
+    await store.consumeEmailChallenge(userId, id, Date.now());
+    throw error;
+  }
 }
 
 app.post("/api/auth/register", async (req, res) => {
-  if (await rateLimitedLogin(req, res)) return;
+  if (await rateLimitedRegistration(req, res)) return;
   const credentials = validateCredentials(req.body);
   if (credentials.error) return res.status(400).json({ error: credentials.error });
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Для регистрации нужен корректный email" });
   try {
     if (await store.getUserByName(credentials.username!)) {
       return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
@@ -2135,18 +2580,36 @@ app.post("/api/auth/register", async (req, res) => {
     console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
   }
-  void (async () => {
+  let createdUserId: string | undefined;
+  try {
+    // Local development should remain usable without a configured mail provider.
+    // Production and test runs still require the normal email challenge flow.
+    const localEmailVerificationBypass = process.env.NODE_ENV !== "production"
+      && !process.env.EMAIL_CODE_CAPTURE_FILE?.trim()
+      && !emailDeliveryConfigured();
     const userId = newId("user");
-    await store.createUser(credentials.username!, hashPassword(credentials.password!), userId);
-    await clearLoginAttempts(req.ip || "unknown");
-    res.status(201).json({ success: true, session: await establishSession(req, res, userId, credentials.username!) });
-  })().catch((error) => {
+    createdUserId = userId;
+    if (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email)) {
+      res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
+    }
+    const created = store instanceof PostgresPersistence
+      ? await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
+      : await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
+    if (localEmailVerificationBypass) {
+      return res.status(201).json({ success: true, session: await establishSession(req, res, created.id, created.username, created.email) });
+    }
+    await issueEmailChallenge(created.id, email);
+    return res.status(202).json({ success: true, pendingEmailVerification: true, email, message: "Проверьте email и введите код подтверждения." });
+  } catch (error) {
+    if (createdUserId) {
+      await store.deleteUser(createdUserId).catch(() => undefined);
+    }
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
     console.error("Registration error:", error);
-    return res.status(500).json({ error: "Не удалось создать аккаунт" });
-  });
+    return res.status(503).json({ error: "Не удалось создать аккаунт или отправить код подтверждения" });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -2167,12 +2630,134 @@ app.post("/api/auth/login", async (req, res) => {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ error: "Неверный логин или пароль" });
   }
+  if (user.email && user.emailVerifiedAt === null) {
+    return res.status(403).json({ error: "Подтвердите email кодом из письма перед входом", code: "EMAIL_NOT_VERIFIED" });
+  }
   await clearLoginAttempts(req.ip || "unknown");
   try {
-    res.json({ success: true, session: await establishSession(req, res, user.id, user.username) });
+    res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch (error) {
     console.error("Session creation failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось создать сессию. Повторите попытку." });
+  }
+});
+
+async function consumeEmailCodeLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-code-ip", hashToken(req.ip || "unknown"), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-code-email", hashToken(email), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`ip:${req.ip || "unknown"}`, `email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_CODE_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function consumeEmailVerifyLimit(req: express.Request, email: string): Promise<boolean> {
+  if (store instanceof PostgresPersistence) {
+    try {
+      const [ip, address] = await Promise.all([
+        store.consumeRateLimit("email-verify-ip", hashToken(req.ip || "unknown"), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+        store.consumeRateLimit("email-verify-email", hashToken(email), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+      ]);
+      return ip.allowed && address.allowed;
+    } catch {
+      return false;
+    }
+  }
+  const now = Date.now();
+  const keys = [`verify-ip:${req.ip || "unknown"}`, `verify-email:${email}`];
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    if (current && now - current.startedAt < EMAIL_CODE_WINDOW_MS && current.count >= EMAIL_VERIFY_LIMIT) return false;
+  }
+  for (const key of keys) {
+    const current = emailCodeAttempts.get(key);
+    const window = !current || now - current.startedAt >= EMAIL_CODE_WINDOW_MS ? { count: 0, startedAt: now } : current;
+    window.count += 1; emailCodeAttempts.set(key, window);
+  }
+  return true;
+}
+
+async function sendEmailCode(email: string, code: string): Promise<void> {
+  const captureFile = process.env.EMAIL_CODE_CAPTURE_FILE?.trim();
+  if (process.env.NODE_ENV === "test" && captureFile) {
+    fs.mkdirSync(path.dirname(captureFile), { recursive: true });
+    fs.appendFileSync(captureFile, JSON.stringify({ email, code, createdAt: new Date().toISOString() }) + "\n", "utf8");
+    return;
+  }
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.EMAIL_FROM?.trim();
+  if (!apiKey || !from) throw new Error("Email provider is not configured");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
+  });
+  if (!response.ok) throw new Error("Email provider rejected the request");
+}
+
+function emailDeliveryConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim());
+}
+
+app.post(["/api/auth/email/request", "/api/auth/email/request-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Введите корректный email" });
+  if (!(await consumeEmailCodeLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много запросов. Повторите позже." });
+  }
+  try {
+    if (!process.env.RESEND_API_KEY?.trim() || !process.env.EMAIL_FROM?.trim()) {
+      return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+    }
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (user) {
+      await issueEmailChallenge(user.id, email);
+    }
+    return res.json({ success: true, message: "Если аккаунт существует, код отправлен на email." });
+  } catch (error) {
+    console.error("Email code request failed");
+    return res.status(503).json({ error: "Сервис отправки кода временно недоступен." });
+  }
+});
+
+app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Введите email и шестизначный код" });
+  if (!(await consumeEmailVerifyLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много попыток. Повторите позже." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (!user) return res.status(401).json({ error: "Неверный или просроченный код" });
+    const secret = process.env.EMAIL_CODE_SECRET?.trim();
+    if (!secret) return res.status(503).json({ error: "Сервис входа временно недоступен." });
+    const accepted = await store.verifyEmailChallenge(user.id, code, secret);
+    if (!accepted) {
+      return res.status(401).json({ error: "Неверный или просроченный код" });
+    }
+    if (user.emailVerifiedAt === null) await store.markEmailVerified(user.id);
+    return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
+  } catch {
+    return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
 });
 
@@ -2191,6 +2776,38 @@ app.post("/api/auth/logout", async (req, res) => {
   } catch (error) {
     console.error("Logout failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось завершить сессию. Повторите попытку." });
+  }
+});
+
+/**
+ * Deletes only the authenticated owner's account. CSRF and the current password
+ * are both required, so a browser session alone cannot trigger irreversible data
+ * removal. PostgreSQL cascades the garage/session/challenge rows; JSON mode
+ * removes the matching local records and all active process sessions.
+ */
+app.delete("/api/auth/account", async (req, res) => {
+  try {
+    const context = currentContext();
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!password) return res.status(400).json({ error: "Введите текущий пароль для удаления аккаунта" });
+    const user = await store.getUserById(context.userId);
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return res.status(403).json({ error: "Неверный пароль" });
+    }
+
+    const deleted = await store.deleteUser(context.userId);
+    if (!deleted) return res.status(404).json({ error: "Аккаунт не найден" });
+    if (!(store instanceof PostgresPersistence)) {
+      for (const [tokenHash, session] of sessions) {
+        if (session.userId === context.userId) sessions.delete(tokenHash);
+      }
+      await persistSessions();
+    }
+    res.setHeader("Set-Cookie", clearSessionCookie());
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Account deletion failed:", error instanceof Error ? error.message : "unknown error");
+    return res.status(503).json({ error: "Не удалось удалить аккаунт. Повторите попытку." });
   }
 });
 
@@ -2217,7 +2834,7 @@ app.get("/api/auth/session", async (req, res) => {
       }
       res.setHeader("Set-Cookie", sessionCookie(token, SESSION_TTL_MS));
     }
-    return res.json({ username: user.username, csrfToken: session.csrfSecret });
+    return res.json({ username: user.username, email: user.email, csrfToken: session.csrfSecret });
   } catch (error) {
     console.error("Session lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Не удалось проверить сессию. Повторите попытку." });
@@ -2237,7 +2854,7 @@ app.get("/api/backup/export", requireAuth, (req, res) => {
     serviceRecords: dbMemory.serviceRecords.filter((record) => record.vehicleId === vehicleId),
     fuelRecords: dbMemory.fuelRecords.filter((record) => record.vehicleId === vehicleId),
     oemSchedules: dbMemory.oemSchedules.filter((record) => record.vehicleId === vehicleId),
-    garageParts: dbMemory.garageParts.filter((record) => record.vehicleId === vehicleId),
+    garageParts: dbMemory.garageParts.filter((record) => record.vehicleId === vehicleId || record.vehicleId === "all"),
     toFixTasks: dbMemory.toFixTasks.filter((record) => record.vehicleId === vehicleId),
     tuningStages: dbMemory.tuningStages.filter((record) => record.vehicleId === vehicleId),
   } : dbMemory;
@@ -2352,25 +2969,36 @@ app.post("/api/agents/run", requireAgentServiceAccess, async (req, res) => {
 // 1. Diagnostic Assistant
 app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
   try {
-    const problemDescription =
-      req.body.problemDescription || req.body.symptoms || "";
-    const vehicle =
-      req.body.vehicle || {
-        make: req.body.make,
-        model: req.body.model,
-        generation: req.body.generation,
-        year: req.body.year,
-        engine: req.body.engine,
-        currentMileage: req.body.currentMileage,
-        transmission: req.body.transmission,
-        driveType: req.body.driveType,
-      };
-    const userNotes = req.body.userNotes || "";
-    const recentHistory =
-      req.body.recentHistory ||
-      (Array.isArray(req.body.serviceHistory)
-        ? JSON.stringify(req.body.serviceHistory)
-        : req.body.serviceHistory || "");
+    const problemDescription = asTrimmedString(
+      req.body.problemDescription || req.body.symptoms,
+      4_000,
+    );
+    const rawVehicle: Record<string, unknown> =
+      req.body.vehicle && typeof req.body.vehicle === "object" && !Array.isArray(req.body.vehicle)
+        ? req.body.vehicle
+        : {
+            make: req.body.make,
+            model: req.body.model,
+            generation: req.body.generation,
+            year: req.body.year,
+            engine: req.body.engine,
+            currentMileage: req.body.currentMileage,
+            transmission: req.body.transmission,
+            driveType: req.body.driveType,
+          };
+    const vehicle = rawVehicle;
+    const userNotes = asTrimmedString(req.body.userNotes, 2_000);
+    const rawRecentHistory = req.body.recentHistory ||
+      (Array.isArray(req.body.serviceHistory) ? JSON.stringify(req.body.serviceHistory) : req.body.serviceHistory);
+    const recentHistory = asTrimmedString(rawRecentHistory, 8_000);
+    const currentMileage = asNonNegativeNumber(vehicle.currentMileage, 1_000_000_000);
+    const vehicleMake = asTrimmedString(vehicle.make, 80);
+    const vehicleModel = asTrimmedString(vehicle.model, 120);
+    const vehicleGeneration = asTrimmedString(vehicle.generation, 120);
+    const vehicleEngine = asTrimmedString(vehicle.engine, 120);
+    const vehicleTransmission = asTrimmedString(vehicle.transmission, 80);
+    const vehicleDriveType = asTrimmedString(vehicle.driveType, 80);
+    const vehicleYear = isValidYear(vehicle.year) ? String(Number(vehicle.year)) : "";
 
     if (!problemDescription || typeof problemDescription !== "string") {
       return res
@@ -2379,10 +3007,14 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
     }
 
     const knowledgeContext = searchKnowledge(problemDescription, {
-      brand: vehicle?.make || undefined,
-      model: vehicle?.model || undefined,
-      generation: vehicle?.generation || undefined,
+      brand: vehicleMake || undefined,
+      model: vehicleModel || undefined,
+      generation: vehicleGeneration || undefined,
     }).slice(0, 5);
+    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const retrievedRecommendations = recommendationContext.length
+      ? recommendationContext.map((item) => "[" + item.risk + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + ")").join("\n")
+      : "Подходящих правил для запроса нет.";
     const retrievedContext = knowledgeContext.length
       ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source})`).join("\n")
       : "Подходящих подтверждённых фрагментов локальной базы нет. Не выдавай предположения за факт.";
@@ -2392,11 +3024,11 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
 Твоя задача: на основе точного профиля автомобиля, его пробега, истории недавних ремонтов и описанных симптомов дать структурированную, практически полезную и объективную диагностику.
 
 ДАННЫЕ АВТОМОБИЛЯ:
-- Марка и модель: ${vehicle?.make || "Не указана"} ${vehicle?.model || ""} (${vehicle?.generation || ""})
-- Год выпуска: ${vehicle?.year || "Не указан"}
-- Текущий пробег: ${vehicle?.currentMileage ? vehicle.currentMileage.toLocaleString("ru-RU") + " км" : "Не указан"}
-- Двигатель / КПП: ${vehicle?.engine || "Стандарт"} / ${vehicle?.transmission || "Стандарт"}
-- Тип привода: ${vehicle?.driveType || "Стандарт"}
+- Марка и модель: ${vehicleMake || "Не указана"} ${vehicleModel} (${vehicleGeneration})
+- Год выпуска: ${vehicleYear || "Не указан"}
+- Текущий пробег: ${currentMileage !== null ? currentMileage.toLocaleString("ru-RU") + " км" : "Не указан"}
+- Двигатель / КПП: ${vehicleEngine || "Стандарт"} / ${vehicleTransmission || "Стандарт"}
+- Тип привода: ${vehicleDriveType || "Стандарт"}
 
 ИСТОРИЯ ПРЕДЫДУЩИХ ОБСЛУЖИВАНИЙ:
 ${recentHistory || "Ранее зафиксированных записей нет или стандартное ТО."}
@@ -2407,6 +3039,9 @@ ${userNotes ? `Дополнительные примечания: ${userNotes}` 
 
 РЕЛЕВАНТНЫЙ КОНТЕКСТ KNOWLEDGE BASE (RAG):
 ${retrievedContext}
+
+ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ:
+${retrievedRecommendations}
 
 Правила: отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если данных для точного вывода нет, скажи, что нужна проверка по официальному руководству или на СТО.
 
@@ -2505,6 +3140,10 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) {
       return res.status(400).json({ error: "Некорректное base64-изображение" });
     }
+    const decodedImage = Buffer.from(cleanBase64, "base64");
+    if (decodedImage.length === 0) {
+      return res.status(400).json({ error: "Пустое изображение чека" });
+    }
 
     const receiptPrompt = `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
 Извлеки точные данные и верни JSON со структурой:
@@ -2522,7 +3161,7 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     const documentReceiptId = process.env.DOCUMENT_AI_RECEIPT_PROCESSOR_ID;
     if (documentReceiptId && process.env.GOOGLE_CLOUD_PROJECT) {
       try {
-        const doc = await processWithDocumentAi(Buffer.from(cleanBase64, "base64"), supportedMime, documentReceiptId);
+        const doc = await processWithDocumentAi(decodedImage, supportedMime, documentReceiptId);
         const entities = (doc?.entities || []) as Array<{ type?: string; mentionText?: string; normalizedValue?: { text?: string; moneyValue?: { currencyCode?: string; units?: string; nanos?: number } } }>;
         const totalEntity = entities.find(item => (item.type || "").toLowerCase().includes("total_amount"));
         const totalText = documentEntityValue(entities, ["total_amount", "total"]);
@@ -2559,15 +3198,18 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
           contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
           config: { responseMimeType: "application/json" },
         })).text;
-    const parsed = parseJsonSafely(responseText, {});
+    const parsed = parseJsonSafely(responseText, null);
+    const parsedRecord = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
     const classification = classifyReceiptText(
       `${responseText}\n${JSON.stringify(parsed)}`,
-      parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).category : undefined,
+      parsedRecord.category,
     );
     res.json({
-      ...parsed,
+      ...parsedRecord,
       category: classification.category,
-      ...(classification.fuelDetails && !("fuelDetails" in (parsed as Record<string, unknown>))
+      ...(classification.fuelDetails && !("fuelDetails" in parsedRecord)
         ? { fuelDetails: classification.fuelDetails }
         : {}),
     });
@@ -2576,6 +3218,39 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
     res.status(500).json({
       error: "Не удалось распознать чек.",
     });
+  }
+});
+
+// 2a. Structured OCR for a Russian vehicle registration certificate (STS)
+app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
+  try {
+    const { imageBase64, mimeType } = req.body;
+    if (typeof imageBase64 !== "string" || !imageBase64) return res.status(400).json({ error: "Изображение СТС не предоставлено." });
+    if (imageBase64.length > 9_000_000) return res.status(413).json({ error: "Изображение СТС слишком большое." });
+    const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
+    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное изображение СТС." });
+    if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение СТС." });
+    const prompt = [
+      "Ты высокоточный OCR российского свидетельства о регистрации транспортного средства (СТС).",
+      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай.",
+      "Верни только JSON. Для отсутствующих или нечитабельных полей используй null.",
+      JSON.stringify({ make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
+      "Подсказка по полям СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест.",
+      "Дату верни в формате YYYY-MM-DD. Мощность в л.с. вычисляй из кВт только если P.2 прочитано уверенно. Не подменяй VIN номером свидетельства."
+    ].join("\n");
+    const responseText = getOpenRouterConfig("document").key
+      ? await requestOpenRouterVision(imageBase64, detectedMime, prompt, "document")
+      : (await getAi().models.generateContent({
+          model: GEMINI_MODEL,
+          contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: detectedMime } }, { text: prompt }] },
+          config: { responseMimeType: "application/json" },
+        })).text;
+    const parsed = parseJsonSafely(responseText, {});
+    return res.json(parsed && typeof parsed === "object" ? parsed : {});
+  } catch (error) {
+    console.error("STS OCR error:", error);
+    return res.status(500).json({ error: "Не удалось распознать СТС." });
   }
 });
 
@@ -2588,6 +3263,7 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
     const detectedMime = imageBase64.match(/^data:([^;]+);base64,/)?.[1] || mimeType || "image/jpeg";
     const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "").trim();
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное base64-изображение." });
+    if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение документа." });
     const prepared = await prepareDocumentImage(Buffer.from(cleanBase64, "base64"));
     const documentOcrId =
       process.env.DOCUMENT_AI_OCR_PROCESSOR_ID || process.env.DOCUMENT_AI_DOCUMENT_PROCESSOR_ID;
@@ -2624,14 +3300,22 @@ app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
 app.post("/api/ai/oem-schedule", requireGeminiAccess, async (req, res) => {
   try {
     const { make, model, year, engine, fuelType } = req.body;
+    const safeMake = normalizePartLookupText(make, 80);
+    const safeModel = normalizePartLookupText(model, 120);
+    const numericYear = Number(year);
+    if (!safeMake || !safeModel || !Number.isInteger(numericYear) || numericYear < 1900 || numericYear > 2100) {
+      return res.status(400).json({ error: "Для OEM-регламента укажите марку, модель и корректный год выпуска." });
+    }
+    const safeEngine = normalizePartLookupText(engine, 120);
+    const safeFuelType = normalizePartLookupText(fuelType, 40);
     const ai = getAi();
 
     const prompt = `Сформируй регламент заводского технического обслуживания (OEM Service Schedule) для автомобиля:
-- Марка: ${make}
-- Модель: ${model}
-- Год выпуска: ${year}
-- Двигатель / модификация: ${engine || "Стандартный двигатель"}
-- Тип топлива: ${fuelType || "Бензин"}
+- Марка: ${safeMake}
+- Модель: ${safeModel}
+- Год выпуска: ${numericYear}
+- Двигатель / модификация: ${safeEngine || "Стандартный двигатель"}
+- Тип топлива: ${safeFuelType || "Бензин"}
 
 Опирайся на официальные заводские сервисные книжки (Toyota, Nissan, VAG, BMW, Hyundai/Kia и др.) и адаптацию для умеренных условий эксплуатации.
 Сформируй JSON со следующими полями:
@@ -2663,8 +3347,12 @@ app.post("/api/ai/oem-schedule", requireGeminiAccess, async (req, res) => {
       },
     });
 
-    const parsed = parseJsonSafely(response.text, {});
-    res.json(parsed);
+    const parsed = parseJsonSafely(response.text, null);
+    const normalized = normalizeOemScheduleResponse(parsed);
+    if (!normalized) {
+      return res.status(502).json({ error: "Сервис OEM-регламента вернул некорректный ответ." });
+    }
+    res.json(normalized);
   } catch (error: any) {
     console.error("OEM schedule error:", error);
     res.status(500).json({
@@ -2677,11 +3365,25 @@ app.post("/api/ai/oem-schedule", requireGeminiAccess, async (req, res) => {
 app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
   try {
     const { partName, vehicle, partNumber } = req.body;
+    const safePartName = normalizePartLookupText(partName, 160);
+    if (!safePartName || !vehicle || typeof vehicle !== "object" || Array.isArray(vehicle)) {
+      return res.status(400).json({ error: "Укажите деталь и автомобиль для подбора." });
+    }
+    const safeVehicle = vehicle as Record<string, unknown>;
+    const safeMake = normalizePartLookupText(safeVehicle.make, 80);
+    const safeModel = normalizePartLookupText(safeVehicle.model, 120);
+    if (!safeMake || !safeModel) {
+      return res.status(400).json({ error: "Для подбора детали нужны марка и модель автомобиля." });
+    }
+    const safeGeneration = normalizePartLookupText(safeVehicle.generation, 120);
+    const safeVehicleYear = Number(safeVehicle.year);
+    const safeEngine = normalizePartLookupText(safeVehicle.engine, 120);
+    const safePartNumber = normalizePartLookupText(partNumber, 80);
     const ai = getAi();
 
     const prompt = `Ты — эксперт по подбору автозапчастей и кросс-номеров (каталоги TecDoc, EPC).
-Автомобиль: ${vehicle?.make || ""} ${vehicle?.model || ""} ${vehicle?.generation || ""} (${vehicle?.year || ""}), двигатель: ${vehicle?.engine || ""}.
-Запрос детали: "${partName}" ${partNumber ? `(Артикул: ${partNumber})` : ""}
+Автомобиль: ${safeMake} ${safeModel} ${safeGeneration} (${Number.isFinite(safeVehicleYear) ? safeVehicleYear : ""}), двигатель: ${safeEngine}.
+Запрос детали: "${safePartName}" ${safePartNumber ? `(Артикул: ${safePartNumber})` : ""}
 
 Предоставь рекомендации по артикулам и производителям в формате JSON:
 {
@@ -2715,8 +3417,12 @@ app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
       },
     });
 
-    const parsed = parseJsonSafely(response.text, {});
-    res.json(parsed);
+    const parsed = parseJsonSafely(response.text, null);
+    const normalized = normalizePartLookupResponse(parsed);
+    if (!normalized) {
+      return res.status(502).json({ error: "Сервис подбора вернул некорректный ответ." });
+    }
+    res.json(normalized);
   } catch (error: any) {
     console.error("Part lookup error:", error);
     res.status(500).json({

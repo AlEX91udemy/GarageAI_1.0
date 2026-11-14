@@ -92,3 +92,5 @@ export interface MobileNotification {
 }
 
 export type DeviceFrameType = "iphone" | "android" | "fluid";
+
+export type SyncStatus = "loading" | "synced" | "guest" | "offline" | "error";
