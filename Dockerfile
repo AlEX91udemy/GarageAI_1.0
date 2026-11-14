@@ -15,6 +15,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/db/migrations ./db/migrations
+# Include the reviewed, non-secret operational scripts used by controlled Cloud Run jobs.
+COPY --from=build /app/scripts ./scripts
 # Keep only the runtime data directory writable; run the service without root.
 RUN mkdir -p /app/data && chown -R node:node /app/data
 EXPOSE 8080
