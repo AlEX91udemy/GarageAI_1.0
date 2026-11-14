@@ -15,6 +15,9 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 # .dockerignore excludes .env files, runtime data, Git metadata and venvs.
 COPY . .
 
+# Include the controlled private-agent smoke helper for approved Cloud Run jobs.
+COPY scripts/cloud-run-agent-smoke.py /app/scripts/cloud-run-agent-smoke.py
+
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
 ENV GOOGLE_CLOUD_LOCATION=europe-west1
 EXPOSE 8080
