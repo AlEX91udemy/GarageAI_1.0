@@ -15,7 +15,7 @@
 
 - The Cloudflare Workers Builds GitHub check fails immediately in the external Cloudflare pipeline. Wrangler dry-run/manual deployment and public health are healthy; Cloudflare dashboard owner access is required for the first failing build log or pipeline repair.
 - `www.garageai.site` and `ww.garageai.site` have no DNS records, so their TLS routes are not available. Add only the aliases that are intentionally supported in Cloudflare DNS, then verify HTTPS.
-- A private-agent job reached the service but returned HTTP 401 before the latest deployed revision was available; a fresh OIDC plus provider smoke is still required after the revision containing token normalization is confirmed serving.
+- The private-agent OIDC and application-token boundary now passes from an approved Cloud Run job; the current smoke reaches the service and returns HTTP 502 from the configured Gemini/Vertex provider. This closes IAM/token transport, but provider/model availability is still an open gate.
 - Independent mailbox receipt and complete email-code request/verify/logout flow are not evidenced.
 - OCR release acceptance still needs the approved anonymized 30+ sample regression set, ground truth, mobile/desktop smoke and latency/cost results. Existing fixtures are diagnostic only.
 - Legacy bundle provenance/ownership and privacy retention/deletion sign-off are not evidenced.
