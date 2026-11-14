@@ -55,7 +55,11 @@ if ([string]::IsNullOrWhiteSpace($repository)) {
 }
 
 $webExists = $true
-try { [void](Invoke-GcloudValue @('run', 'services', 'describe', 'garageai-web', ('--region=' + $Region), '--format=value(metadata.name)')) } catch { $webExists = $false }
+try {
+  $webServiceNames = @(Invoke-GcloudValue @('run', 'services', 'list', ('--region=' + $Region), '--format=value(metadata.name)') -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  $webExists = @('garageai-web', 'garageai-web-canary') | Where-Object { $_ -in $webServiceNames } | Measure-Object | Select-Object -ExpandProperty Count
+  $webExists = $webExists -gt 0
+} catch { $webExists = $false }
 $agentsExists = $true
 try { [void](Invoke-GcloudValue @('run', 'services', 'describe', 'garageai-agents', ('--region=' + $Region), '--format=value(metadata.name)')) } catch { $agentsExists = $false }
 
