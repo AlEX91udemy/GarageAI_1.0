@@ -216,7 +216,7 @@ async def run_agents(
     x_agents_caller: str | None = Header(default=None, alias="X-Agents-Caller"),
 ) -> AgentResponse:
     # Fail closed: never allow paid model calls unless an application token is configured.
-    expected_token = os.getenv("AGENTS_API_TOKEN", "")
+    expected_token = os.getenv("AGENTS_API_TOKEN", "").strip()
     if not expected_token:
         raise HTTPException(503, "Agent API is disabled: configure AGENTS_API_TOKEN.")
     if not x_agents_token or not hmac.compare_digest(x_agents_token, expected_token):
