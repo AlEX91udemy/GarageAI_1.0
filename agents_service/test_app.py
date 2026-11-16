@@ -221,6 +221,37 @@ class AgentEndpointAuthTests(unittest.TestCase):
 
 
 class AgentClientLifecycleTests(unittest.IsolatedAsyncioTestCase):
+    async def test_model_not_found_retries_with_fallback_model(self):
+        from types import SimpleNamespace
+        from agents_service.app import _run_agent
+
+        calls = []
+
+        class FakeModels:
+            async def generate_content(self, **kwargs):
+                calls.append(kwargs["model"])
+                if len(calls) == 1:
+                    raise RuntimeError("NOT_FOUND: model does not exist")
+                return SimpleNamespace(text="fallback answer")
+
+        class FakeAio:
+            def __init__(self):
+                self.models = FakeModels()
+
+            async def aclose(self):
+                pass
+
+        class FakeClient:
+            def __init__(self, **_kwargs):
+                self.aio = FakeAio()
+
+        with patch("agents_service.app.genai.Client", side_effect=lambda **kwargs: FakeClient(**kwargs)), patch("agents_service.app.FALLBACK_MODEL", "fallback-model"):
+            with patch.dict(os.environ, {"GOOGLE_GENAI_USE_VERTEXAI": "true"}, clear=False):
+                result = await _run_agent({"model": "missing-model", "instruction": "Act as QA."}, "qa", "Review this repository.")
+
+        self.assertEqual(result, "fallback answer")
+        self.assertEqual(calls, ["missing-model", "fallback-model"])
+
     async def test_client_closes_and_agent_instruction_is_passed_separately(self):
         from types import SimpleNamespace
 

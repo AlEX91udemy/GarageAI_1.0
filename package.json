@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "start": "node dist/server.cjs",
+    "start": "node scripts/start-production.mjs",
     "preview": "vite preview",
     "cloudflare:deploy": "npm run build && npx --yes wrangler@4.152.0 deploy",
     "cloudflare:types": "npx --yes wrangler@4.152.0 types",

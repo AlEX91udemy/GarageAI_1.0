@@ -21,4 +21,4 @@ COPY --from=build /app/scripts ./scripts
 RUN mkdir -p /app/data && chown -R node:node /app/data
 EXPOSE 8080
 USER node
-CMD ["node", "dist/server.cjs"]
+CMD ["node", "scripts/start-production.mjs"]
