@@ -1,8 +1,8 @@
-# Release evidence: 2026-11-14 (updated 2026-11-17)
+# Release evidence: 2026-11-14 (updated 2026-11-18)
 
 ## Current deployed state
 
-- Worker deployment source commit: `ddb3a75`; current PR candidate branch tip: `f0d5dd4` on `codex/release-readiness-20261117`. Compare URL: https://github.com/AlEX91udemy/GarageAI_1.0/compare/main...codex/release-readiness-20261117?expand=1.
+- Worker deployment source commit: `4021b98`; PR #49 was merged to `main` as merge commit `2275946` on 2026-11-17. The post-merge GitHub workflow `44153622572` passed all Node.js, PostgreSQL, container, Python and secret-scanning jobs.
 - Cloud Run web service `garageai-web-canary` is serving revision `garageai-web-canary-00023-n8r` at 100% traffic.
 - The currently recorded Cloud Run image was built as `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:release-89f03c7` with digest `sha256:e5212b298452b22b009b1ec30fda23646521d55d2dd4bbd2d7f0ddaaaf8f727f`; local source changes below still require a new backend build and rollout.
 - The production entrypoint now forces `NODE_ENV=production` and starts the bundled server without Vite middleware.
@@ -26,7 +26,7 @@
 
 ## Still open release gates
 
-- The Cloudflare Workers Builds GitHub check still requires the external pipeline log; the current manual Wrangler deployment and public health are healthy. Cloudflare dashboard owner access is required for the first failing build log or pipeline repair.
+- The historical Cloudflare Workers Builds check attached to PR #49 failed before producing a log, while the manual Wrangler deployment and public health are healthy. A future Workers Builds run still needs an owner-side dashboard check or repair before that integration can be called green.
 - `www.garageai.site` and `ww.garageai.site` have no DNS records, so their TLS routes are not available. Add only the aliases that are intentionally supported in Cloudflare DNS, then verify HTTPS.
 - The private-agent OIDC and application-token boundary passes from an approved Cloud Run job; the last recorded end-to-end smoke reached the service but returned HTTP 502 from the configured Gemini/Vertex provider. The agent now retries a configured fallback model when the provider explicitly reports a missing model, but a fresh authenticated Vertex smoke is still required after deployment.
 - Independent mailbox receipt and complete email-code request/verify/logout flow are not evidenced.
