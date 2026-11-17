@@ -18,28 +18,29 @@
     "catalog:audit": "tsx scripts/catalog-audit.ts",
     "config:check": "node scripts/check-env-example.mjs",
     "release:verify-health": "tsx scripts/verify-public-health.ts",
+    "release:readiness": "node scripts/release-readiness.mjs",
     "revoke:sessions": "tsx scripts/revoke-all-sessions.ts",
     "preflight:production": "tsx scripts/production-preflight.ts"
   },
   "dependencies": {
     "@google-cloud/documentai": "^10.2.0",
     "@google/genai": "^2.4.0",
-    "@tailwindcss/vite": "^4.1.14",
     "@types/three": "^0.185.4",
-    "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "postgres": "^3.4.7",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "sharp": "^0.35.5",
     "tesseract.js": "^7.0.0",
-    "three": "^0.185.1",
-    "postgres": "^3.4.7"
+    "three": "^0.185.1"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
     "@playwright/test": "^1.63.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",

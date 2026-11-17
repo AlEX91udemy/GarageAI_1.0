@@ -10,5 +10,6 @@ Reports and operational runbooks for the GarageAI project.
 - [Scanner verification plan — 2026-11-14](../tasks/scanner-verification-plan-2026-11-14.md): OCR/scanner test corpus, accuracy targets, manual smoke and release gate.
 - [Previous release-readiness log — 2026-11-13](../tasks/release-readiness-plan-2026-11-13.md): historical deployment and release-gate evidence.
 - [Git history secret-remediation runbook](git-history-secret-remediation.md): separately approved procedure for removing historical session data without suppressing Gitleaks.
+- Run `npm run release:readiness` for the current local release-gate report. It intentionally leaves external ownership and production-evidence gates pending until their evidence is recorded.
 
-**Current status (2026-11-14):** the deployed service and current `main` are operationally verified, but public launch acceptance is still **NO-GO**. See [release evidence](release-evidence-2026-11-14.md) for the latest SHA, CI, Cloud SQL, IAM and public health evidence, plus the remaining external gates: Cloudflare Workers Builds, DNS aliases, private-agent provider smoke, mailbox delivery, OCR acceptance, legacy-data provenance/privacy and the observation window.
+**Current status (2026-11-17):** the deployed service and current `main` are operationally testable, the Worker was redeployed from the current tree, and all available local gates pass. Public launch acceptance remains **NO-GO** until the external gates in [release evidence](release-evidence-2026-11-14.md) are independently evidenced.

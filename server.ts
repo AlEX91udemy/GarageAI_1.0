@@ -2645,11 +2645,10 @@ app.post("/api/auth/login", async (req, res) => {
 async function consumeEmailCodeLimit(req: express.Request, email: string): Promise<boolean> {
   if (store instanceof PostgresPersistence) {
     try {
-      const [ip, address] = await Promise.all([
-        store.consumeRateLimit("email-code-ip", hashToken(req.ip || "unknown"), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
-        store.consumeRateLimit("email-code-email", hashToken(email), EMAIL_CODE_LIMIT, EMAIL_CODE_WINDOW_MS),
+      return await store.consumeRateLimitsAtomically([
+        { scope: "email-code-ip", bucketKey: hashToken(req.ip || "unknown"), limit: EMAIL_CODE_LIMIT, windowMs: EMAIL_CODE_WINDOW_MS },
+        { scope: "email-code-email", bucketKey: hashToken(email), limit: EMAIL_CODE_LIMIT, windowMs: EMAIL_CODE_WINDOW_MS },
       ]);
-      return ip.allowed && address.allowed;
     } catch {
       return false;
     }
@@ -2671,11 +2670,10 @@ async function consumeEmailCodeLimit(req: express.Request, email: string): Promi
 async function consumeEmailVerifyLimit(req: express.Request, email: string): Promise<boolean> {
   if (store instanceof PostgresPersistence) {
     try {
-      const [ip, address] = await Promise.all([
-        store.consumeRateLimit("email-verify-ip", hashToken(req.ip || "unknown"), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
-        store.consumeRateLimit("email-verify-email", hashToken(email), EMAIL_VERIFY_LIMIT, EMAIL_CODE_WINDOW_MS),
+      return await store.consumeRateLimitsAtomically([
+        { scope: "email-verify-ip", bucketKey: hashToken(req.ip || "unknown"), limit: EMAIL_VERIFY_LIMIT, windowMs: EMAIL_CODE_WINDOW_MS },
+        { scope: "email-verify-email", bucketKey: hashToken(email), limit: EMAIL_VERIFY_LIMIT, windowMs: EMAIL_CODE_WINDOW_MS },
       ]);
-      return ip.allowed && address.allowed;
     } catch {
       return false;
     }
