@@ -24,15 +24,20 @@ const riskClass: Record<VehicleRecommendationResponse["recommendations"][number]
 export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPanelProps> = ({ vehicle }) => {
   const [state, setState] = useState<{ loading: boolean; data: VehicleRecommendationResponse | null; error: string | null }>({ loading: true, data: null, error: null });
   const [refreshState, setRefreshState] = useState<{ loading: boolean; message: string | null }>({ loading: false, message: null });
+  const hasVehicle = vehicle.id !== "empty-garage";
 
   useEffect(() => {
     let cancelled = false;
+    if (!hasVehicle) {
+      setState({ loading: false, data: null, error: null });
+      return () => { cancelled = true; };
+    }
     setState({ loading: true, data: null, error: null });
     fetchVehicleRecommendations(vehicle)
       .then((data) => { if (!cancelled) setState({ loading: false, data, error: null }); })
       .catch((error) => { if (!cancelled) setState({ loading: false, data: null, error: error instanceof Error ? error.message : "Рекомендации временно недоступны" }); });
     return () => { cancelled = true; };
-  }, [vehicle.id, vehicle.make, vehicle.model, vehicle.generation, vehicle.engine, vehicle.fuelType, vehicle.currentMileage]);
+  }, [hasVehicle, vehicle.id, vehicle.make, vehicle.model, vehicle.generation, vehicle.engine, vehicle.fuelType, vehicle.currentMileage]);
 
   const handleRefreshSources = async () => {
     setRefreshState({ loading: true, message: null });
@@ -64,22 +69,27 @@ export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPan
       </div>
       {refreshState.message && <p className="mt-2 text-[11px] text-neutral-500 dark:text-neutral-400" role="status">{refreshState.message}</p>}
 
-      {state.loading && (
+      {!hasVehicle && (
+        <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300">
+          Добавьте автомобиль, чтобы получить рекомендации по обслуживанию.
+        </div>
+      )}
+      {hasVehicle && state.loading && (
         <div className="mt-4 flex items-center gap-2 text-xs text-neutral-500" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Загружаем рекомендации…
         </div>
       )}
-      {state.error && !state.loading && (
+      {hasVehicle && state.error && !state.loading && (
         <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300" role="status">
           {state.error}. Остальные функции гаража доступны.
         </div>
       )}
-      {!state.loading && !state.error && state.data?.recommendations.length === 0 && (
+      {hasVehicle && !state.loading && !state.error && state.data?.recommendations.length === 0 && (
         <div className="mt-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-3 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/60 dark:text-neutral-300">
           Для этого профиля пока нет подходящих правил. Уточните двигатель, год и пробег, чтобы сузить рекомендации.
         </div>
       )}
-      {!state.loading && !state.error && state.data && state.data.recommendations.length > 0 && (
+      {hasVehicle && !state.loading && !state.error && state.data && state.data.recommendations.length > 0 && (
         <div className="mt-4 space-y-2.5">
           {state.data.recommendations.slice(0, 3).map((item) => (
             <article key={item.id} className={riskClass[item.risk] + " rounded-2xl border p-3"}>

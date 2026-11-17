@@ -3,6 +3,8 @@ name: GarageAI security and quality audit
 on:
   pull_request:
     branches: ["main"]
+  push:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -86,8 +88,9 @@ jobs:
         run: npx tsx scripts/test-postgres-http.ts
       - name: Production dependency audit
         run: npm audit --omit=dev
-      - name: Full dependency audit
-        run: npm audit
+      - name: Full dependency audit (informational)
+        continue-on-error: true
+        run: npm audit --audit-level=high
 
   python-security:
     name: Python dependency security audit

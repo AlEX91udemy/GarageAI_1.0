@@ -379,6 +379,56 @@ export class PostgresPersistence {
     };
   }
 
+  /** Consume multiple buckets as one decision so rejected identity limits do not burn IP attempts. */
+  async consumeRateLimitsAtomically(
+    policies: Array<{ scope: string; bucketKey: string; limit: number; windowMs: number }>,
+    now = Date.now(),
+  ): Promise<boolean> {
+    this.assertInitialized();
+    if (!policies.length) throw new Error("At least one rate-limit policy is required");
+    for (const policy of policies) {
+      if (!policy.scope.trim() || policy.scope.length > 64 || !policy.bucketKey.trim() || policy.bucketKey.length > 512) {
+        throw new Error("Invalid rate-limit key");
+      }
+      if (!Number.isSafeInteger(policy.limit) || policy.limit < 1 || !Number.isSafeInteger(policy.windowMs) || policy.windowMs < 1) {
+        throw new Error("Invalid rate-limit policy");
+      }
+    }
+    return this.sql.begin(async (tx) => {
+      const decisions: boolean[] = [];
+      for (const policy of policies) {
+        const rows = await tx`
+          SELECT window_started_ms, hit_count
+          FROM garageai_rate_limits
+          WHERE scope = ${policy.scope} AND bucket_key = ${policy.bucketKey}
+          FOR UPDATE
+        `;
+        const row = rows[0];
+        const expired = row ? Number(row.window_started_ms) + policy.windowMs <= now : true;
+        const count = expired ? 0 : Number(row.hit_count);
+        decisions.push(count < policy.limit);
+      }
+      if (decisions.some((allowed) => !allowed)) return false;
+      for (const policy of policies) {
+        await tx`
+          INSERT INTO garageai_rate_limits (scope, bucket_key, window_started_ms, hit_count, updated_at)
+          VALUES (${policy.scope}, ${policy.bucketKey}, ${now}, 1, now())
+          ON CONFLICT (scope, bucket_key) DO UPDATE SET
+            window_started_ms = CASE
+              WHEN garageai_rate_limits.window_started_ms + ${policy.windowMs} <= ${now} THEN ${now}
+              ELSE garageai_rate_limits.window_started_ms
+            END,
+            hit_count = CASE
+              WHEN garageai_rate_limits.window_started_ms + ${policy.windowMs} <= ${now} THEN 1
+              ELSE garageai_rate_limits.hit_count + 1
+            END,
+            updated_at = now()
+        `;
+      }
+      return true;
+    });
+  }
+
   async resetRateLimit(scope: string, bucketKey: string): Promise<void> {
     this.assertInitialized();
     await this.sql`
