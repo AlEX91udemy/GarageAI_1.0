@@ -5,11 +5,27 @@ steps:
       - -f
       - agents_service/Dockerfile
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:${_IMAGE_TAG}
       - .
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:${_IMAGE_TAG}
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - garageai-agents
+      - --project=$PROJECT_ID
+      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:${_IMAGE_TAG}
+      - --quiet
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:${_IMAGE_TAG}
 substitutions:
   _REGION: europe-west1
+  _IMAGE_TAG: local-build
 options:
   logging: CLOUD_LOGGING_ONLY
