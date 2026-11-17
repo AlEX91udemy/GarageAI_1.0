@@ -2,7 +2,7 @@
 
 ## Current deployed state
 
-- Worker deployment source commit: `ddb3a75` on branch `codex/release-readiness-20261117`; the branch tip contains the release evidence update and remains the PR candidate. Compare URL: https://github.com/AlEX91udemy/GarageAI_1.0/compare/main...codex/release-readiness-20261117?expand=1.
+- Worker deployment source commit: `ddb3a75`; current PR candidate branch tip: `f0d5dd4` on `codex/release-readiness-20261117`. Compare URL: https://github.com/AlEX91udemy/GarageAI_1.0/compare/main...codex/release-readiness-20261117?expand=1.
 - Cloud Run web service `garageai-web-canary` is serving revision `garageai-web-canary-00023-n8r` at 100% traffic.
 - The currently recorded Cloud Run image was built as `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:release-89f03c7` with digest `sha256:e5212b298452b22b009b1ec30fda23646521d55d2dd4bbd2d7f0ddaaaf8f727f`; local source changes below still require a new backend build and rollout.
 - The production entrypoint now forces `NODE_ENV=production` and starts the bundled server without Vite middleware.
