@@ -9,7 +9,7 @@
 - Public health verification passed for `https://garageai.site`; anonymous protected routes still return HTTP 401.
 - Worker `garageai-1-0` was redeployed from the current tree as version `8d22041c-5f4b-4a2a-9586-8bc0f01a9515`; apex and Worker `/api/health` both returned HTTP 200 with only `status` and `timestamp`.
 - Live anonymous boundary check at both `https://garageai.site/api/data` and the Worker endpoint returned HTTP 401 with `Требуется вход в аккаунт`.
-- The private agents service remains private; direct unauthenticated `/health` and `/agents/run` requests return HTTP 403.
+- The private agents service remains private; direct unauthenticated `/health` and `/agents/run` requests return HTTP 403. The broken post-merge agent revisions were caused by the Cloud Build trigger using the root Node Dockerfile; the service was rebuilt from `agents_service/Dockerfile` and revision `garageai-agents-00053-v8c` is Ready at 100% traffic.
 - Local verification after the latest changes: 30 Vitest files / 170 tests, scanner tests 31/31, TypeScript, production build, env contract, catalog audit, `npm audit --omit=dev` (0 vulnerabilities), Python syntax, Wrangler dry-run, public health and `git diff --check` all pass.
 - `npm run release:readiness` now produces a machine-readable gate report and returns `external-gates-pending` when local checks pass.
 
