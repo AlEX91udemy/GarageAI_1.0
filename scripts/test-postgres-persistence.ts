@@ -93,6 +93,25 @@ async function main() {
     const afterReset = await repository.consumeRateLimit("integration", rateKey, 2, 60_000, rateNow + 3);
     assert(afterReset.allowed && afterReset.count === 1, "reset should clear a shared rate-limit bucket");
 
+    const atomicIpKey = `ci-atomic-ip-${suffix}`;
+    const atomicEmailKey = `ci-atomic-email-${suffix}`;
+    const atomicNow = Date.now();
+    const atomicFirst = await repository.consumeRateLimitsAtomically([
+      { scope: "atomic-ip", bucketKey: atomicIpKey, limit: 2, windowMs: 60_000 },
+      { scope: "atomic-email", bucketKey: atomicEmailKey, limit: 1, windowMs: 60_000 },
+    ], atomicNow);
+    const rejected = await peerRepository.consumeRateLimitsAtomically([
+      { scope: "atomic-ip", bucketKey: atomicIpKey, limit: 2, windowMs: 60_000 },
+      { scope: "atomic-email", bucketKey: atomicEmailKey, limit: 1, windowMs: 60_000 },
+    ], atomicNow + 1);
+    const differentEmail = await repository.consumeRateLimitsAtomically([
+      { scope: "atomic-ip", bucketKey: atomicIpKey, limit: 2, windowMs: 60_000 },
+      { scope: "atomic-email", bucketKey: `${atomicEmailKey}-other`, limit: 1, windowMs: 60_000 },
+    ], atomicNow + 2);
+    assert(atomicFirst, "first atomic multi-bucket hit should be allowed");
+    assert(!rejected, "an exhausted bucket should reject the whole atomic decision");
+    assert(differentEmail, "a rejected email bucket must not consume the IP bucket");
+
     const now = Date.now();
     const session = {
       tokenHash: sessionHash,

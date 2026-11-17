@@ -18,6 +18,7 @@ load_dotenv()
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 ARGON_MODEL = os.getenv("ARGON_MODEL", "gemini-4-argon")
+FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
 MAX_AGENTS_PER_REQUEST = 3
 
 AGENT_BRIEFS = {
@@ -140,8 +141,14 @@ def _build_agents() -> dict[str, dict[str, str]]:
     }
 
 
+def _model_not_found(error: Exception) -> bool:
+    """Recognize provider responses that specifically reject a model ID."""
+    message = str(error).upper()
+    return "NOT_FOUND" in message or "MODEL_NOT_FOUND" in message or "DOES NOT EXIST" in message
+
+
 async def _run_agent(agent: dict[str, str], name: str, prompt: str) -> str:
-    """Call Google GenAI directly and always release the async client."""
+    """Call Google GenAI and retry once with the configured fallback model."""
     use_vertex_ai = _env_flag("GOOGLE_GENAI_USE_VERTEXAI")
     client_options: dict[str, Any] = {
         "vertexai": use_vertex_ai,
@@ -154,16 +161,25 @@ async def _run_agent(agent: dict[str, str], name: str, prompt: str) -> str:
     if api_key and not use_vertex_ai:
         client_options["api_key"] = api_key
 
-    client = genai.Client(**client_options)
-    try:
-        response = await client.aio.models.generate_content(
-            model=agent["model"],
-            contents=prompt,
-            config=types.GenerateContentConfig(system_instruction=agent["instruction"]),
-        )
-        return (getattr(response, "text", None) or "").strip() or "Агент не вернул текстовый ответ."
-    finally:
-        await client.aio.aclose()
+    models = [agent["model"]]
+    if FALLBACK_MODEL and FALLBACK_MODEL not in models:
+        models.append(FALLBACK_MODEL)
+    for index, model in enumerate(models):
+        client = genai.Client(**client_options)
+        try:
+            response = await client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(system_instruction=agent["instruction"]),
+            )
+            return (getattr(response, "text", None) or "").strip() or "Агент не вернул текстовый ответ."
+        except Exception as exc:
+            if index == 0 and len(models) > 1 and _model_not_found(exc):
+                continue
+            raise
+        finally:
+            await client.aio.aclose()
+    raise RuntimeError("No Gemini model was configured")
 
 app = FastAPI(title="GarageAI Agents", version="1.0.0")
 
@@ -198,7 +214,7 @@ def _env_flag(name: str) -> bool:
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
-    return {"status": "ok", "agents": list(AGENT_BRIEFS), "model": MODEL, "argon_model": ARGON_MODEL}
+    return {"status": "ok", "agents": list(AGENT_BRIEFS), "model": MODEL, "fallback_model": FALLBACK_MODEL, "argon_model": ARGON_MODEL}
 
 @app.get("/agents/run")
 async def run_agents_help() -> dict[str, Any]:
