@@ -7,7 +7,7 @@
 - The currently recorded Cloud Run image was built as `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web:release-89f03c7` with digest `sha256:e5212b298452b22b009b1ec30fda23646521d55d2dd4bbd2d7f0ddaaaf8f727f`; local source changes below still require a new backend build and rollout.
 - The production entrypoint now forces `NODE_ENV=production` and starts the bundled server without Vite middleware.
 - Public health verification passed for `https://garageai.site`; anonymous protected routes still return HTTP 401.
-- Worker `garageai-1-0` was redeployed from the current tree as version `34e9d88c-6cc8-4dce-ae5c-2caaebeb2cd9`; apex and Worker `/api/health` both returned HTTP 200 with only `status` and `timestamp`.
+- Worker `garageai-1-0` was redeployed from the current tree as version `8d22041c-5f4b-4a2a-9586-8bc0f01a9515`; apex and Worker `/api/health` both returned HTTP 200 with only `status` and `timestamp`.
 - Live anonymous boundary check at both `https://garageai.site/api/data` and the Worker endpoint returned HTTP 401 with `Требуется вход в аккаунт`.
 - The private agents service remains private; direct unauthenticated `/health` and `/agents/run` requests return HTTP 403.
 - Local verification after the latest changes: 30 Vitest files / 170 tests, scanner tests 31/31, TypeScript, production build, env contract, catalog audit, `npm audit --omit=dev` (0 vulnerabilities), Python syntax, Wrangler dry-run, public health and `git diff --check` all pass.
