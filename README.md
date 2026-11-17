@@ -1,15 +1,25 @@
-# Garage AI — Дневник авто и ремонта
+# GarageAI — цифровой гараж и помощник по обслуживанию автомобиля
 
-Garage AI — веб-приложение для ведения цифрового гаража: автомобили, пробег, обслуживание, заправки, склад запчастей, напоминания и проекты тюнинга. Приложение работает в веб- и мобильном режиме, поддерживает гостевое локальное использование и авторизацию с отдельным гаражом для каждого аккаунта.
+GarageAI — production-ready веб-приложение для ведения цифрового гаража: автомобили, пробег, обслуживание, заправки, склад запчастей, напоминания и проекты тюнинга. Приложение работает в веб- и мобильном режиме, поддерживает гостевое локальное использование и авторизацию с отдельным гаражом для каждого аккаунта.
 
 ## Ссылки
 
-* **Приложение:** https://garageai-1-0.sambur91.workers.dev/
+* **Приложение:** https://garageai.site/
+* **Резервный адрес Worker:** https://garageai-1-0.sambur91.workers.dev/
 * **Репозиторий:** https://github.com/AlEX91udemy/GarageAI_1.0
 
-Ссылка на приложение проверена 29.10.2026: frontend отвечает с HTTP 200, а `/api/health` возвращает `status: ok`.
+Проверка production от 17.11.2026: `https://garageai.site/api/health` и Worker health endpoint отвечают HTTP 200, защищённый `/api/data` без сессии отвечает HTTP 401. Основная ветка `main` содержит последний успешно проверенный release commit.
 
-## Возможности
+## Production статус
+
+* **Web/API:** Cloudflare Worker + Cloud Run + PostgreSQL/Cloud SQL.
+* **Private agents:** Cloud Run revision `garageai-agents-00053-v8c`, 100% production traffic, Python image собирается из `agents_service/Dockerfile`.
+* **CI:** TypeScript, production build, 170 unit-тестов, PostgreSQL integration/smoke, Python audit и secret scanning проходят на `main`.
+* **Безопасность:** HttpOnly-сессии, CSRF-защита, rate limits, tenant isolation, fail-closed production storage guard и секреты вне frontend.
+
+Открытые операционные задачи владельца инфраструктуры перечислены в [issue #52](https://github.com/AlEX91udemy/GarageAI_1.0/issues/52). Они относятся к независимому mailbox smoke, длительному production observation, OCR acceptance corpus, Cloudflare Builds integration и исторической ротации секретов; код и обязательные CI-проверки уже завершены.
+
+## Ключевые возможности
 
 * карточки автомобилей с VIN, пробегом, фотографиями и 3D-моделями;
 * история сервисных работ, расходы на обслуживание и автоматическое обновление пробега;
@@ -20,6 +30,16 @@ Garage AI — веб-приложение для ведения цифровог
 * AI-сканирование чеков и документов через Google Gemini, Google Document AI или OpenRouter;
 * локальный OCR на Tesseract.js с русским и английским языками, подготовкой изображений и ограничением размера входных файлов;
 * мобильный сканер штрихкодов, QR-кодов деталей и VIN.
+
+### Что сделано в последнем release
+
+* Исправлен Cloud Build trigger private-agent: production теперь собирает Python-сервис из `agents_service/Dockerfile`, а не корневой Node/Express image.
+* Развёрнута и проверена revision `garageai-agents-00053-v8c`; старый runtime guard больше не приводит к падению сервиса при корректном production image.
+* Завершены PostgreSQL migration, persistence и HTTP integration checks, включая tenant isolation, сессии, импорт legacy JSON и restore rehearsal.
+* Завершены строгая TypeScript-проверка, production build, catalog audit, Python dependency audit и secret scanning в GitHub Actions.
+* Исправлены синхронизация гаража, списание деталей при обслуживании, backup/import в рамках текущего аккаунта, генерация ID через `crypto.randomUUID()` и мобильные расчёты.
+* Добавлена безопасная конфигурация AI-моделей через окружение, гибридный OCR с Gemini/Document AI и локальный Tesseract fallback.
+* Production health contract подтверждён для apex-домена и Cloudflare Worker; неавторизованный доступ к защищённым данным возвращает 401.
 
 Сканер чеков извлекает продавца, дату, итоговую сумму, топливо, работы и запчасти. Результат перед сохранением можно проверить и отредактировать. Для документов доступны облачный OCR и локальный резервный проход; качество зависит от модели, освещения и качества фотографии.
 
