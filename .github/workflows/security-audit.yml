@@ -88,8 +88,9 @@ jobs:
         run: npx tsx scripts/test-postgres-http.ts
       - name: Production dependency audit
         run: npm audit --omit=dev
-      - name: Record development dependency audit status
-        run: npm audit --omit=dev --audit-level=high
+      - name: Full dependency audit (informational)
+        continue-on-error: true
+        run: npm audit --audit-level=high
 
   python-security:
     name: Python dependency security audit
