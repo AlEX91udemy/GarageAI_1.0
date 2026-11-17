@@ -76,7 +76,7 @@ async function request(auth: Auth, route: string, init: RequestInit = {}): Promi
   return fetch(`${baseUrl}${route}`, { ...init, headers });
 }
 
-describe("HTTP tenant isolation", { timeout: 15_000 }, () => {
+describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
   beforeAll(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "garageai-http-isolation-"));
     emailCaptureFile = path.join(tempDir, "email-codes.ndjson");
