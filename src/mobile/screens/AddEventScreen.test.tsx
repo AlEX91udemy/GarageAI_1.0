@@ -172,6 +172,19 @@ describe("AddEventScreen", () => {
     }));
   });
 
+  it("does not invent a purchase price when a part was not priced", () => {
+    const { onSavePart } = renderScreen("part");
+    const nameInput = container.querySelector<HTMLInputElement>("input[aria-label='Наименование детали']");
+    if (!nameInput) throw new Error("Missing part name input");
+    setInput(nameInput, "Неизвестная деталь");
+
+    act(() => Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.trim() === "Сохранить")?.click());
+
+    expect(onSavePart).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Укажите цену покупки детали");
+  });
+
   it("shows work suggestions while typing and fills the category when one is selected", () => {
     const { onSaveService } = renderScreen("service");
     const titleInput = container.querySelector<HTMLInputElement>("input[role='combobox']");

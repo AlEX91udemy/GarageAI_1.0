@@ -44,7 +44,9 @@ import {
   top100 as catalogTop100,
   catalogSearch,
 } from "./src/catalog/database";
-import { searchKnowledge } from "./src/catalog/knowledge";
+import { ingestedKnowledgeChunks, searchKnowledge } from "./src/catalog/knowledge";
+import { acceptKnowledgeChunkImport, loadReviewedKnowledgeChunks } from "./src/catalog/ingestion";
+import type { IngestedKnowledgeChunk } from "./src/catalog/types";
 import { publicKnowledgeSources } from "./src/catalog/publicSources";
 import { getVehicleRecommendations } from "./src/catalog/recommendations";
 import { verifyModification } from "./src/catalog/verification";
@@ -83,6 +85,7 @@ import {
   isValidYear,
   validateCredentials,
   validateDiagnosticResult,
+  sanitizeDiagnosticResult,
 } from "./server/validation";
 
 // Production logs must stay focused on request and startup failures.
@@ -936,7 +939,7 @@ const KNOWLEDGE_VEHICLE_MAX_LENGTH = 4_000;
 const KNOWLEDGE_REFRESH_LIMIT = 3;
 const KNOWLEDGE_REFRESH_WINDOW_MS = 15 * 60 * 1000;
 const knowledgeRefreshAttempts = new Map<string, { count: number; startedAt: number }>();
-const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
+const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "market", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
 const KNOWLEDGE_QUERY_KEYS = new Set(["vehicle", "q", ...KNOWLEDGE_VEHICLE_KEYS]);
 
 function parseKnowledgeVehicle(value: unknown): { vehicle?: Record<string, unknown>; error?: string } {
@@ -1018,7 +1021,9 @@ async function rateLimitKnowledgeRefresh(req: express.Request, res: express.Resp
 }
 
 app.get("/api/knowledge/sources", (_req, res) => {
-  res.json({ sources: publicKnowledgeSources, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-14", statusScope: "instance-local", note: "Реестр содержит публичные точки входа. Статусы проверки относятся к текущему экземпляру сервера и не являются доказательством содержимого документа. Для точного совета нужен документ производителя для конкретного рынка, года, двигателя и VIN." });
+  const sourceIdsWithChunks = new Set(ingestedKnowledgeChunks.map((chunk) => chunk.metadata.sourceId));
+  const inventory = publicKnowledgeSources.map((source) => ({ ...source, documentStatus: source.documentStatus || "entry_page_only", excerptCount: ingestedKnowledgeChunks.filter((chunk) => chunk.metadata.sourceId === source.id).length, availableForRecommendations: sourceIdsWithChunks.has(source.id) }));
+  res.json({ sources: inventory, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-18", statusScope: "instance-local", note: "Ссылка на страницу производителя не равна загруженному руководству. Рекомендации по выдержкам появляются только при наличии проверенного цитируемого фрагмента с совпадающими маркой, моделью, поколением, рынком, годом, двигателем и КПП." });
 });
 const publicKnowledgeSourceStatuses = new Map<string, { sourceId: string; checkedAt: string; status: "reachable" | "http_error" | "network_error" | "not_checked"; httpStatus?: number; responseUrl?: string; error?: string }>();
 async function refreshPublicKnowledgeSources() {
@@ -1050,6 +1055,13 @@ app.get("/api/knowledge/recommendations", (req, res) => {
   if (rawQuery.length > KNOWLEDGE_QUERY_MAX_LENGTH) return res.status(400).json({ error: "Запрос слишком длинный" });
   const query = rawQuery;
   res.json({ recommendations: getVehicleRecommendations(parsedVehicle.vehicle || {}, query), sources: publicKnowledgeSources });
+});
+
+app.post("/api/knowledge/chunks/validate", requireAuth, (req, res) => {
+  const value = req.body?.chunk;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return res.status(400).json({ valid: false, errors: ["Фрагмент должен быть объектом"] });
+  const result = (() => { try { acceptKnowledgeChunkImport(value, [...catalogSources, ...publicKnowledgeSources]); return { valid: true, errors: [] }; } catch (error) { return { valid: false, errors: [error instanceof Error ? error.message : "Фрагмент отклонён"] }; } })();
+  res.status(result.valid ? 200 : 400).json(result);
 });
 
 app.get("/api/vehicles/:id", (req, res) => {
@@ -2978,10 +2990,12 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
             make: req.body.make,
             model: req.body.model,
             generation: req.body.generation,
+            market: req.body.market,
             year: req.body.year,
             engine: req.body.engine,
             currentMileage: req.body.currentMileage,
             transmission: req.body.transmission,
+            fuelType: req.body.fuelType,
             driveType: req.body.driveType,
           };
     const vehicle = rawVehicle;
@@ -2993,6 +3007,7 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
     const vehicleMake = asTrimmedString(vehicle.make, 80);
     const vehicleModel = asTrimmedString(vehicle.model, 120);
     const vehicleGeneration = asTrimmedString(vehicle.generation, 120);
+    const vehicleMarket = asTrimmedString(vehicle.market, 24);
     const vehicleEngine = asTrimmedString(vehicle.engine, 120);
     const vehicleTransmission = asTrimmedString(vehicle.transmission, 80);
     const vehicleDriveType = asTrimmedString(vehicle.driveType, 80);
@@ -3008,24 +3023,43 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
       brand: vehicleMake || undefined,
       model: vehicleModel || undefined,
       generation: vehicleGeneration || undefined,
+      market: vehicleMarket || undefined,
+      yearStart: vehicleYear ? Number(vehicleYear) : undefined,
+      yearEnd: vehicleYear ? Number(vehicleYear) : undefined,
+      engine: vehicleEngine || undefined,
+      transmission: vehicleTransmission || undefined,
     }).slice(0, 5);
-    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, market: vehicleMarket, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, fuelType: asTrimmedString(vehicle.fuelType, 80), driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const exactManualRecommendations = recommendationContext.filter((item) => item.evidenceType === "vehicle_document_excerpt");
+    const knowledgeSources = recommendationContext.map((item) => ({
+      evidenceType: item.evidenceType || "general_guidance",
+      title: item.title,
+      documentName: item.citation?.documentName,
+      locator: item.citation?.locator,
+      sourceUrl: item.citation?.sourceUrl || item.sources[0]?.url,
+      applicability: item.applicability,
+    }));
     const retrievedRecommendations = recommendationContext.length
-      ? recommendationContext.map((item) => "[" + item.risk + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + ")").join("\n")
+      ? recommendationContext.map((item) => "[" + item.risk + "; " + item.evidenceType + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + (item.citation ? "; " + item.citation.locator + "; SHA-256 " + item.citation.documentHash : "") + ")").join("\n")
       : "Подходящих правил для запроса нет.";
+    const exactManualContext = exactManualRecommendations.length
+      ? exactManualRecommendations.map((item) => item.text + " (Документ: " + (item.citation?.documentName || item.sources[0]?.title || item.title) + "; " + (item.citation?.locator || "раздел не указан") + ".)").join("\n")
+      : "Точной выдержки руководства для всей конфигурации автомобиля в базе нет. Не выдавай общие правила за заводские данные.";
     const retrievedContext = knowledgeContext.length
-      ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source})`).join("\n")
+      ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source}${item.citation ? "; " + item.citation.locator + "; SHA-256 " + item.citation.documentHash : ""})`).join("\n")
       : "Подходящих подтверждённых фрагментов локальной базы нет. Не выдавай предположения за факт.";
 
     const ai = getAi();
     const prompt = `Ты — ведущий профессиональный автомеханик и диагност в сервисной системе "Garage AI Rev".
-Твоя задача: на основе точного профиля автомобиля, его пробега, истории недавних ремонтов и описанных симптомов дать структурированную, практически полезную и объективную диагностику.
+Твоя задача: по профилю автомобиля, пробегу, истории обслуживания и симптомам предложить гипотезы и безопасную последовательность проверок. Это предварительная оценка, не подтверждённый диагноз и не замена осмотру специалиста. Не выдумывай статистическую точность, цены, артикулы или доказательства.
 
 ДАННЫЕ АВТОМОБИЛЯ:
 - Марка и модель: ${vehicleMake || "Не указана"} ${vehicleModel} (${vehicleGeneration})
+- Рынок спецификации: ${vehicleMarket || "Не указан"}
 - Год выпуска: ${vehicleYear || "Не указан"}
 - Текущий пробег: ${currentMileage !== null ? currentMileage.toLocaleString("ru-RU") + " км" : "Не указан"}
 - Двигатель / КПП: ${vehicleEngine || "Стандарт"} / ${vehicleTransmission || "Стандарт"}
+- Тип топлива: ${asTrimmedString(vehicle.fuelType, 80) || "Не указан"}
 - Тип привода: ${vehicleDriveType || "Стандарт"}
 
 ИСТОРИЯ ПРЕДЫДУЩИХ ОБСЛУЖИВАНИЙ:
@@ -3038,48 +3072,35 @@ ${userNotes ? `Дополнительные примечания: ${userNotes}` 
 РЕЛЕВАНТНЫЙ КОНТЕКСТ KNOWLEDGE BASE (RAG):
 ${retrievedContext}
 
-ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ:
+ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ И ВЫДЕРЖЕК РУКОВОДСТВА:
 ${retrievedRecommendations}
+Если источник имеет тип make_guidance или model_series_guidance, используй его только как низкоуверенную справочную подсказку, не как подтверждённую частоту поломок.
 
-Правила: отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если данных для точного вывода нет, скажи, что нужна проверка по официальному руководству или на СТО.
+ТОЧНЫЕ ВЫДЕРЖКИ РУКОВОДСТВА ДЛЯ ЭТОЙ КОНФИГУРАЦИИ:
+${exactManualContext}
+
+Правила: сведения с evidenceType=vehicle_document_excerpt считаются применимыми только к указанной конфигурации и должны пересказываться с сохранением ссылки на раздел/страницу. Сведения с evidenceType=general_guidance являются общими и не могут выдавать точные объёмы, интервалы, моменты затяжки или совместимость деталей. Отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если точной выдержки руководства нет, скажи это прямо и направь к официальному руководству или на СТО.
 
 Сформируй ответ в формате JSON строго по следующей схеме:
 {
   "primaryDiagnosis": "Краткое название наиболее вероятной неисправности",
   "summary": "краткий профессиональный вывод (1-2 предложения)",
-  "confidence": 88,
   "urgency": "high" | "medium" | "low",
   "safetyAssessment": "оценка риска для безопасности движения",
   "likelyCauses": [
-    {
-      "cause": "название причины",
-      "probability": 80
-    },
-    {
-      "cause": "вторая возможная причина",
-      "probability": 15
-    }
+    { "cause": "проверяемая диагностическая гипотеза" }
   ],
   "possibleCauses": [
     {
       "cause": "название причины",
-      "probability": "Высокая" | "Средняя" | "Низкая",
       "explanation": "подробное объяснение механизма неисправности",
       "checkMethod": "как проверить в гараже или на СТО"
     }
   ],
   "diagnosticSteps": ["шаг 1 проверки", "шаг 2", "шаг 3"],
-  "estimatedCostRange": "диапазон стоимости (например '5 000 — 12 000 ₽')",
-  "estimatedCost": "5 000 — 12 000 ₽",
-  "recommendedParts": [
-    {
-      "name": "Наименование детали",
-      "partNumber": "каталожный номер OEM / кросс",
-      "brand": "рекомендуемые бренды (например Mann, Brembo, SKF)"
-    }
-  ],
   "mechanicTip": "совет мастера для владельца именно этого кузова/модели/мотора",
-  "proTip": "совет мастера"
+  "proTip": "совет мастера",
+  "knowledgeSources": []
 }`;
 
     const response = await ai.models.generateContent({
@@ -3094,9 +3115,9 @@ ${retrievedRecommendations}
     if (!validateDiagnosticResult(parsed)) {
       return res.status(502).json({ error: "AI вернул ответ в неподдерживаемом формате" });
     }
-    res.json(parsed);
+    res.json({ ...sanitizeDiagnosticResult(parsed), knowledgeSources });
   } catch (error: any) {
-    console.error("Diagnostic AI error:", error);
+    console.error("Diagnostic AI request failed");
     res.status(500).json({
       error: "Не удалось провести AI-диагностику.",
     });
@@ -3434,6 +3455,16 @@ app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
 // ---------------------------------------------------------------------------
 
 async function startServer() {
+  const knowledgeFile = path.join(DATA_DIR, "knowledge_chunks.json");
+  if (fs.existsSync(knowledgeFile)) {
+    try {
+      const rawKnowledge: unknown = JSON.parse(fs.readFileSync(knowledgeFile, "utf-8"));
+      const corpusStatus = loadReviewedKnowledgeChunks(rawKnowledge, ingestedKnowledgeChunks, [...catalogSources, ...publicKnowledgeSources]);
+      console.info("Reviewed vehicle knowledge loaded:", corpusStatus.loaded, "accepted,", corpusStatus.rejected, "rejected");
+    } catch {
+      console.error("Reviewed vehicle knowledge file could not be loaded; no document excerpts enabled");
+    }
+  }
   if (store instanceof PostgresPersistence) {
     await store.initialize();
     await store.healthCheck();

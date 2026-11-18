@@ -90,6 +90,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
         env: {
           ...process.env,
           NODE_ENV: "test",
+          DISABLE_HMR: "true",
           // The HTTP integration server uses disposable test files, never real production data.
           GARAGE_ALLOW_EPHEMERAL_STORAGE: "true",
           PORT: String(port),
@@ -444,8 +445,9 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
   it("validates public knowledge recommendation input and exposes instance-local refresh scope", async () => {
     const sources = await fetch(`${baseUrl}/api/knowledge/sources`);
     expect(sources.status).toBe(200);
-    const sourceBody = await sources.json() as { statusScope?: string };
+    const sourceBody = await sources.json() as { statusScope?: string; sources?: Array<{ id: string; excerptCount?: number; availableForRecommendations?: boolean }> };
     expect(sourceBody.statusScope).toBe("instance-local");
+    expect(sourceBody.sources?.find((source) => source.id === "source-nissan-xtrail-thailand-t32")).toMatchObject({ excerptCount: 2, availableForRecommendations: true });
 
     const nonFiniteMileage = await fetch(`${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify({ currentMileage: "NaN" }))}`);
     expect(nonFiniteMileage.status).toBe(400);
@@ -463,6 +465,32 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     expect(valid.status).toBe(200);
     const validBody = await valid.json() as { recommendations?: Array<{ id: string }> };
     expect(validBody.recommendations?.some((item) => item.id === "rule-lada-manual")).toBe(true);
+  });
+
+  it("serves reviewed manual excerpts only for the exact supported vehicle configuration", async () => {
+    const requestRecommendations = (vehicle: Record<string, unknown>) => fetch(
+      `${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify(vehicle))}&q=${encodeURIComponent("масла")}`,
+    );
+    const exact = await requestRecommendations({ make: "Nissan", model: "X-Trail", generation: "T32 (2013–2017)", market: "TH", year: 2014, engine: "2.0L MR20DD (144 л.с.)", transmission: "Вариатор CVT" });
+    expect(exact.status).toBe(200);
+    const exactBody = await exact.json() as { recommendations?: Array<{ id: string; evidenceType?: string; citation?: { locator?: string; documentHash?: string } }> };
+    const excerpts = exactBody.recommendations?.filter((item) => item.evidenceType === "vehicle_document_excerpt") || [];
+    expect(excerpts.map((item) => item.id)).toEqual(["kb-nissan-xtrail-t32-th-engine-oil-check"]);
+    expect(excerpts[0].citation?.locator).toContain("8-10");
+    expect(excerpts[0].citation?.documentHash).toMatch(/^[a-f0-9]{64}$/);
+
+    for (const vehicle of [
+      { make: "Nissan", model: "X-Trail", generation: "T31", market: "RU", year: 2008, engine: "MR20DE", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "RU", year: 2014, engine: "MR20DD", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2015, engine: "MR20DD", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2014, engine: "QR25DE", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2014, engine: "MR20DD", transmission: "e-CVT" },
+    ]) {
+      const response = await requestRecommendations(vehicle);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { recommendations?: Array<{ evidenceType?: string }> };
+      expect(body.recommendations?.some((item) => item.evidenceType === "vehicle_document_excerpt")).toBe(false);
+    }
   });
 
   it("does not drop records when one user creates vehicles concurrently", async () => {

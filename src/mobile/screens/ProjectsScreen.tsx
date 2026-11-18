@@ -59,7 +59,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
           className="px-3 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-brand-strong/30 transition cursor-pointer active:scale-95"
         >
           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-          <span>Проект</span>
+          <span>Доработки</span>
         </button>
       </div>
 
@@ -90,7 +90,7 @@ export const ProjectsScreen: React.FC<ProjectsScreenProps> = ({
                       : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
                   }`}
                 >
-                  {isDone ? "ЗАВЕРШЕН" : "В РАБОТЕ"}
+                  {isDone ? "ЗАВЕРШЕН" : proj.status === "planning" ? "ЗАПЛАНИРОВАН" : "В РАБОТЕ"}
                 </span>
               </div>
 

@@ -284,6 +284,7 @@ export default function App() {
   const [showServiceBookModal, setShowServiceBookModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [vehicleModalMode, setVehicleModalMode] = useState<"edit" | "add">("edit");
+  const [initialVehicleVin, setInitialVehicleVin] = useState<string | undefined>(undefined);
   const [showRemindersModal, setShowRemindersModal] = useState(false);
   const [showInstallPcModal, setShowInstallPcModal] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -1008,7 +1009,11 @@ export default function App() {
           currentVehicle={currentVehicle}
           allVehicles={vehicles}
           initialMode={vehicleModalMode}
-          onClose={() => setShowVehicleModal(false)}
+          initialVin={initialVehicleVin}
+          onClose={() => {
+            setShowVehicleModal(false);
+            setInitialVehicleVin(undefined);
+          }}
           onSaveVehicle={handleSaveVehicle}
           onAddVehicle={handleAddVehicle}
           onDeleteVehicle={handleDeleteVehicle}
@@ -1153,21 +1158,34 @@ export default function App() {
           oemSchedules={oemSchedules}
           toFixTasks={toFixTasks}
           garageParts={garageParts}
+          tuningStages={tuningStages}
           onAddServiceRecord={handleAddServiceRecord}
           onDeleteServiceRecord={handleDeleteServiceRecord}
           onAddFuelRecord={handleAddFuelRecord}
           onAddGaragePart={handleAddGaragePart}
           onDeleteGaragePart={handleDeleteGaragePart}
           onUpdateGaragePart={handleUpdateGaragePart}
+          onCreateTuningStage={handleCreateTuningStage}
+          onUpdateTuningStage={handleUpdateTuningStage}
+          onDeleteTuningStage={handleDeleteTuningStage}
           onAddToFixTask={handleCreateToFixTask}
           onToggleToFixStatus={handleToggleToFixStatus}
           onUpdateMileage={handleUpdateMileage}
           onOpenAddVehicleModal={() => {
             setVehicleModalMode("add");
+            setInitialVehicleVin(undefined);
             setShowVehicleModal(true);
           }}
           onOpenEditVehicleModal={() => {
             setVehicleModalMode("edit");
+            setInitialVehicleVin(undefined);
+            setShowVehicleModal(true);
+          }}
+          onApplyVinToVehicle={(vin, matchingVehicleId) => {
+            const matchingVehicle = vehicles.find((vehicle) => vehicle.id === matchingVehicleId);
+            if (matchingVehicle) setActiveVehicleId(matchingVehicle.id);
+            setVehicleModalMode(matchingVehicle ? "edit" : "add");
+            setInitialVehicleVin(vin);
             setShowVehicleModal(true);
           }}
           onOpenDataBackupModal={() => setShowBackupModal(true)}

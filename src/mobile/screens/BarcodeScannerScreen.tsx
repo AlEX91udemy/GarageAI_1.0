@@ -28,7 +28,7 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
-import jsQR from "jsqr";
+import { decodeBarcodeCanvas } from "../barcodeImageDecoder";
 import { Vehicle, GaragePart } from "../../types";
 import {
   parseBarcodeOrQr,
@@ -36,7 +36,7 @@ import {
   ScannedResult,
   checkPartAvailabilityAPI,
   PartAvailabilityInfo,
-  AUTOMOTIVE_BARCODE_CATALOG,
+  isPartCompatibleWithVehicle,
 } from "../barcodeScannerService";
 import { PrefilledScanData } from "../types";
 
@@ -48,6 +48,7 @@ interface BarcodeScannerScreenProps {
   vinOnly?: boolean;
   onBack: () => void;
   onApplyResult: (prefilled: PrefilledScanData) => void;
+  onApplyVin?: (vin: string, matchingVehicleId?: string) => void;
 }
 
 type ScanMode = "all" | "part_barcode" | "part_qr" | "vin";
@@ -60,6 +61,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
   vinOnly = false,
   onBack,
   onApplyResult,
+  onApplyVin,
 }) => {
   const [targetForm, setTargetForm] = useState<"part" | "service">(defaultTarget);
   const [scanMode, setScanMode] = useState<ScanMode>("all");
@@ -84,6 +86,8 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const barcodeDetectorRef = useRef<any>(null);
+  const detectionInFlightRef = useRef(false);
+  const lastDetectionAtRef = useRef(0);
 
   // Initialize BarcodeDetector if available in browser
   useEffect(() => {
@@ -135,9 +139,14 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       setScannedResult(parsed);
       setIsProcessing(false);
 
-      // AUTOMATIC CHECK IN SPARE PARTS DATABASE & API
-      setIsCheckingAvailability(true);
       setAvailabilityInfo(null);
+      if (parsed.scanType === "vin" || parsed.scanType === "unknown" || !parsed.partInfo) {
+        setIsCheckingAvailability(false);
+        return;
+      }
+
+      // Only known catalog parts are sent to the availability lookup.
+      setIsCheckingAvailability(true);
       checkPartAvailabilityAPI(
         codeText,
         parsed.partInfo?.partNumber,
@@ -167,41 +176,31 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (ctx) {
+      const now = Date.now();
+      if (ctx && !detectionInFlightRef.current && now - lastDetectionAtRef.current >= 250) {
         canvas.width = video.videoWidth || 640;
         canvas.height = video.videoHeight || 480;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // 1. Try native BarcodeDetector API if available
+        lastDetectionAtRef.current = now;
+        detectionInFlightRef.current = true;
+        const fallbackDecode = () => decodeBarcodeCanvas(canvas).then((rawValue) => {
+          if (rawValue) handleDetectedCode(rawValue);
+        });
         if (barcodeDetectorRef.current) {
           barcodeDetectorRef.current
             .detect(canvas)
             .then((barcodes: any[]) => {
-              if (barcodes && barcodes.length > 0) {
-                const rawValue = barcodes[0].rawValue;
-                if (rawValue) {
-                  handleDetectedCode(rawValue);
-                  return;
-                }
-              }
+              const rawValue = barcodes?.[0]?.rawValue;
+              return rawValue ? handleDetectedCode(rawValue) : fallbackDecode();
             })
-            .catch(() => {
-              // fallback
+            .catch(fallbackDecode)
+            .finally(() => {
+              detectionInFlightRef.current = false;
             });
-        }
-
-        // 2. Try jsQR for 2D QR codes
-        try {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
+        } else {
+          void fallbackDecode().finally(() => {
+            detectionInFlightRef.current = false;
           });
-          if (qrCode && qrCode.data) {
-            handleDetectedCode(qrCode.data);
-            return;
-          }
-        } catch {
-          // ignore
         }
       }
     }
@@ -316,7 +315,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         if (!ctx) return;
         ctx.drawImage(img, 0, 0);
 
-        // Try BarcodeDetector
+        // Try native detection first, then ZXing for 1D/2D codes and jsQR for QR.
         if (barcodeDetectorRef.current) {
           barcodeDetectorRef.current
             .detect(canvas)
@@ -325,13 +324,13 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                 handleDetectedCode(barcodes[0].rawValue);
                 return;
               }
-              tryJsQR(ctx, canvas.width, canvas.height);
+              tryFallback(canvas);
             })
             .catch(() => {
-              tryJsQR(ctx, canvas.width, canvas.height);
+              tryFallback(canvas);
             });
         } else {
-          tryJsQR(ctx, canvas.width, canvas.height);
+          tryFallback(canvas);
         }
       };
       img.onerror = () => setCameraError("Не удалось открыть изображение. Попробуйте другое фото.");
@@ -341,18 +340,11 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
     reader.onabort = () => setCameraError("Чтение фотографии было прервано. Попробуйте ещё раз.");
     reader.readAsDataURL(file);
 
-    function tryJsQR(ctx: CanvasRenderingContext2D, w: number, h: number) {
-      try {
-        const imgData = ctx.getImageData(0, 0, w, h);
-        const code = jsQR(imgData.data, w, h);
-        if (code && code.data) {
-          handleDetectedCode(code.data);
-        } else {
-          setCameraError("Штрихкод или QR-код не найден на изображении. Попробуйте другое фото.");
-        }
-      } catch {
-        setCameraError("Не удалось обработать изображение. Попробуйте другое фото.");
-      }
+    function tryFallback(imageCanvas: HTMLCanvasElement) {
+      void decodeBarcodeCanvas(imageCanvas).then((code) => {
+        if (code) handleDetectedCode(code);
+        else setCameraError("Штрихкод или QR-код не найден на изображении. Попробуйте другое фото.");
+      });
     }
   };
 
@@ -381,6 +373,12 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       code: "8020584055274",
       type: "EAN-13",
       badge: "Запчасть",
+    },
+    {
+      label: "Неизвестный штрихкод (демо)",
+      code: "4601234567890",
+      type: "EAN-13",
+      badge: "Ручная проверка",
     },
     {
       label: "VIN: Nissan X-Trail T31",
@@ -425,23 +423,19 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       name:
         avail?.name ||
         part?.name ||
-        (vin ? `Запчасть для ${vin.make} ${vin.model}` : `Деталь #${scannedResult.rawCode}`),
+        (vin ? `Запчасть для ${vin.make} ${vin.model}` : `Код детали ${scannedResult.rawCode}`),
       brand: avail?.brand || part?.brand || (vin ? vin.make : "OEM"),
       partNumber:
         avail?.sku ||
         part?.partNumber ||
         (vin ? `VIN-${vin.vin.slice(-6)}` : scannedResult.rawCode),
-      category: part?.category || "ТО и замена жидкостей",
-      price: chosenPrice,
+      category: part?.category || "Другое",
+      price: avail || part ? chosenPrice : undefined,
       quantity: avail?.garageItem?.quantity || 1,
       location: chosenLocation,
       description:
         part?.description ||
-        `Штрихкод/QR: ${scannedResult.rawCode}${
-          avail?.inGarage
-            ? ` (Позиция уже есть на складе: ${avail.garageItem?.quantity} шт.)`
-            : " (Проверено в API каталоге запчастей)"
-        }`,
+        `Штрихкод/QR: ${scannedResult.rawCode}. Цена, наличие и совместимость требуют ручной проверки.`,
       barcode: scannedResult.rawCode,
       vin: vin?.vin,
     };
@@ -470,16 +464,18 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
         srv?.title ||
         (part
           ? `Замена / Установка: ${part.brand} ${part.name}`
-          : `ТО по штрихкоду: ${scannedResult.rawCode}`),
-      category: srv?.category || part?.category || "ТО и замена жидкостей",
-      laborCost: labor,
-      totalCost: partPrice + labor,
+          : `Запись по коду: ${scannedResult.rawCode}`),
+      category: srv?.category || part?.category || "Другое",
+      laborCost: srv || part ? labor : undefined,
+      totalCost: srv || part ? partPrice + labor : undefined,
       serviceCenter: "Автосервис / Гараж",
       description:
         srv?.description ||
         (avail?.inGarage
           ? `Установка запчасти со склада гаража (${avail.name}, арт. ${avail.sku}, место: ${avail.garageItem?.location}).`
-          : `Установка запчасти ${part?.brand || avail?.brand} (${part?.partNumber || avail?.sku}), проверенной по штрихкоду в API.`),
+          : part
+          ? `Установка запчасти ${part.brand} (${part.partNumber}). Перед записью подтвердите совместимость.`
+          : `Код ${scannedResult.rawCode} распознан, но деталь не найдена в каталоге. Добавьте описание и стоимость вручную.`),
       name: avail?.name || part?.name,
       brand: avail?.brand || part?.brand,
       partNumber: avail?.sku || part?.partNumber,
@@ -700,9 +696,11 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
               <div>
                 <div className="text-xs font-black text-white leading-tight">
                   {scannedResult.scanType === "vin"
-                    ? "VIN-код кузова распознан"
+                    ? "VIN-код найден"
                     : scannedResult.scanType === "qr_payload"
                     ? "QR-код детали распознан"
+                    : scannedResult.scanType === "unknown"
+                    ? "Код найден"
                     : "Штрихкод детали распознан"}
                 </div>
                 <div className="text-[10px] font-mono text-neutral-400">
@@ -773,19 +771,29 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                   </span>
                 </div>
                 <div className="text-sm font-black text-white">
-                  {scannedResult.vinInfo.make} {scannedResult.vinInfo.model} ({scannedResult.vinInfo.year} г.в.)
+                  {scannedResult.vinInfo.model !== "Автомобиль"
+                    ? `${scannedResult.vinInfo.make} ${scannedResult.vinInfo.model}${scannedResult.vinInfo.year ? ` (${scannedResult.vinInfo.year} г.в.)` : ""}`
+                    : scannedResult.vinInfo.make}
                 </div>
                 <div className="text-[11px] text-neutral-400">
                   {scannedResult.vinInfo.isCurrentVehicle ? (
                     <span className="text-emerald-400 font-bold">
                       ✓ Данный VIN совпадает с текущим автомобилем в гараже
                     </span>
+                  ) : scannedResult.vinInfo.model === "Автомобиль" ? (
+                    <span>VIN проверен по формату. Точную модель и год нужно подтвердить по документам автомобиля.</span>
                   ) : (
                     <span>
-                      Автомобиль опознан. Можно оформить ТО или добавить запчасть.
+                      Автомобиль совпал с записью в гараже. Можно оформить ТО или добавить запчасть.
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {scannedResult.scanType === "unknown" && (
+              <div className="rounded-xl border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-100">
+                Код распознан, но в каталоге запчастей не найден. Цена, наличие и совместимость неизвестны. Перенесите код в форму и проверьте сведения вручную.
               </div>
             )}
 
@@ -932,23 +940,40 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
                   )}
                 </div>
 
-                {/* Compatibility confirmation */}
-                <div className="text-[11px] flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 p-2 rounded-xl border border-emerald-900/50">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Совместимо с автомобилем: <b>{vehicle.make} {vehicle.model}</b>
-                  </span>
-                </div>
+                {isPartCompatibleWithVehicle(scannedResult.partInfo, vehicle) ? (
+                  <div className="text-[11px] flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 p-2 rounded-xl border border-emerald-900/50">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Каталог указывает применимость к <b>{vehicle.make} {vehicle.model} {vehicle.generation}</b>. Сверьте артикул по VIN перед установкой.</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] flex items-center gap-1.5 text-amber-200 bg-amber-950/30 p-2 rounded-xl border border-amber-900/50">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Совместимость с <b>{vehicle.make} {vehicle.model}</b> не подтверждена каталогом. Проверьте артикул по VIN и у производителя.</span>
+                  </div>
+                )}
               </div>
             ) : null}
           </div>
 
           {/* PRIMARY ACTION */}
-          {vinOnly ? (
-            <button onClick={handleApplyAsService} className="w-full py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95 shadow-md bg-brand-strong hover:bg-brand text-white">
-              <Car className="w-4 h-4" />
-              Использовать этот VIN
-            </button>
+          {scannedResult.scanType === "vin" ? (
+            <div className="space-y-2 rounded-xl border border-neutral-700 bg-neutral-950 p-3 text-center text-xs text-neutral-300">
+              <p>VIN проверен по формату. Подтвердите модель, год, двигатель и коробку по документам автомобиля.</p>
+              {onApplyVin && scannedResult.vinInfo?.vin && (
+                <button
+                  type="button"
+                  onClick={() => onApplyVin(scannedResult.vinInfo!.vin, scannedResult.vinInfo!.matchingVehicleId)}
+                  className="w-full rounded-xl bg-brand-strong px-3 py-2 text-xs font-bold text-white transition hover:bg-brand active:scale-95"
+                >
+                  Заполнить VIN в форме автомобиля
+                </button>
+              )}
+            </div>
+          ) : scannedResult.scanType === "unknown" ? (
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button onClick={handleApplyAsPart} className="py-3 px-3 rounded-2xl text-xs font-bold bg-brand-strong text-white"><Package className="inline w-4 h-4 mr-1" />Внести код вручную</button>
+              <button onClick={handleApplyAsService} className="py-3 px-3 rounded-2xl text-xs font-bold bg-neutral-800 text-neutral-200 border border-neutral-700"><Wrench className="inline w-4 h-4 mr-1" />Создать запись</button>
+            </div>
           ) : <div className="grid grid-cols-2 gap-2 pt-1">
             <button
               onClick={handleApplyAsPart}

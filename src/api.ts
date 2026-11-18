@@ -280,7 +280,7 @@ export async function searchTechnicalKnowledge(query: string, context: Partial<{
 }
 
 export interface VehicleRecommendationResponse {
-  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string }>;
+  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string; evidenceType?: "general_guidance" | "make_guidance" | "model_series_guidance" | "vehicle_document_excerpt"; knowledgeLevel?: "make" | "model" | "generation" | "configuration"; citation?: { locator: string; documentHash: string; documentName?: string; sourceUrl?: string } }>;
   sources: unknown[];
 }
 

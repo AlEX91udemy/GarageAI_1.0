@@ -15,6 +15,7 @@ import {
   Plus,
   ArrowRight,
   Lightbulb,
+  BookOpen,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, ToFixTask, DiagnosticResult } from "../types";
 import { authenticatedFetch } from "../api";
@@ -72,8 +73,13 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
         body: JSON.stringify({
           make: vehicle.make,
           model: vehicle.model,
+          generation: vehicle.generation,
+          market: vehicle.market,
           year: vehicle.year,
           engine: vehicle.engine,
+          transmission: vehicle.transmission,
+          driveType: vehicle.driveType,
+          fuelType: vehicle.fuelType,
           currentMileage: vehicle.currentMileage,
           symptoms: query,
           serviceHistory: recentHistory,
@@ -101,12 +107,14 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
       id: "tf-ai-" + Date.now(),
       vehicleId: vehicle.id,
       title: diagnosticResult.primaryDiagnosis || "Устранение неисправности",
-      description: `Рекомендация AI Rev: ${diagnosticResult.mechanicTip || ""}. Шаги: ${diagnosticResult.diagnosticSteps?.[0] || ""}`,
-      priority: diagnosticResult.urgency === "high" ? "high" : "medium",
-      estimatedCost: 6500,
-      targetMileage: vehicle.currentMileage + 500,
+      description: [
+        diagnosticResult.safetyAssessment ? `Безопасность: ${diagnosticResult.safetyAssessment}` : "",
+        diagnosticResult.mechanicTip ? `Рекомендация: ${diagnosticResult.mechanicTip}` : "",
+        diagnosticResult.diagnosticSteps?.[0] ? `Первый шаг: ${diagnosticResult.diagnosticSteps[0]}` : "",
+      ].filter(Boolean).join(" "),
+      priority: diagnosticResult.urgency === "high" ? "high" : diagnosticResult.urgency === "low" ? "low" : "medium",
       status: "pending",
-      category: "Подвеска и рулевое",
+      category: "Другое",
       createdAt: new Date().toISOString().split("T")[0],
     };
 
@@ -246,9 +254,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase">
                       Вероятный диагноз
                     </span>
-                    <span className="text-xs font-mono font-bold text-neutral-700">
-                      Точность: {diagnosticResult.confidence || 85}%
-                    </span>
                   </div>
                   <h3 className="text-base font-extrabold text-neutral-900 mt-1">
                     {diagnosticResult.primaryDiagnosis}
@@ -266,7 +271,21 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </span>
               </div>
 
-              {/* Causes & Probabilities */}
+              {diagnosticResult.safetyAssessment && (
+                <div className={`flex items-start gap-2 rounded-xl border p-3 text-xs ${
+                  diagnosticResult.urgency === "high"
+                    ? "border-red-200 bg-red-50 text-red-900"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+                }`}>
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <div>
+                    <div className="font-bold">Оценка безопасности движения</div>
+                    <p className="mt-1 leading-relaxed">{diagnosticResult.safetyAssessment}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnostic hypotheses */}
               {diagnosticResult.likelyCauses && (
                 <div>
                   <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">
@@ -279,9 +298,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                         className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-neutral-200/80"
                       >
                         <span className="text-neutral-800 font-medium">{c.cause}</span>
-                        <span className="font-mono font-bold text-neutral-900 shrink-0 ml-2">
-                          {c.probability}%
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -304,32 +320,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </div>
               )}
 
-              {/* Recommended Parts with Brands */}
-              {diagnosticResult.recommendedParts && diagnosticResult.recommendedParts.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Package className="w-3 h-3 text-brand-strong" />
-                    <span>Рекомендуемые запчасти и проверенные бренды:</span>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    {diagnosticResult.recommendedParts.map((part, i) => (
-                      <div
-                        key={i}
-                        className="bg-white p-2 rounded-xl border border-neutral-200/80 flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-semibold text-neutral-900">{part.name}</span>{" "}
-                          <span className="text-neutral-500">({part.brand})</span>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-brand-strong">
-                          {part.partNumber}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Mechanic Tip */}
               {diagnosticResult.mechanicTip && (
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2 text-xs text-amber-900">
@@ -338,14 +328,31 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </div>
               )}
 
-              {/* Estimated budget & Action */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-                <div className="text-xs">
-                  <span className="text-neutral-500">Примерный бюджет:</span>{" "}
-                  <strong className="text-neutral-900 font-mono">
-                    {diagnosticResult.estimatedCostRange || "По запросу"}
-                  </strong>
+              {diagnosticResult.knowledgeSources && (
+                <div className="rounded-xl border border-neutral-200 bg-white p-3 text-xs">
+                  <div className="mb-1.5 flex items-center gap-1.5 font-bold text-neutral-600">
+                    <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                    Основание ответа
+                  </div>
+                  {diagnosticResult.knowledgeSources.length === 0 ? (
+                    <p className="text-neutral-500">Точная выдержка руководства для этой конфигурации не найдена. Ответ содержит общие рекомендации и диагностические гипотезы.</p>
+                  ) : (
+                    <ul className="space-y-1.5 text-neutral-600">
+                      {diagnosticResult.knowledgeSources.map((source, index) => (
+                        <li key={`${source.title}-${index}`}>
+                          <span className="font-semibold">{source.evidenceType === "vehicle_document_excerpt" ? "Руководство" : source.evidenceType === "model_series_guidance" ? "Модельная серия" : source.evidenceType === "make_guidance" ? "Марка" : "Общее правило"}:</span>{" "}
+                          {source.documentName || source.title}{source.locator ? `, ${source.locator}` : ""}
+                          {source.sourceUrl && <a className="ml-1 underline" href={source.sourceUrl} target="_blank" rel="noreferrer">Источник</a>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
+              )}
+
+              {/* Action */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <p className="text-xs text-neutral-500">Стоимость и артикулы требуют проверки по региону и комплектации.</p>
 
                 {taskAdded ? (
                   <div className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm animate-in fade-in duration-200">

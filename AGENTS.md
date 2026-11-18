@@ -2,6 +2,13 @@
 
 This repository is the GarageAI production web application. Work from this repository root for all project tasks.
 
+## Windows Git in Hermes
+
+- Hermes may resolve `git` to the MSYS Git bundled with Git Bash, which can fail with `Permission denied` in its terminal.
+- Run Git through Windows PowerShell using the installed Windows Git: `powershell.exe -NoProfile -Command "git -C 'C:/Users/user/Documents/ChatGPT/авто/repo-GarageAI_1.0' status --short --branch"`.
+- Use the same `powershell.exe -NoProfile -Command` wrapper for other Git operations; do not modify executable ACLs or repository permissions to work around this issue.
+- Confirm the command's exit code and output before reporting Git status or changes.
+
 ## Before changing code
 
 - Read the relevant source and tests first.

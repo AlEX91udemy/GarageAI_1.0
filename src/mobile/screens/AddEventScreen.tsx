@@ -363,7 +363,12 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         status: "pending",
       });
     } else if (eventType === "part") {
-      const pPrice = parseFloat(partPrice) || 1200;
+      const enteredPartPrice = parseFloat(partPrice);
+      if (!Number.isFinite(enteredPartPrice) || enteredPartPrice < 0) {
+        setSaveError("Укажите цену покупки детали или подтвердите её вручную.");
+        return;
+      }
+      const pPrice = enteredPartPrice;
       const pQty = parseInt(partQuantity, 10) || 1;
       onSavePart?.({
         vehicleId: vehicle.id,

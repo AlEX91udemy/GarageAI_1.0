@@ -33,6 +33,7 @@ interface VehicleModalProps {
   currentVehicle?: Vehicle;
   allVehicles: Vehicle[];
   initialMode?: "edit" | "add";
+  initialVin?: string;
   onClose: () => void;
   onSaveVehicle: (vehicle: Vehicle) => boolean | void;
   onAddVehicle: (vehicle: Vehicle) => boolean | void;
@@ -285,6 +286,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   currentVehicle,
   allVehicles,
   initialMode = "edit",
+  initialVin,
   onClose,
   onSaveVehicle,
   onAddVehicle,
@@ -297,6 +299,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   const [make, setMake] = useState(mode === "add" ? "" : (currentVehicle?.make || ""));
   const [model, setModel] = useState(mode === "add" ? "" : (currentVehicle?.model || ""));
   const [generation, setGeneration] = useState(mode === "add" ? "" : (currentVehicle?.generation || ""));
+  const [market, setMarket] = useState(mode === "add" ? "" : (currentVehicle?.market || ""));
   const [bodyType, setBodyType] = useState<CarBodyType>(
     mode === "add" ? "suv" : (currentVehicle?.bodyType || "suv")
   );
@@ -357,6 +360,11 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
   const [registrationData, setRegistrationData] = useState<VehicleRegistrationData>(currentVehicle?.registrationData || {});
   const decodedVin = decodeVin(vin, currentVehicle, allVehicles);
 
+  useEffect(() => {
+    const cleanedVin = initialVin?.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (cleanedVin && cleanedVin !== vin) setVin(cleanedVin);
+  }, [initialVin]);
+
   const applyStsData = (data: VehicleDocumentOcrResult) => {
     setRegistrationData({
       engineDisplacementCc: data.engineDisplacementCc,
@@ -386,8 +394,8 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     setShowStsScanner(false);
   };
 
-  // A complete VIN can identify a known make/model/year in the offline decoder.
-  // Unknown VINs leave the user's existing make and model untouched.
+  // Only an exact VIN match in the garage may fill model and year automatically.
+  // Unknown VINs leave the user's existing vehicle details untouched.
   useEffect(() => {
     const decoded = decodeVin(vin, currentVehicle, allVehicles);
     if (!decoded) return;
@@ -410,6 +418,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
     make: make || "Автомобиль",
     model: model || "3D Модель",
     generation,
+    market,
     bodyType,
     year: Number(year) || 2024,
     engine: engine || "2.0L",
@@ -463,6 +472,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         make: make.trim(),
         model: model.trim(),
         generation: generation.trim() || undefined,
+        market: market || undefined,
         bodyType,
         year: Number(year),
         engine: engine.trim(),
@@ -484,6 +494,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
         make: make.trim(),
         model: model.trim(),
         generation: generation.trim() || undefined,
+        market: market || undefined,
         bodyType,
         year: Number(year),
         engine: engine.trim() || "2.0L",
@@ -758,7 +769,7 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
           </div>
 
           {/* Row 4: Year, Transmission, Drive Type */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" style={{ order: 3 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5" style={{ order: 3 }}>
             <div>
               <label className="block font-semibold text-neutral-700 mb-1">
                 Год выпуска <span className="text-brand-strong">*</span>
@@ -772,6 +783,19 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
                 required
               />
+            </div>
+            <div>
+              <label htmlFor="vehiclemodal-market" className="block font-semibold text-neutral-700 mb-1">Рынок автомобиля</label>
+              <select id="vehiclemodal-market" value={market} onChange={(event) => setMarket(event.target.value)} className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold">
+                <option value="">Не указан</option>
+                <option value="RU">Россия / ЕАЭС</option>
+                <option value="EU">Европа</option>
+                <option value="US">США / Канада</option>
+                <option value="JP">Япония</option>
+                <option value="TH">Таиланд</option>
+                <option value="OTHER">Другой рынок</option>
+              </select>
+              <p className="mt-1 text-[10px] text-neutral-500">Берётся из документов автомобиля, не по месту текущей регистрации</p>
             </div>
             <div>
               <label htmlFor="vehiclemodal-field-1" className="block font-semibold text-neutral-700 mb-1">

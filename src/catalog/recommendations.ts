@@ -1,16 +1,23 @@
 import type { Vehicle } from "../types";
 import type { VehicleRecommendation } from "./types";
 import { publicKnowledgeSources, recommendationRules } from "./publicSources";
+import { ingestedKnowledgeChunks, searchApplicableKnowledge } from "./knowledge";
+import type { IngestedKnowledgeChunk } from "./types";
+import { getSeriesGuidance } from "./seriesGuidance";
 
 const normalize = (value: unknown) => typeof value === "string" ? value.trim().toLowerCase() : "";
 
-export function getVehicleRecommendations(vehicle: Partial<Vehicle>, query = ""): VehicleRecommendation[] {
+export function getVehicleRecommendations(vehicle: Partial<Vehicle>, query = "", chunks: IngestedKnowledgeChunk[] = ingestedKnowledgeChunks): VehicleRecommendation[] {
   const make = normalize(vehicle.make);
   const makeAliases = make === "автоваз" || make === "ваз" ? [make, "лада", "lada"] : make === "лада" ? [make, "автоваз", "ваз"] : [make];
   const fuel = normalize(vehicle.fuelType);
   const mileage = typeof vehicle.currentMileage === "number" && Number.isFinite(vehicle.currentMileage) ? vehicle.currentMileage : null;
   const queryTokens = normalize(query).split(/\s+/).filter(Boolean);
-  return recommendationRules
+  const documentRecommendations = searchApplicableKnowledge({
+    make: vehicle.make, model: vehicle.model, generation: vehicle.generation, market: vehicle.market,
+    year: vehicle.year, engine: vehicle.engine, transmission: vehicle.transmission,
+  }, query, chunks);
+  const genericRecommendations = recommendationRules
     .filter((rule) => {
       const { makes, fuelTypes, minMileageKm, maxMileageKm } = rule.appliesTo;
       if (makes?.length && !makes.some((item) => makeAliases.includes(normalize(item)))) return false;
@@ -22,7 +29,12 @@ export function getVehicleRecommendations(vehicle: Partial<Vehicle>, query = "")
     })
     .map((rule) => {
       const sources = rule.sourceIds.map((id) => publicKnowledgeSources.find((source) => source.id === id)).filter((source): source is (typeof publicKnowledgeSources)[number] => Boolean(source));
-      const manufacturerMatch = sources.some((source) => source.scope === "manufacturer" && source.verificationStatus !== "network_unverified" && make && normalize(source.publisher) === make);
-      return { id: rule.id, title: rule.title, text: rule.text, category: rule.category, risk: rule.risk, confidence: manufacturerMatch ? "high" : rule.risk === "safety" ? "medium" : "low", sourceIds: rule.sourceIds, sources, applicability: mileage === null ? "Пробег не указан; подтвердите применимость в руководстве." : "Пробег автомобиля: " + mileage.toLocaleString("ru-RU") + " км." };
+      // A registry URL is provenance, not evidence that this rule was checked
+      // against the vehicle's exact market, year, engine, and transmission.
+      const confidence: VehicleRecommendation["confidence"] = rule.risk === "safety" ? "medium" : "low";
+      return { id: rule.id, title: rule.title, text: rule.text, category: rule.category, risk: rule.risk, confidence, sourceIds: rule.sourceIds, sources, applicability: mileage === null ? "Общая подсказка; пробег не указан. Сверьте применимость с руководством вашей комплектации." : "Пробег автомобиля: " + mileage.toLocaleString("ru-RU") + " км. Подтвердите применимость по году, двигателю, коробке и рынку.", evidenceType: "general_guidance" as const };
     });
+  // Series guidance fills the gap between a generic rule and an exact manual
+  // excerpt. Exact configuration evidence remains first and highest confidence.
+  return [...documentRecommendations, ...getSeriesGuidance(vehicle, query), ...genericRecommendations];
 }

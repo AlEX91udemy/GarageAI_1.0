@@ -1,6 +1,6 @@
 # GarageAI — цифровой гараж и помощник по обслуживанию автомобиля
 
-GarageAI — production-ready веб-приложение для ведения цифрового гаража: автомобили, пробег, обслуживание, заправки, склад запчастей, напоминания и проекты тюнинга. Приложение работает в веб- и мобильном режиме, поддерживает гостевое локальное использование и авторизацию с отдельным гаражом для каждого аккаунта.
+GarageAI — production веб-приложение для ведения цифрового гаража: автомобили, пробег, обслуживание, заправки, склад запчастей, напоминания и проекты тюнинга. Приложение работает в веб- и мобильном режиме, поддерживает гостевое локальное использование и авторизацию с отдельным гаражом для каждого аккаунта. Сервис развёрнут и проходит автоматические проверки, однако **публичная production-приёмка остаётся NO-GO** до независимого подтверждения release gates ниже.
 
 ## Ссылки
 
@@ -8,7 +8,7 @@ GarageAI — production-ready веб-приложение для ведения 
 * **Резервный адрес Worker:** https://garageai-1-0.sambur91.workers.dev/
 * **Репозиторий:** https://github.com/AlEX91udemy/GarageAI_1.0
 
-Проверка production от 17.11.2026: `https://garageai.site/api/health` и Worker health endpoint отвечают HTTP 200, защищённый `/api/data` без сессии отвечает HTTP 401. Основная ветка `main` содержит последний успешно проверенный release commit.
+Проверка production от 18.11.2026: `https://garageai.site/api/health` и Worker health endpoint отвечают HTTP 200, защищённый `/api/data` без сессии отвечает HTTP 401. Workflow GitHub Actions `44164586629` успешно завершился для `main` (`b2664b3`). В рабочей копии есть локальные изменения, поэтому CI относится к `main`, а не к итоговому результату этих изменений.
 
 ## Production статус
 
@@ -17,7 +17,7 @@ GarageAI — production-ready веб-приложение для ведения 
 * **CI:** TypeScript, production build, 170 unit-тестов, PostgreSQL integration/smoke, Python audit и secret scanning проходят на `main`.
 * **Безопасность:** HttpOnly-сессии, CSRF-защита, rate limits, tenant isolation, fail-closed production storage guard и секреты вне frontend.
 
-Открытые операционные задачи владельца инфраструктуры перечислены в [issue #52](https://github.com/AlEX91udemy/GarageAI_1.0/issues/52). Они относятся к независимому mailbox smoke, длительному production observation, OCR acceptance corpus, Cloudflare Builds integration и исторической ротации секретов; код и обязательные CI-проверки уже завершены.
+Открытые задачи приёмки перечислены в [issue #52](https://github.com/AlEX91udemy/GarageAI_1.0/issues/52) и [release evidence](docs/release-evidence-2026-11-14.md): независимый mailbox smoke, проверка Vertex/agents, OCR-корпус с достоверной разметкой, подтверждение происхождения перенесённых данных и процедур приватности, окно production-наблюдения и согласованные действия по историческим секретам. Их выполнение требует подходящих данных и доступа владельца инфраструктуры; зелёная сборка и доступный health endpoint сами по себе не закрывают эти проверки. См. [план готовности](tasks/project-readiness-plan-2026-11-14.md).
 
 ## Ключевые возможности
 

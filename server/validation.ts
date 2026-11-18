@@ -32,20 +32,40 @@ export function validateDiagnosticResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const result = value as Record<string, unknown>;
   if (typeof result.primaryDiagnosis !== "string" || !result.primaryDiagnosis.trim()) return false;
-  if (!isFiniteNonNegative(result.confidence) || (result.confidence as number) > 100) return false;
   if (!["high", "medium", "low"].includes(String(result.urgency))) return false;
+  if (typeof result.safetyAssessment !== "string" || !result.safetyAssessment.trim()) return false;
   if (!Array.isArray(result.likelyCauses) || !Array.isArray(result.diagnosticSteps)) return false;
+  if (result.possibleCauses !== undefined && (!Array.isArray(result.possibleCauses) || result.possibleCauses.some((cause) => {
+    if (!cause || typeof cause !== "object" || Array.isArray(cause)) return true;
+    const item = cause as Record<string, unknown>;
+    return (
+      typeof item.cause !== "string" || !item.cause.trim() ||
+      typeof item.explanation !== "string" || !item.explanation.trim() ||
+      typeof item.checkMethod !== "string" || !item.checkMethod.trim()
+    );
+  }))) return false;
   return (
     result.likelyCauses.every((cause) => {
       if (!cause || typeof cause !== "object") return false;
       const item = cause as Record<string, unknown>;
-      return (
-        typeof item.cause === "string" &&
-        isFiniteNonNegative(item.probability) &&
-        (item.probability as number) <= 100
-      );
+      return typeof item.cause === "string" && item.cause.trim().length > 0;
     }) && result.diagnosticSteps.every((step) => typeof step === "string")
   );
+}
+
+/** AI has no verified regional price or fitment source, so never return these as facts. */
+export function sanitizeDiagnosticResult(value: Record<string, unknown>): Record<string, unknown> {
+  const { confidence: _confidence, estimatedCostRange: _estimatedCostRange, estimatedCost: _estimatedCost, recommendedParts: _recommendedParts, ...safeResult } = value;
+  for (const key of ["likelyCauses", "possibleCauses"]) {
+    const causes = safeResult[key];
+    if (!Array.isArray(causes)) continue;
+    safeResult[key] = causes.map((cause) => {
+      if (!cause || typeof cause !== "object" || Array.isArray(cause)) return cause;
+      const { probability: _probability, confidence: _causeConfidence, ...unscoredCause } = cause as Record<string, unknown>;
+      return unscoredCause;
+    });
+  }
+  return safeResult;
 }
 
 export function validateCredentials(input: unknown): { username?: string; password?: string; error?: string } {
