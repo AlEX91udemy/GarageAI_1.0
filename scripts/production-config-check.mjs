@@ -10,7 +10,8 @@ if (!/^\d+$/.test(env.TRUSTED_PROXY_HOPS || "") || Number(env.TRUSTED_PROXY_HOPS
 if (env.GARAGE_ALLOW_EPHEMERAL_STORAGE === "true") failures.push("GARAGE_ALLOW_EPHEMERAL_STORAGE must be unset in production");
 if (env.GARAGE_POSTGRES_READY !== "true") failures.push("GARAGE_POSTGRES_READY must be true after the controlled PostgreSQL cutover");
 if (!has("DATABASE_URL")) failures.push("DATABASE_URL is required");
-if (env.DATABASE_SSL !== "true") failures.push("DATABASE_SSL must be true for production PostgreSQL");
+const cloudSqlSocket = env.DATABASE_HOST?.trim().startsWith("/cloudsql/");
+if (env.DATABASE_SSL !== "true" && !cloudSqlSocket) failures.push("DATABASE_SSL must be true for production PostgreSQL unless DATABASE_HOST is a Cloud SQL Unix socket");
 if (!has("EMAIL_FROM")) failures.push("EMAIL_FROM is required for email-code authentication");
 if (!has("RESEND_API_KEY")) failures.push("RESEND_API_KEY is required for email-code authentication");
 if (!has("EMAIL_CODE_SECRET")) failures.push("EMAIL_CODE_SECRET is required for email-code authentication");
