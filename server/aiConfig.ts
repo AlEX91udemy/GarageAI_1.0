@@ -39,3 +39,11 @@ export function hasAiConfiguration(env: AiConfigurationEnvironment): boolean {
     hasNonEmptyKey(env.OPENROUTER_DOCUMENT_API_KEY)
   );
 }
+
+/**
+ * OCR routes can still serve the local Tesseract path when no paid provider
+ * is configured. Set OCR_LOCAL_ENABLED=false only for a deliberate shutdown.
+ */
+export function hasOcrConfiguration(env: AiConfigurationEnvironment & { OCR_LOCAL_ENABLED?: string }): boolean {
+  return hasAiConfiguration(env) || env.OCR_LOCAL_ENABLED !== "false";
+}

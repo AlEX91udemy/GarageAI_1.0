@@ -9,11 +9,77 @@ export interface ReceiptClassification {
   };
 }
 
+export interface LocalReceiptFields {
+  merchantName: string | null;
+  date: string | null;
+  totalAmount: number | null;
+  category: ReceiptCategory;
+  description: string;
+  fuelDetails?: ReceiptClassification["fuelDetails"];
+  works: Array<{ description: string; cost: number | null }>;
+  parts: Array<{ name: string; quantity: number; price: number | null }>;
+  notes: string | null;
+  rawText: string;
+  _source: "local-tesseract";
+}
+
 const FUEL_TYPE_PATTERN = /(АИ[- ]?\s?\d{2}(?:\s?К\d)?|ДТ|дизел(?:ь|ьное топливо)|diesel|gasoline|бензин)/i;
 
 function parseRussianNumber(value: string): number | null {
   const parsed = Number(value.replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseDate(value: string): string | null {
+  const match = value.match(/(?:^|[^0-9])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?:[^0-9]|$)/);
+  if (!match) {
+    const reverse = value.match(/(?:^|[^0-9])(\d{1,2})[.\-/](\d{1,2})[.\-/](20\d{2})(?:[^0-9]|$)/);
+    if (!reverse) return null;
+    const [, day, month, year] = reverse;
+    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+  const [, year, month, day] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function parseMoney(value: string): number | null {
+  const normalized = value.replace(/\s/g, "").replace(/,/g, ".");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+/** Extracts conservative receipt fields from local OCR text without guessing. */
+export function parseLocalReceiptText(text: string): LocalReceiptFields {
+  const rawText = text.trim();
+  const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const classification = classifyReceiptText(rawText);
+  const totalMatch = rawText.match(/(?:итог|всего|сумма|к оплате|total)[^0-9]{0,12}([0-9][0-9\s]*(?:[.,][0-9]{1,2})?)/i);
+  const totalAmount = totalMatch ? parseMoney(totalMatch[1]) : null;
+  const date = parseDate(rawText);
+  const merchantCandidates = lines.filter((line) =>
+    !/(итог|всего|сумма|дата|время|кассир|адрес|телефон|чек|фп|ккт|сканер|документ|освещение|назад|фото|интерфейс|amocrm|garageai|функции|статус|топливо|цена|объем|объём|факт|данным|подтвердите|действие)/i.test(line) &&
+    /[а-яёa-z]{3,}/i.test(line) &&
+    !/^.{0,3}\d+.{0,3}$/.test(line)
+  );
+  const merchantName = classification.category === "fuel"
+    ? merchantCandidates.find((line) => /(азс|лукойл|газпром|роснефть|shell|bp|топливо)/i.test(line)) || null
+    : merchantCandidates[0] || null;
+  const description = classification.category === "fuel"
+    ? `Заправка${classification.fuelDetails?.fuelType ? ` ${classification.fuelDetails.fuelType}` : ""}`
+    : merchantName ? `Расход по чеку ${merchantName}` : "Расход по распознанному чеку";
+  return {
+    merchantName,
+    date,
+    totalAmount,
+    category: classification.category,
+    description,
+    ...(classification.fuelDetails ? { fuelDetails: classification.fuelDetails } : {}),
+    works: [],
+    parts: [],
+    notes: rawText ? "Поля извлечены локальным OCR. Проверьте данные перед сохранением." : null,
+    rawText,
+    _source: "local-tesseract",
+  };
 }
 
 export function classifyReceiptText(text: string, currentCategory?: unknown): ReceiptClassification {
@@ -36,10 +102,12 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
 
   if (category !== "fuel") return { category };
 
-  const fuelTypeMatch = text.match(FUEL_TYPE_PATTERN);
-  const litersMatch = text.match(/(\d{1,4}(?:[\s.,]\d{1,3})?)\s*(?:л\.?|литр(?:а|ов|ы)?)/i);
+  const fuelTypeMatch = text.match(/(?:топливо|fuel)[^\n:]{0,12}[:\-]?\s*(АИ[- ]?\s?\d{2}(?:\s?К\d)?|ДТ|дизел(?:ь|ьное топливо)|diesel|gasoline|бензин)/i)
+    || text.match(/\b(АИ[- ]?\s?\d{2}(?:\s?К\d)?|ДТ|дизел(?:ь|ьное топливо)|diesel|gasoline)\b/i);
+  const litersMatch = text.match(/(\d{1,4}(?:[\s.,]\d{1,3})?)\s*(?:л\.?|литр(?:а|ов|ы)?)/i)
+    || text.match(/(?:объем|объём|факт\s+объем|факт\s+объём)[^0-9]{0,12}(\d{1,4}(?:[\s.,]\d{1,3})?)/i);
   const priceMatch = text.match(/(\d{1,4}(?:[\s.,]\d{1,3})?)\s*(?:₽|руб(?:\.|лей)?)?\s*(?:\/\s*л|за\s*литр)/i)
-    || text.match(/(?:цена\s*за\s*литр|по)\s*[:—-]?\s*(\d{1,4}(?:[\s.,]\d{1,3})?)\s*(?:₽|руб(?:\.|лей)?)?/i);
+    || text.match(/(?:цена\s*за\s*литр|цена|по)\s*[:—-]?\s*(\d{1,4}(?:[\s.,]\d{1,3})?)\s*(?:₽|руб(?:\.|лей)?)?/i);
 
   return {
     category,

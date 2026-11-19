@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyReceiptText } from "./receiptClassification";
+import { classifyReceiptText, parseLocalReceiptText } from "./receiptClassification";
 
 describe("classifyReceiptText", () => {
   it("classifies a Russian fuel receipt and extracts liters and unit price", () => {
@@ -26,5 +26,36 @@ describe("classifyReceiptText", () => {
   it("preserves an already recognized non-other category unless fuel evidence is strong", () => {
     expect(classifyReceiptText("Покупка в магазине", "parts").category).toBe("parts");
     expect(classifyReceiptText("АЗС, бензин АИ-95, 40 л, цена за литр 60 ₽", "other").category).toBe("fuel");
+  });
+
+  it("extracts conservative local OCR fields without inventing receipt values", () => {
+    const result = parseLocalReceiptText([
+      "ООО Автосервис",
+      "Дата: 05.06.2026",
+      "ИТОГ: 3 312,92 ₽",
+    ].join("\n"));
+
+    expect(result._source).toBe("local-tesseract");
+    expect(result.merchantName).toBe("ООО Автосервис");
+    expect(result.date).toBe("2026-06-05");
+    expect(result.totalAmount).toBe(3312.92);
+    expect(result.works).toEqual([]);
+    expect(result.parts).toEqual([]);
+  });
+
+  it("extracts fuel values from the local OCR shape used by the scanner screen", () => {
+    const result = parseLocalReceiptText([
+      "Подтвердите действие на adm.benzuber.ru",
+      "Статус: заправка завершена",
+      "Топливо: АИ-95",
+      "Цена: 71,15",
+      "Сумма: 2 134.50",
+      "Факт объем: 30.00",
+    ].join("\n"));
+
+    expect(result.category).toBe("fuel");
+    expect(result.merchantName).toBeNull();
+    expect(result.totalAmount).toBe(2134.5);
+    expect(result.fuelDetails).toMatchObject({ fuelType: "АИ-95", liters: 30, pricePerLiter: 71.15 });
   });
 });

@@ -59,13 +59,13 @@ import {
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData, type EmailAuthChallengeRecord } from "./server/store";
 import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
-import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
+import { hasAiConfiguration, hasGeminiConfiguration, hasOcrConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
-import { classifyReceiptText } from "./server/receiptClassification";
+import { classifyReceiptText, parseLocalReceiptText } from "./server/receiptClassification";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -2462,6 +2462,13 @@ function requireAiAccess(req: express.Request, res: express.Response, next: expr
   return enforceAiRateLimit(req, res, next);
 }
 
+function requireOcrAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasOcrConfiguration(process.env)) {
+    return res.status(503).json({ error: "OCR временно отключён на сервере." });
+  }
+  return enforceAiRateLimit(req, res, next);
+}
+
 function requireGeminiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!hasGeminiConfiguration(process.env)) {
     return res.status(503).json({ error: "Для этой AI-функции требуется GEMINI_API_KEY или настройка Vertex AI." });
@@ -3125,7 +3132,7 @@ ${exactManualContext}
 });
 
 // 2. Receipt OCR Scanner
-app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
+app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
 
@@ -3210,13 +3217,34 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
       } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
     }
     const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
-    const responseText = hasReceiptOpenRouter
-      ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
-      : (await getAi().models.generateContent({
-          model: GEMINI_MODEL,
-          contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
-          config: { responseMimeType: "application/json" },
-        })).text;
+    if (!hasReceiptOpenRouter && !hasGeminiConfiguration(process.env) && !documentReceiptId) {
+      const prepared = await prepareDocumentImage(decodedImage);
+      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+      return res.json(parseLocalReceiptText(local.text));
+    }
+    let responseText = "";
+    try {
+      responseText = hasReceiptOpenRouter
+        ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
+        : (await getAi().models.generateContent({
+            model: GEMINI_MODEL,
+            contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
+            config: { responseMimeType: "application/json" },
+          })).text || "";
+    } catch (providerError) {
+      // A configured provider can still be unavailable for the selected model
+      // or region. Keep the basic scanner usable through local OCR and expose
+      // only the safe source marker to the client.
+      console.warn("Receipt vision provider unavailable; using local OCR fallback", providerError instanceof Error ? providerError.message : "unknown");
+      const prepared = await prepareDocumentImage(decodedImage);
+      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+      return res.json(parseLocalReceiptText(local.text));
+    }
+    if (!responseText.trim()) {
+      const prepared = await prepareDocumentImage(decodedImage);
+      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+      return res.json(parseLocalReceiptText(local.text));
+    }
     const parsed = parseJsonSafely(responseText, null);
     const parsedRecord = parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? parsed as Record<string, unknown>
@@ -3274,7 +3302,7 @@ app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
 });
 
 // 2b. Full document OCR with image preprocessing and local OCR fallback
-app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
+app.post("/api/ai/scan-document", requireOcrAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
     if (typeof imageBase64 !== "string" || !imageBase64) return res.status(400).json({ error: "Изображение документа не предоставлено." });
