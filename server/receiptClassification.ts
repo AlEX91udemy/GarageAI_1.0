@@ -16,6 +16,7 @@ export interface LocalReceiptFields {
   category: ReceiptCategory;
   description: string;
   fuelDetails?: ReceiptClassification["fuelDetails"];
+  currency?: string | null;
   works: Array<{ description: string; cost: number | null }>;
   parts: Array<{ name: string; quantity: number; price: number | null }>;
   notes: string | null;
@@ -48,16 +49,29 @@ function parseMoney(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+function parseFuelDisplay(text: string): { liters: number | null; pricePerLiter: number | null; currency: string | null } {
+  const gallonsMatch = text.match(/([0-9]{1,4}(?:[\s.,][0-9]{1,3})?)\s* gallons?/i);
+  const litersMatch = text.match(/([0-9]{1,4}(?:[\s.,][0-9]{1,3})?)\s*(?:л\.?|литр(?:а|ов|ы)?)/i);
+  const unitPriceMatch = text.match(/(?:price\s*(?:per|\/)\s*(?:gallon|gal)|цена\s*(?:за|\/)\s*(?:галлон|литр)|price)[^0-9]{0,12}([$€£₽])?\s*([0-9]{1,4}(?:[\s.,][0-9]{1,3})?)/i);
+  const gallons = gallonsMatch ? parseRussianNumber(gallonsMatch[1]) : null;
+  const liters = litersMatch ? parseRussianNumber(litersMatch[1]) : gallons ? gallons * 3.785411784 : null;
+  const unitPrice = unitPriceMatch ? parseRussianNumber(unitPriceMatch[2]) : null;
+  const currency = unitPriceMatch?.[1] || (/[€]/.test(text) ? "€" : /[£]/.test(text) ? "£" : /[$]/.test(text) ? "$" : null);
+  const pricePerLiter = unitPrice && gallonsMatch && !litersMatch ? unitPrice / 3.785411784 : unitPrice;
+  return { liters, pricePerLiter, currency };
+}
+
 /** Extracts conservative receipt fields from local OCR text without guessing. */
 export function parseLocalReceiptText(text: string): LocalReceiptFields {
   const rawText = text.trim();
   const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const classification = classifyReceiptText(rawText);
+  const fuelDisplay = classification.category === "fuel" ? parseFuelDisplay(rawText) : { liters: null, pricePerLiter: null, currency: null };
   const totalMatch = rawText.match(/(?:итог|всего|сумма|к оплате|total)[^0-9]{0,12}([0-9][0-9\s]*(?:[.,][0-9]{1,2})?)/i);
   const totalAmount = totalMatch ? parseMoney(totalMatch[1]) : null;
   const date = parseDate(rawText);
   const merchantCandidates = lines.filter((line) =>
-    !/(итог|всего|сумма|дата|время|кассир|адрес|телефон|чек|фп|ккт|сканер|документ|освещение|назад|фото|интерфейс|amocrm|garageai|функции|статус|топливо|цена|объем|объём|факт|данным|подтвердите|действие)/i.test(line) &&
+    !/(итог|всего|сумма|дата|время|кассир|адрес|телефон|чек|фп|ккт|сканер|документ|освещение|назад|фото|интерфейс|amocrm|garageai|функции|статус|топливо|цена|объем|объём|факт|данным|подтвердите|действие|gallons?|price|fuel|receipt)/i.test(line) &&
     /[а-яёa-z]{3,}/i.test(line) &&
     !/^.{0,3}\d+.{0,3}$/.test(line)
   );
@@ -73,7 +87,14 @@ export function parseLocalReceiptText(text: string): LocalReceiptFields {
     totalAmount,
     category: classification.category,
     description,
-    ...(classification.fuelDetails ? { fuelDetails: classification.fuelDetails } : {}),
+    ...(classification.fuelDetails ? {
+      fuelDetails: {
+        ...classification.fuelDetails,
+        liters: classification.fuelDetails.liters ?? fuelDisplay.liters,
+        pricePerLiter: classification.fuelDetails.pricePerLiter ?? fuelDisplay.pricePerLiter,
+      },
+    } : fuelDisplay.liters || fuelDisplay.pricePerLiter ? { fuelDetails: { fuelType: null, liters: fuelDisplay.liters, pricePerLiter: fuelDisplay.pricePerLiter } } : {}),
+    currency: fuelDisplay.currency,
     works: [],
     parts: [],
     notes: rawText ? "Поля извлечены локальным OCR. Проверьте данные перед сохранением." : null,
@@ -91,6 +112,7 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
   const strongFuelSignal =
     /(азс|заправк[а-я]*|топлив[а-я]*|бензин|дизельное топливо|дизтопливо|дт)/i.test(normalized) ||
     /(аи[- ]?\d{2}(?:\s?к\d)?)/i.test(normalized) ||
+    /\b(?:gallons?|price\s+per\s+(?:gallon|gal)|fuel\s+pump)\b/i.test(normalized) ||
     (/(литр(?:а|ов|ы)?|л\.?\s*(?:×|x|по|\d))/i.test(normalized) &&
       /(?:₽\s*\/\s*л|руб(?:\.|лей)?\s*(?:за|\/)?\s*литр|цена\s*за\s*литр|колонка)/i.test(normalized));
   const repairSignal = /(?:^|[^а-яё])сто(?:$|[^а-яё])|заказ[- ]?наряд|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту/i.test(normalized);

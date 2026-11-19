@@ -467,6 +467,16 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     expect(validBody.recommendations?.some((item) => item.id === "rule-lada-manual")).toBe(true);
   });
 
+  it("allows guest OCR requests to reach the local fallback instead of returning an auth error", async () => {
+    const response = await fetch(`${baseUrl}/api/ai/scan-receipt`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ imageBase64: "not-base64", mimeType: "image/jpeg" }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Некорректное base64-изображение" });
+  });
+
   it("serves reviewed manual excerpts only for the exact supported vehicle configuration", async () => {
     const requestRecommendations = (vehicle: Record<string, unknown>) => fetch(
       `${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify(vehicle))}&q=${encodeURIComponent("масла")}`,

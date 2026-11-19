@@ -407,11 +407,13 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Чек успешно распознан!</span>
+                  <span>{scanResult._source === "local-tesseract" ? "Распознано локально, проверьте поля" : "Чек успешно распознан"}</span>
                 </div>
-                <span className="text-sm font-extrabold font-mono text-emerald-900">
-                  {Number(scanResult.totalAmount || 0).toLocaleString("ru-RU")} ₽
-                </span>
+                {Number.isFinite(Number(scanResult.totalAmount)) && Number(scanResult.totalAmount) > 0 && (
+                  <span className="text-sm font-extrabold font-mono text-emerald-900">
+                    {Number(scanResult.totalAmount).toLocaleString("ru-RU")} {scanResult.currency || "₽"}
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -469,7 +471,8 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                 <div className="p-2 bg-white rounded-xl border border-emerald-100 text-xs flex items-center justify-between">
                   <span>
                     Топливо: <strong>{scanResult.fuelDetails.fuelType || "Бензин"}</strong>,{" "}
-                    <strong>{scanResult.fuelDetails.liters} л</strong> по {scanResult.fuelDetails.pricePerLiter} ₽/л
+                    <strong>{Number(scanResult.fuelDetails.liters).toFixed(2)} л</strong>{" "}
+                    {Number.isFinite(Number(scanResult.fuelDetails.pricePerLiter)) && <>по {Number(scanResult.fuelDetails.pricePerLiter).toFixed(2)} {scanResult.currency || "₽"}/л</>}
                   </span>
                 </div>
               )}

@@ -772,6 +772,8 @@ app.use("/api", (req, res, next) => {
     req.path === "/knowledge/search" ||
     req.path === "/knowledge/sources" ||
     req.path === "/knowledge/recommendations" ||
+    req.path === "/ai/scan-receipt" ||
+    req.path === "/ai/scan-document" ||
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||

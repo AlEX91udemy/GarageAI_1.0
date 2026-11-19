@@ -90,4 +90,28 @@ describe("vehicle recommendations", () => {
     const result = getVehicleRecommendations({ make: "Хендай", model: "Solaris" }, "масло");
     expect(result.some((item) => item.evidenceType === "model_series_guidance")).toBe(true);
   });
+
+  it("prioritizes applicable model guidance over global reminders in dashboard results", () => {
+    const result = getVehicleRecommendations({ make: "Lada", model: "Vesta", currentMileage: 120000 });
+    expect(result.slice(0, 3).map((item) => item.id)).toEqual([
+      "model-lada-vesta",
+      "rule-high-mileage-inspection",
+      "rule-lada-manual",
+    ]);
+  });
+
+  it("keeps the model guidance ahead of global reminders", () => {
+    const result = getVehicleRecommendations({ make: "Lada", model: "Vesta", currentMileage: 120000 });
+    expect(result.slice(0, 3).map((item) => item.id)).toEqual([
+      "model-lada-vesta",
+      "rule-high-mileage-inspection",
+      "rule-lada-manual",
+    ]);
+  });
+
+  it("does not append unrelated global maintenance reminders to a specific query", () => {
+    const result = getVehicleRecommendations({ make: "Toyota", model: "Camry", currentMileage: 150000 }, "тормоза");
+    expect(result.some((item) => item.id === "rule-maintenance-manual")).toBe(false);
+    expect(result[0].id).toBe("rule-safety-brakes");
+  });
 });

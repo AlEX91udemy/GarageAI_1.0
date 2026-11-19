@@ -58,4 +58,15 @@ describe("classifyReceiptText", () => {
     expect(result.totalAmount).toBe(2134.5);
     expect(result.fuelDetails).toMatchObject({ fuelType: "АИ-95", liters: 30, pricePerLiter: 71.15 });
   });
+
+  it("recognizes pump-display gallons and converts them to liters without inventing a station or date", () => {
+    const result = parseLocalReceiptText("39.72\n17.853 Gallons\nPrice per gallon: $3.469");
+    expect(result.category).toBe("fuel");
+    expect(result.merchantName).toBeNull();
+    expect(result.date).toBeNull();
+    expect(result.totalAmount).toBeNull();
+    expect(result.currency).toBe("$");
+    expect(result.fuelDetails?.liters).toBeCloseTo(67.58, 1);
+    expect(result.fuelDetails?.pricePerLiter).toBeCloseTo(0.917, 2);
+  });
 });
