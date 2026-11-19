@@ -56,7 +56,7 @@ if (!process.env.DATABASE_URL?.trim()) {
 fileEvidence("Release evidence", "docs/release-evidence-2026-11-14.md", (content) => content.includes("Still open release gates"));
 fileEvidence("Scanner gate plan", "tasks/scanner-verification-plan-2026-11-14.md", (content) => content.includes("минимум из 30") && content.includes("ручной smoke-test"));
 fileEvidence("History remediation runbook", "docs/git-history-secret-remediation.md", (content) => content.includes("Gitleaks"));
-const externalPending = ["Cloudflare Workers Builds owner log and repair", "DNS aliases and TLS verification", "Authenticated Vertex/private-agent smoke", "Independent mailbox delivery and full email flow", "OCR regression set with ground truth and device smoke", "Legacy bundle provenance and privacy sign-off", "Post-rollout observation window with thresholds", "Approved Git history rewrite and secret/session rotation", "Full OEM evidence for every catalog configuration"];
+const externalPending = ["Cloudflare Workers Builds owner log and repair", "Authenticated Vertex/private-agent smoke", "Independent mailbox delivery and full email flow", "OCR regression set with ground truth and device smoke", "Legacy bundle provenance and privacy sign-off", "Post-rollout observation window with thresholds", "Approved Git history rewrite and secret/session rotation", "Full OEM evidence for every catalog configuration"];
 const passed = checks.filter((check) => check.status === "passed").length;
 const failed = checks.filter((check) => check.status === "failed").length;
 const localPending = checks.filter((check) => check.status === "pending").length;

@@ -1,4 +1,28 @@
-# Release evidence: 2026-11-14 (updated 2026-11-19)
+# Release evidence: 2026-11-14 (updated 2026-11-20)
+
+## Owner decisions — 2026-11-20
+
+- AI provider: Vertex AI remains primary. Paid agents stay disabled and the allowlist remains empty until an authenticated runtime-identity Vertex smoke succeeds. OpenRouter is not an approved fallback. Spending is `0 SGD` before that smoke and capped at `50 SGD/month` after explicit enablement.
+- Domains: only `garageai.site` and the current Worker hostname are supported. `www.garageai.site` and `ww.garageai.site` are intentionally excluded from origin configuration and DNS work.
+- Email: the owner will inspect the test mailbox manually. The required evidence is limited to delivery, code accepted/rejected, logout, replay rejection, and expiry rejection.
+- OCR/mobile: OCR remains beta until an anonymized 30+ document ground-truth set is supplied and iOS/Android smoke is completed by a device operator.
+- Git history: proposed maintenance window is 2026-11-21 10:00–11:00 Asia/Yekaterinburg. Force-push is not authorized. The legacy backup may remain in restricted storage for 30 days, then must be deleted after fresh-clone, Gitleaks, and secret-rotation checks.
+- Catalog: configurations without OEM evidence remain `provisional`; promotion requires an OEM-source owner confirmation.
+- Observation: 48 hours, with 5xx below 1%, no P0/P1 incidents, no unresolved Cloud SQL/email/AI errors, API p95 at or below 2 seconds, spend at or below 50 SGD, and the previous Cloud Run revision retained for rollback.
+- Cloudflare: apex-only support is accepted. Manual Wrangler deployment and public health are working; Workers Builds remains an open CI blocker until its failure cause is known.
+- Release decision: **NO-GO** until Git history, email smoke, Vertex/private-agent smoke, OCR/mobile acceptance, and the observation window are evidenced.
+
+## Verification update — 2026-11-20
+
+- Read-only Google Cloud verification confirmed project `garage-ai-512223`, region `europe-west1`, Cloud Run service `garageai-web-canary` at 100% traffic on revision `garageai-web-canary-00037-vex`; the latest ready OCR revision is `garageai-web-canary-00039-niz`. Direct web health returned HTTP 200 and anonymous `/api/data` returned HTTP 401.
+- The private `garageai-agents` service is Ready on revision `garageai-agents-00053-v8c`; unauthenticated `/health` returned HTTP 403 and the only `roles/run.invoker` binding is the `garageai-web-runtime` service identity. Paid-agent allowlist remains empty.
+- Cloud SQL `garageai-postgres` is `RUNNABLE` on PostgreSQL 16 in `europe-west1`. Automated backups and point-in-time recovery are enabled; transaction-log retention is 7 days. No traffic, data, or migration settings were changed during this verification.
+- A one-off database preflight Job was executed with the web runtime identity and Cloud SQL socket, then deleted. The execution completed successfully; its stdout was not copied into this workstation evidence, so previously recorded aggregate counts remain the authoritative preflight result.
+- Vertex checks from the available ADC returned `404 model_or_resource_not_found` for `gemini-2.5-flash` and `gemini-3.8-flash` in both `us-central1` and `europe-west1`. No model, IAM, billing, or traffic configuration was changed. The authenticated agent smoke is still not accepted as passed.
+- GitHub workflow `44468506209` passed Node.js, Python dependency, and secret-scanning jobs for commit `3da2b85`; the Cloudflare Workers Build check remains failed.
+- Final workspace verification after the apex-only origin change passed: TypeScript, 35 test files / 200 tests, scanner suite 5 files / 39 tests, production build, environment contract, production dependency audit (0 vulnerabilities), and `git diff --check`.
+- Public checks on 2026-11-20 returned HTTP 200 from `https://garageai.site/api/health` and `https://garageai-1-0.sambur91.workers.dev/api/health`; anonymous `/api/data` returned HTTP 401 on both hosts. `www.garageai.site` and `ww.garageai.site` remain intentionally unsupported and have no DNS records.
+- GitHub PR #49's historical Workers Builds failure is linked to Cloudflare build `2087658f-d332-49a3-ab78-b664d56b0725`; the current GitHub workflow `44468506209` is fully successful for its Node, Python, and secret-scanning jobs. The Cloudflare dashboard log still requires owner-side confirmation before this gate is called closed.
 
 ## Verification update — 2026-11-19
 

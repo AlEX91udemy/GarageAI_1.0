@@ -160,7 +160,7 @@ app.set("trust proxy", Number.isInteger(trustedProxyHops) && trustedProxyHops >=
 app.use(express.json({ limit: "10mb" }));
 
 const ALLOWED_ORIGIN_HOSTS = new Set(
-  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://www.garageai.site,https://garageai-1-0.sambur91.workers.dev,http://localhost:3000,http://localhost:8080")
+  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://garageai-1-0.sambur91.workers.dev,http://localhost:3000,http://localhost:8080")
     .split(",")
     .map((item) => {
       try {
@@ -380,14 +380,15 @@ function getOpenRouterConfig(purpose: OpenRouterPurpose = "receipt") {
 }
 
 async function requestOpenRouter(body: Record<string, unknown>, title: string, key: string) {
-  const maxAttempts = 3;
+  // OCR must fail over to local Tesseract quickly during provider outages.
+  const maxAttempts = 1;
   let currentBody: Record<string, unknown> = { ...body };
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await fetch(OPENROUTER_URL, {
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(15_000),
         method: "POST",
         headers: {
           Authorization: "Bearer " + key,
@@ -405,7 +406,7 @@ async function requestOpenRouter(body: Record<string, unknown>, title: string, k
         const { response_format: _ignored, ...fallbackBody } = currentBody;
         currentBody = fallbackBody;
         const retryResponse = await fetch(OPENROUTER_URL, {
-          signal: AbortSignal.timeout(45_000),
+          signal: AbortSignal.timeout(15_000),
           method: "POST",
           headers: {
             Authorization: "Bearer " + key,
@@ -3226,11 +3227,14 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
     try {
       responseText = hasReceiptOpenRouter
         ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
-        : (await getAi().models.generateContent({
-            model: GEMINI_MODEL,
-            contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
-            config: { responseMimeType: "application/json" },
-          })).text || "";
+        : await Promise.race([
+            getAi().models.generateContent({
+              model: GEMINI_MODEL,
+              contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
+              config: { responseMimeType: "application/json" },
+            }).then((result) => result.text || ""),
+            new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Receipt vision timeout")), 15_000)),
+          ]);
     } catch (providerError) {
       // A configured provider can still be unavailable for the selected model
       // or region. Keep the basic scanner usable through local OCR and expose

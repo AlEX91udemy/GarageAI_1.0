@@ -17,6 +17,7 @@ data/manuals/*.pdf
 artifacts/
 .aistudio/
 .codex-autorouter/
+.playwright-cli/
 
 # Local audit exports, Python caches and generated visual/diagnostic artifacts
 *.zip

@@ -23,6 +23,7 @@ if (env.GOOGLE_GENAI_USE_VERTEXAI === "true" && !has("GOOGLE_CLOUD_LOCATION")) f
 if (env.GOOGLE_CLOUD_PROJECT === "your-project-id") failures.push("GOOGLE_CLOUD_PROJECT still contains the .env.example placeholder");
 if (!has("AGENTS_SERVICE_URL") || !has("AGENTS_SERVICE_AUDIENCE") || !has("AGENTS_API_TOKEN")) warnings.push("Private agent service is not fully configured; paid agents remain unavailable");
 if (env.ALLOWED_ORIGINS?.split(",").some((origin) => origin.trim().startsWith("http://") && !origin.trim().includes("localhost"))) failures.push("ALLOWED_ORIGINS contains a non-local HTTP origin");
+if (env.ALLOWED_ORIGINS?.split(",").map((origin) => origin.trim()).some((origin) => /https:\/\/(?:www|ww)\.garageai\.site$/i.test(origin))) failures.push("ALLOWED_ORIGINS must not include unsupported www/ww garageai.site aliases");
 if (has("EMAIL_FROM")) {
   const sender = env.EMAIL_FROM.trim();
   const senderAddress = sender.match(/<([^<>@\s]+@[^<>@\s]+)>$/)?.[1] || sender;

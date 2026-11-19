@@ -103,7 +103,7 @@ Do this only after the JSON store/session persistence blockers are resolved and 
 4. On the web service, configure the same Secret Manager secret `agents-api-token` used by the agent service, plus the agent service URL/audience. Keep the service public only if the application’s own login/session controls and production database are ready. Do not disable Cloud Run IAM on the agent service.
 
 Environment settings:
-- `ALLOWED_ORIGINS`: include every browser origin that can reach the API through the Worker, including `https://garageai.site`, `https://www.garageai.site`, and `https://garageai-1-0.sambur91.workers.dev`. The Worker forwards the browser `Origin` header to Cloud Run, so omitting the Worker hostname causes legitimate state-changing requests to receive `403`.
+- `ALLOWED_ORIGINS`: include the supported browser origins `https://garageai.site` and `https://garageai-1-0.sambur91.workers.dev`. The Worker forwards the browser `Origin` header to Cloud Run, so omitting the Worker hostname causes legitimate state-changing requests to receive `403`. `www.garageai.site` and `ww.garageai.site` are intentionally unsupported.
 - `AGENTS_SERVICE_URL`: exact Cloud Run service URL returned by `gcloud run services describe`.
 - `AGENTS_SERVICE_AUDIENCE`: normally the same service URL; use a custom value only when Cloud Run is configured for that audience.
 - `AGENTS_API_TOKEN`: same high-entropy secret in both services, stored in Secret Manager. Never commit or send it to the browser.

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord } from "../types";
 import { SAMPLE_RECEIPT_IMAGE } from "../mockData";
-import { authenticatedFetch } from "../api";
+import { authenticatedFetch, fetchVehicleRecommendations } from "../api";
 
 interface ReceiptScannerModalProps {
   vehicle: Vehicle;
@@ -111,6 +111,8 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         if (match) detectedMime = match[1];
       }
 
+      // Fetch the reviewed instruction guidance in parallel with OCR.
+      const recommendationsPromise = fetchVehicleRecommendations(vehicle).catch(() => null);
       const response = await authenticatedFetch("/api/ai/scan-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -125,13 +127,20 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       }
 
       const data = await response.json();
-      setScanResult(data);
+      setScanResult({ ...data, recommendations: [] });
+      void recommendationsPromise.then((recommendations) => {
+        if (!recommendations) return;
+        setScanResult((current: any) => current ? { ...current, recommendations: recommendations.recommendations.slice(0, 3) } : current);
+      });
     } catch (err: any) {
       console.error(err);
       // Demo presets may use a local fallback when the AI service is unavailable.
       // Never infer a receipt type by searching inside an encoded image data URL.
       if (fallbackResult) {
-        setScanResult(fallbackResult);
+        setScanResult({ ...fallbackResult, recommendations: [] });
+        void fetchVehicleRecommendations(vehicle).then((recommendations) => {
+          setScanResult((current: any) => current ? { ...current, recommendations: recommendations.recommendations.slice(0, 3) } : current);
+        }).catch(() => undefined);
       } else {
         setScanError("Не удалось разобрать изображение. Проверьте качество фото и подключение к серверу.");
       }
@@ -462,6 +471,23 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     Топливо: <strong>{scanResult.fuelDetails.fuelType || "Бензин"}</strong>,{" "}
                     <strong>{scanResult.fuelDetails.liters} л</strong> по {scanResult.fuelDetails.pricePerLiter} ₽/л
                   </span>
+                </div>
+              )}
+
+              {Array.isArray(scanResult.recommendations) && scanResult.recommendations.length > 0 && (
+                <div className="rounded-2xl border border-brand-200 bg-brand-50 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-strong">
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Рекомендации по инструкции
+                  </div>
+                  <div className="space-y-2">
+                    {scanResult.recommendations.map((item: any) => (
+                      <div key={item.id} className="text-xs leading-relaxed text-neutral-700">
+                        <strong>{item.title}:</strong> {item.text}
+                        <span className="ml-1 text-[10px] text-neutral-500">({item.confidence === "high" ? "подтверждено руководством" : "сверьте с руководством"})</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

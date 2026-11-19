@@ -39,6 +39,7 @@ import {
   isPartCompatibleWithVehicle,
 } from "../barcodeScannerService";
 import { PrefilledScanData } from "../types";
+import { fetchVehicleRecommendations } from "../../api";
 
 interface BarcodeScannerScreenProps {
   vehicle: Vehicle;
@@ -79,6 +80,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
   const [availabilityInfo, setAvailabilityInfo] = useState<PartAvailabilityInfo | null>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [showSuppliersDetails, setShowSuppliersDetails] = useState(false);
+  const [instructionRecommendations, setInstructionRecommendations] = useState<Array<{ id: string; title: string; text: string; confidence: string }>>([]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -138,6 +140,10 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
       }
       setScannedResult(parsed);
       setIsProcessing(false);
+      setInstructionRecommendations([]);
+      void fetchVehicleRecommendations(vehicle)
+        .then((data) => setInstructionRecommendations(data.recommendations.slice(0, 3)))
+        .catch(() => { /* Scanner remains usable when recommendations are unavailable. */ });
 
       setAvailabilityInfo(null);
       if (parsed.scanType === "vin" || parsed.scanType === "unknown" || !parsed.partInfo) {
@@ -713,6 +719,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
               onClick={() => {
                 setScannedResult(null);
                 setAvailabilityInfo(null);
+                setInstructionRecommendations([]);
               }}
               className="text-xs text-neutral-400 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 cursor-pointer transition active:scale-95"
             >
@@ -794,6 +801,23 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({
             {scannedResult.scanType === "unknown" && (
               <div className="rounded-xl border border-amber-800/60 bg-amber-950/30 p-3 text-xs text-amber-100">
                 Код распознан, но в каталоге запчастей не найден. Цена, наличие и совместимость неизвестны. Перенесите код в форму и проверьте сведения вручную.
+              </div>
+            )}
+
+            {instructionRecommendations.length > 0 && (
+              <div className="rounded-xl border border-brand-800/60 bg-brand-950/30 p-3">
+                <div className="mb-2 flex items-center gap-1.5 text-xs font-bold text-brand-on-dark">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  Рекомендации по инструкции
+                </div>
+                <div className="space-y-1.5">
+                  {instructionRecommendations.map((item) => (
+                    <div key={item.id} className="text-[11px] leading-relaxed text-neutral-300">
+                      <strong className="text-white">{item.title}:</strong> {item.text}
+                      <span className="ml-1 text-[10px] text-neutral-500">({item.confidence === "high" ? "подтверждено руководством" : "сверьте с руководством"})</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
