@@ -11,6 +11,8 @@
 - A follow-up production endpoint check confirmed the service is configured with `gemini-3.8-flash`, but the published smoke image exited before serving the helper command. Direct OIDC retry from the current operator identity was rejected because it lacks `iam.serviceAccounts.getAccessToken` for the runtime service account. The temporary job was deleted; an approved Cloud Run job using the runtime identity is still required to close this gate.
 - Local verification after the final mutation: 35 Vitest files / 197 tests, TypeScript, production build, environment contract, production configuration contract with Cloud SQL socket values, production dependency audit (0 vulnerabilities), catalog audit, recommendation matrix, Wrangler dry-run, public health, and `git diff --check` passed.
 - GitHub workflow `44468506209` for commit `3da2b85` passed Node.js tests/typecheck/build, Python dependency audit, and secret scanning.
+- OCR functional fix commit `946b9c0` adds a local Tesseract fallback for receipt and full-document scanning when cloud AI is unavailable, including conservative fuel/amount extraction and explicit source marking. The image was published as digest `sha256:0a52a6db89a764be3cb624980f3bbf8f226f332dd6349d3676e83333384e9b28` and deployed to tagged no-traffic revision `garageai-web-canary-00039-niz` (`ocr-946b9c0`). Tagged health returned HTTP 200, anonymous protected data returned HTTP 401, and production traffic remained on `00037-vex`.
+- Owner reports that email login codes arrive in the mailbox. This closes the delivery observation, but the complete request/verify/logout and replay/expiry checks still require one authenticated smoke.
 
 ## Current deployed state
 
