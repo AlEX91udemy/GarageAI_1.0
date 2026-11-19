@@ -2,7 +2,7 @@
 
 ## Verification update — 2026-11-19
 
-- Current workspace release commit: `3da2b85`; the deployed image remains a separate artifact built from tag `23c1a30`.
+- Current workspace release commit: `7b2bac9`; the deployed image remains a separate artifact built from tag `23c1a30`.
 - Cloud Run revision `garageai-web-canary-00037-vex` serves 100% of `garageai-web-canary` traffic. The deployed image is `europe-west1-docker.pkg.dev/garage-ai-512223/garageai/garageai-web@sha256:09c11d2fe51a34f2cffdc11d044a252788662b0caffc89aade3e540dffe54184`, built from the workspace release image tag `23c1a30`.
 - The tagged revision was deployed with HTTPS application/public URLs, `DATABASE_AUTO_MIGRATE=false`, `GARAGE_POSTGRES_READY=true`, Cloud SQL Unix socket transport, Secret Manager references for database/email/agent credentials, and Vertex configuration. Paid agents remain fail-closed because the production administrator allowlist is empty.
 - Post-cutover smoke passed on the direct Cloud Run URL, `https://garageai.site`, and the Worker URL: `/api/health` returned HTTP 200 and anonymous `/api/data` returned HTTP 401. No error-level logs were present for the new revision during the smoke window.
@@ -10,6 +10,7 @@
 - Vertex agent smoke remains blocked: a one-off Cloud Run Job using the deployed agent image and runtime identity returned `404 NOT_FOUND` for publisher model `gemini-2.5-flash` in `europe-west1` (model unavailable to this project or region). The configured `gemini-3.8-flash` model still needs a successful equivalent smoke; an additional isolated attempt did not reach Vertex and was discarded. Paid agents therefore remain fail-closed; no IAM, billing, model configuration, or production traffic changes were made. All temporary smoke Jobs were removed after evidence capture.
 - A follow-up production endpoint check confirmed the service is configured with `gemini-3.8-flash`, but the published smoke image exited before serving the helper command. Direct OIDC retry from the current operator identity was rejected because it lacks `iam.serviceAccounts.getAccessToken` for the runtime service account. The temporary job was deleted; an approved Cloud Run job using the runtime identity is still required to close this gate.
 - Local verification after the final mutation: 35 Vitest files / 197 tests, TypeScript, production build, environment contract, production configuration contract with Cloud SQL socket values, production dependency audit (0 vulnerabilities), catalog audit, recommendation matrix, Wrangler dry-run, public health, and `git diff --check` passed.
+- GitHub workflow `44468506209` for commit `3da2b85` passed Node.js tests/typecheck/build, Python dependency audit, and secret scanning.
 
 ## Current deployed state
 
