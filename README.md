@@ -14,13 +14,13 @@ GarageAI — production веб-приложение для ведения циф
 
 ### Игровая шкала готовности
 
-**Уровень 4 из 10**
+**Уровень 5 из 10**
 
-`XP 8/20`
+`XP 13/24`
 
-`[████░░░░░░] 40%`
+`[█████░░░░░] 54%`
 
-Каждая закрытая release-задача даёт 1 XP. Следующий уровень начинается с 10 XP (50%). Подробный список задач и отметки `[x]`/`[ ]` находятся в [чек-листе релиза](tasks/project-checklist-2026-11-20.md). Текущий статус публичного запуска: **NO-GO**.
+Каждая закрытая release-задача даёт 1 XP. Следующий уровень начинается с 15 XP (63%). Подробный список задач и отметки `[x]`/`[ ]` находятся в [чек-листе релиза](tasks/project-checklist-2026-11-20.md). Текущий статус публичного запуска: **NO-GO**.
 
 * **Web/API:** Cloudflare Worker + Cloud Run + PostgreSQL/Cloud SQL.
 * **Private agents:** Cloud Run revision `garageai-agents-00053-v8c`, 100% production traffic, Python image собирается из `agents_service/Dockerfile`.

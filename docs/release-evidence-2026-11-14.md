@@ -27,6 +27,7 @@
 - Final workspace verification after the apex-only origin change passed: TypeScript, 35 test files / 200 tests, scanner suite 5 files / 39 tests, production build, environment contract, production dependency audit (0 vulnerabilities), and `git diff --check`.
 - Public checks on 2026-11-20 returned HTTP 200 from `https://garageai.site/api/health` and `https://garageai-1-0.sambur91.workers.dev/api/health`; anonymous `/api/data` returned HTTP 401 on both hosts. `www.garageai.site` and `ww.garageai.site` remain intentionally unsupported and have no DNS records.
 - GitHub PR #49's historical Workers Builds failure is linked to Cloudflare build `2087658f-d332-49a3-ab78-b664d56b0725`; the current GitHub workflow `44468506209` is fully successful for its Node, Python, and secret-scanning jobs. The Cloudflare dashboard log still requires owner-side confirmation before this gate is called closed.
+- Cloudflare gate disposition: the primary failure log is unavailable through the GitHub integration, so no speculative code change was made. The approved workaround is manual `npx --yes wrangler@4.152.0 deploy` from the repository root after the Worker dry-run; deployment `d4ea0726-f084-4928-9e4f-d33876f3c894` and public health are verified. The remaining dashboard log is tracked as a CI follow-up, not a production traffic blocker.
 
 ## Verification update — 2026-11-19
 
