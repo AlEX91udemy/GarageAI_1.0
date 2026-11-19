@@ -9,7 +9,7 @@
 - Git history: proposed maintenance window is 2026-11-21 10:00–11:00 Asia/Yekaterinburg. Force-push is not authorized. The legacy backup may remain in restricted storage for 30 days, then must be deleted after fresh-clone, Gitleaks, and secret-rotation checks.
 - Catalog: configurations without OEM evidence remain `provisional`; promotion requires an OEM-source owner confirmation.
 - Observation: 48 hours, with 5xx below 1%, no P0/P1 incidents, no unresolved Cloud SQL/email/AI errors, API p95 at or below 2 seconds, spend at or below 50 SGD, and the previous Cloud Run revision retained for rollback.
-- Cloudflare: apex-only support is accepted. Manual Wrangler deployment and public health are working; Workers Builds remains an open CI blocker until its failure cause is known.
+- Cloudflare: apex-only support is accepted. Manual Wrangler deployment and public health are working; Workers Builds remains a documented CI follow-up and is not a production traffic blocker.
 - Release decision: **NO-GO** until Git history, email smoke, Vertex/private-agent smoke, OCR/mobile acceptance, and the observation window are evidenced.
 
 ## Verification update — 2026-11-20
@@ -86,7 +86,7 @@
 
 ## Still open release gates
 
-- The historical Cloudflare Workers Builds check attached to PR #49 failed before producing a log, while the manual Wrangler deployment and public health are healthy. A future Workers Builds run still needs an owner-side dashboard check or repair before that integration can be called green.
+- The historical Cloudflare Workers Builds check attached to PR #49 failed before producing a log, while the manual Wrangler deployment and public health are healthy. The dashboard check or repair remains an owner-side CI follow-up; it does not block the verified manual deployment path.
 - `www.garageai.site` and `ww.garageai.site` have no DNS records, so their TLS routes are not available. Add only the aliases that are intentionally supported in Cloudflare DNS, then verify HTTPS.
 - The private-agent OIDC and application-token boundary passes from an approved Cloud Run job; the last recorded end-to-end smoke reached the service but returned HTTP 502 from the configured Gemini/Vertex provider. The agent now retries a configured fallback model when the provider explicitly reports a missing model, but a fresh authenticated Vertex smoke is still required after deployment.
 - Independent mailbox receipt and complete email-code request/verify/logout flow are not evidenced.
