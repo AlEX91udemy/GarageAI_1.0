@@ -51,7 +51,7 @@ interface VehicleProfileScreenProps {
   onEditVehicle: (v: Vehicle) => void;
   onOpenServiceBook?: () => void;
   onOpenReminders?: () => void;
-  onOpenAiMechanic?: () => void;
+  onOpenAiMechanic?: (record?: ServiceRecord) => void;
   onUpdateColor?: (color: string) => void;
   themeMode?: ThemeMode;
   initialTab?: "overview" | "works" | "expenses" | "fuel" | "documents";

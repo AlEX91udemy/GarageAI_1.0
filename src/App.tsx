@@ -281,6 +281,7 @@ export default function App() {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [showScanReceiptModal, setShowScanReceiptModal] = useState(false);
   const [showAiMechanicModal, setShowAiMechanicModal] = useState(false);
+  const [aiMechanicServiceRecord, setAiMechanicServiceRecord] = useState<ServiceRecord | undefined>();
   const [showServiceBookModal, setShowServiceBookModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [vehicleModalMode, setVehicleModalMode] = useState<"edit" | "add">("edit");
@@ -985,6 +986,7 @@ export default function App() {
         <AiMechanicModal
           vehicle={currentVehicle}
           serviceRecords={serviceRecords}
+          selectedServiceRecord={aiMechanicServiceRecord}
           onClose={() => setShowAiMechanicModal(false)}
           onAddTaskToFix={(task) => {
             // Сохраняем задачу на сервере, иначе она теряется после перезагрузки.
@@ -1121,7 +1123,10 @@ export default function App() {
           }}
           onOpenAddService={() => setShowAddServiceModal(true)}
           onOpenScanReceipt={() => setShowScanReceiptModal(true)}
-          onOpenAiMechanic={() => setShowAiMechanicModal(true)}
+          onOpenAiMechanic={(record) => {
+            setAiMechanicServiceRecord(record);
+            setShowAiMechanicModal(true);
+          }}
           onOpenServiceBook={handleOpenServiceBook}
           onOpenReminders={() => setShowRemindersModal(true)}
           onOpenAddVehicle={() => {
@@ -1192,7 +1197,10 @@ export default function App() {
           onSwitchToWebView={() => handleSetPlatform("web")}
           onOpenServiceBookModal={handleOpenServiceBook}
           onOpenRemindersModal={() => setShowRemindersModal(true)}
-          onOpenAiMechanicModal={() => setShowAiMechanicModal(true)}
+          onOpenAiMechanicModal={(record) => {
+            setAiMechanicServiceRecord(record);
+            setShowAiMechanicModal(true);
+          }}
           onOpenScanReceiptModal={() => setShowScanReceiptModal(true)}
           onOpenAddServiceModal={(data) => {
             setServiceModalInitialData(data);
@@ -1547,6 +1555,10 @@ export default function App() {
               }}
               onScanReceipt={() => setShowScanReceiptModal(true)}
               onDeleteRecord={handleDeleteServiceRecord}
+              onAskMechanic={(record) => {
+                setAiMechanicServiceRecord(record);
+                setShowAiMechanicModal(true);
+              }}
             />
           )}
 

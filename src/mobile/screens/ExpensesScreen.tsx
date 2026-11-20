@@ -214,7 +214,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                 ].map(({ key, label, value, icon }) => (
                   <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-brand-soft border-brand-border shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
                     <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-brand-hover" : "text-neutral-500"}`}>{icon}{label}</span>
-                    <span className="block text-sm font-black font-mono mt-0.5">{value}</span>
+                    <span className="block text-sm font-medium font-mono mt-0.5">{value}</span>
                   </button>
                 ))}
               </div>

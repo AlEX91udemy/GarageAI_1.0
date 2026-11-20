@@ -1,5 +1,5 @@
 import { useModalFocus } from "./useModalFocus";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Sparkles,
@@ -23,6 +23,7 @@ import { authenticatedFetch } from "../api";
 interface AiMechanicModalProps {
   vehicle: Vehicle;
   serviceRecords: ServiceRecord[];
+  selectedServiceRecord?: ServiceRecord;
   onClose: () => void;
   onAddTaskToFix: (task: ToFixTask) => void;
 }
@@ -30,6 +31,7 @@ interface AiMechanicModalProps {
 export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
   vehicle,
   serviceRecords,
+  selectedServiceRecord,
   onClose,
   onAddTaskToFix,
 }) => {
@@ -51,8 +53,8 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
   ];
 
   const handleDiagnose = async (queryText?: string) => {
-    const query = queryText || symptomInput;
-    if (!query.trim()) return;
+    const query = queryText ?? symptomInput;
+    if (!query.trim() && !selectedServiceRecord) return;
 
     setIsLoading(true);
     setErrorMsg(null);
@@ -81,8 +83,16 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
           driveType: vehicle.driveType,
           fuelType: vehicle.fuelType,
           currentMileage: vehicle.currentMileage,
-          symptoms: query,
+          symptoms: query || "Разбор выполненного ремонта: " + (selectedServiceRecord?.title || "запись обслуживания"),
           serviceHistory: recentHistory,
+          ...(selectedServiceRecord ? {
+            selectedServiceRecord: {
+              date: selectedServiceRecord.date, mileage: selectedServiceRecord.mileage,
+              category: selectedServiceRecord.category, title: selectedServiceRecord.title,
+              description: selectedServiceRecord.description, serviceCenter: selectedServiceRecord.serviceCenter,
+              parts: (selectedServiceRecord.parts || []).map(({ name, brand, partNumber, quantity }) => ({ name, brand, partNumber, quantity })),
+            },
+          } : {}),
         }),
       });
 
@@ -99,6 +109,10 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (selectedServiceRecord) void handleDiagnose("");
+  }, [selectedServiceRecord?.id]);
 
   const handleAddDiagnosisToFix = () => {
     if (!diagnosticResult) return;
@@ -160,6 +174,11 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
 
         {/* Scrollable Body */}
         <div className="overflow-y-auto p-4 sm:p-6 flex-1 space-y-4">
+        {selectedServiceRecord && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Совет по ремонту от {selectedServiceRecord.date}: <strong>{selectedServiceRecord.title}</strong>
+          </div>
+        )}
           {/* Car Context Bar */}
         <div className="mt-4 p-3 rounded-2xl bg-neutral-900 text-white flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -181,12 +200,16 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
         <div className="space-y-3 mt-4">
           <div>
             <label className="block text-xs font-semibold text-neutral-700 mb-1">
-              Опишите симптомы, посторонний звук или код ошибки OBD-II (DTC):
+              {selectedServiceRecord
+                ? "Добавьте жалобу после ремонта, если она есть (необязательно):"
+                : "Опишите симптомы, посторонний звук или код ошибки OBD-II (DTC):"}
             </label>
             <div className="relative">
               <textarea
                 rows={3}
-                placeholder="например: Появился гул спереди справа на скорости выше 60 км/ч, усиливается при повороте руля влево. Или ошибка P0420..."
+                placeholder={selectedServiceRecord
+                  ? "Например: после ремонта появился стук на неровностях"
+                  : "Например: появился гул спереди справа на скорости выше 60 км/ч или ошибка P0420"}
                 value={symptomInput}
                 onChange={(e) => setSymptomInput(e.target.value)}
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-xs text-neutral-900 focus:outline-none focus:border-amber-500"
@@ -219,7 +242,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
           <div className="flex justify-end pt-1">
             <button
               onClick={() => handleDiagnose()}
-              disabled={isLoading || !symptomInput.trim()}
+              disabled={isLoading || (!symptomInput.trim() && !selectedServiceRecord)}
               className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
             >
               {isLoading ? (
@@ -230,7 +253,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Провести диагностику (Gemini AI)</span>
+                  <span>{selectedServiceRecord ? "Разобрать ремонт" : "Провести диагностику"}</span>
                 </>
               )}
             </button>

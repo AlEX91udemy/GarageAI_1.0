@@ -150,10 +150,15 @@ def _model_not_found(error: Exception) -> bool:
 async def _run_agent(agent: dict[str, str], name: str, prompt: str) -> str:
     """Call Google GenAI and retry once with the configured fallback model."""
     use_vertex_ai = _env_flag("GOOGLE_GENAI_USE_VERTEXAI")
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "europe-west1")
     client_options: dict[str, Any] = {
         "vertexai": use_vertex_ai,
-        "location": os.getenv("GOOGLE_CLOUD_LOCATION", "europe-west1"),
+        "location": location,
     }
+    if use_vertex_ai and location == "eu":
+        client_options["http_options"] = types.HttpOptions(
+            base_url="https://aiplatform.eu.rep.googleapis.com"
+        )
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     if project:
         client_options["project"] = project

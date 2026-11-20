@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   Car,
-  ChevronDown,
   Layers,
   Link as LinkIcon,
   AlertTriangle,
@@ -19,6 +18,7 @@ import {
   findGeneration,
   getModelBodyTypes,
 } from "../carCatalog";
+import { RoundedSelect } from "./RoundedSelect";
 
 const STANDARD_BODY_TYPES: CarBodyType[] = [
   "sedan",
@@ -325,23 +325,12 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
             </div>
           ) : (
             <div className="relative">
-              <select
+              <RoundedSelect
                 value={matchedMake ? matchedMake.name : make ? "__custom__" : ""}
-                onChange={(e) => handleSelectMake(e.target.value)}
-                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border cursor-pointer"
-                required
-              >
-                <option value="" disabled>
-                  — Выберите марку автомобиля —
-                </option>
-                {CAR_CATALOG.map((m) => (
-                  <option key={m.name} value={m.name}>
-                    {m.flag} {m.name}
-                  </option>
-                ))}
-                <option value="__custom__">✏️ Другая марка (ввести вручную)...</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                onChange={handleSelectMake}
+                placeholder="— Выберите марку автомобиля —"
+                options={[...CAR_CATALOG.map((item) => ({ value: item.name, label: `${item.flag} ${item.name}` })), { value: "__custom__", label: "✏️ Другая марка (ввести вручную)..."}]}
+              />
             </div>
           )}
         </div>
@@ -390,24 +379,12 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
             </div>
           ) : (
             <div className="relative">
-              <select
+              <RoundedSelect
                 value={matchedModel ? matchedModel.name : model ? "__custom__" : ""}
-                onChange={(e) => handleSelectModel(e.target.value)}
-                disabled={!make}
-                className="w-full bg-white border border-neutral-300 disabled:bg-neutral-100 disabled:text-neutral-400 rounded-xl px-3 py-2 text-xs font-bold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand-border cursor-pointer"
-                required
-              >
-                <option value="" disabled>
-                  — Выберите модель {matchedMake.name} —
-                </option>
-                {availableModels.map((mod) => (
-                  <option key={mod.name} value={mod.name}>
-                    {mod.name}{mod.generations.length > 0 ? ` (${mod.generations.length} пок.)` : ""}
-                  </option>
-                ))}
-                <option value="__custom__">✏️ Другая модель (ввести вручную)...</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                onChange={handleSelectModel}
+                placeholder={`— Выберите модель ${matchedMake.name} —`}
+                options={[...availableModels.map((item) => ({ value: item.name, label: `${item.name}${item.generations.length > 0 ? ` (${item.generations.length} пок.)` : ""}`})), { value: "__custom__", label: "✏️ Другая модель (ввести вручную)..."}]}
+              />
             </div>
           )}
         </div>
@@ -452,22 +429,12 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
             />
           ) : (
             <div className="relative">
-              <select
+              <RoundedSelect
                 value={matchedGen ? matchedGen.name : generation ? "__custom__" : ""}
-                onChange={(e) => handleSelectGeneration(e.target.value)}
-                className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs font-semibold text-neutral-900 appearance-none pr-8 focus:outline-none focus:border-brand cursor-pointer"
-              >
-                <option value="" disabled>
-                  — Выберите поколение {model || "автомобиля"} —
-                </option>
-                {availableGenerations.map((g) => (
-                  <option key={g.name} value={g.name}>
-                    {g.name}
-                  </option>
-                ))}
-                <option value="__custom__">✏️ Другое поколение (ручной ввод)...</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                onChange={handleSelectGeneration}
+                placeholder={`— Выберите поколение ${model || "автомобиля"} —`}
+                options={[...availableGenerations.map((item) => ({ value: item.name, label: item.name })), { value: "__custom__", label: "✏️ Другое поколение (ручной ввод)..."}]}
+              />
             </div>
           )}
         </div>

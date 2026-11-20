@@ -321,13 +321,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               setNewMileageInput(String(currentVehicle.currentMileage));
               setShowQuickMileageModal(true);
             }}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`mobile-stat-card rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
                 ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="mobile-stat-label">
               <div className="w-5 h-5 rounded-md bg-brand/15 text-brand-strong flex items-center justify-center">
                 <Gauge className="w-3.5 h-3.5" />
               </div>
@@ -335,10 +335,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 Пробег
               </span>
             </div>
-            <div className="text-sm font-black font-mono tracking-tight leading-none">
+            <div className="mobile-stat-value">
               {formatDistance(currentVehicle.currentMileage)}
             </div>
-            <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+            <div className={`text-xs mt-1 leading-tight text-pretty [overflow-wrap:anywhere] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
               {currentVehicle.lastMileageUpdate ? `Обновлён ${formatDateRu(currentVehicle.lastMileageUpdate)}` : "Дата обновления не указана"}
             </div>
           </button>
@@ -348,13 +348,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             aria-label="Открыть дневник заправок"
             onClick={() => onNavigate("fuel")}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`mobile-stat-card rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
                 ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="mobile-stat-label">
               <div className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-500 flex items-center justify-center">
                 <Fuel className="w-3.5 h-3.5" />
               </div>
@@ -362,10 +362,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 Топливо
               </span>
             </div>
-            <div className="text-sm font-black tracking-tight leading-none">
+            <div className="mobile-stat-value">
               {formatFuelType(currentVehicle.fuelType || lastVehicleFuel?.fuelType)}
             </div>
-            <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+            <div className={`text-xs mt-1 leading-tight text-pretty [overflow-wrap:anywhere] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
               {lastVehicleFuel?.fuelType || "Нет записи о заправках"}
             </div>
           </button>
@@ -375,13 +375,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             type="button"
             aria-label="Открыть список работ по автомобилю"
             onClick={() => onNavigate("repair")}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
+            className={`mobile-stat-card rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
               isDark
                 ? "bg-[#17202e] border-[#243044] hover:border-[#243044]"
                 : "bg-white border-[#E2E8F0] shadow-xs hover:border-neutral-300"
             }`}
           >
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="mobile-stat-label">
               <div className="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-500 flex items-center justify-center">
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </div>
@@ -389,11 +389,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 Состояние
               </span>
             </div>
-            <div className={`text-sm font-black tracking-tight ${statusColor} leading-none flex items-center gap-1`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${statusNeedsAttention ? "bg-brand-strong" : statusLabel === "В норме" ? "bg-emerald-500" : "bg-slate-400"}`} />
+            <div className={`mobile-stat-value flex items-baseline justify-center gap-1 ${statusColor}`}>
+              <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${statusNeedsAttention ? "bg-brand-strong" : statusLabel === "В норме" ? "bg-emerald-500" : "bg-slate-400"}`} />
               <span>{statusLabel}</span>
             </div>
-            <div className={`text-[9px] mt-1 truncate ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+            <div className={`text-xs mt-1 leading-tight text-pretty [overflow-wrap:anywhere] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
               {statusDescription}
             </div>
           </button>
@@ -518,7 +518,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <div className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Следующее ТО
                   </div>
-                  <div className="text-base font-black tracking-tight mt-0.5">
+                  <div className="text-base font-medium tracking-tight mt-0.5">
                     {!nextSchedule
                       ? "Регламент не задан"
                       : nextSchedule.remainingKm < 0
@@ -559,7 +559,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <div className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Последняя заправка
                   </div>
-                  <div className="text-base font-black tracking-tight mt-0.5">
+                  <div className="text-base font-medium tracking-tight mt-0.5">
                     {lastVehicleFuel ? fmtDate(lastVehicleFuel.date) : "—"}
                   </div>
                 </div>
@@ -595,7 +595,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </div>
 
                 <div className="mt-2">
-                  <div className="text-xs font-bold text-brand-strong truncate">
+                  <div className="text-xs font-medium text-brand-strong truncate">
                     {lastVehicleService ? lastVehicleService.title : "Нет записей"}
                   </div>
                   <div className={`text-[10px] mt-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
@@ -617,7 +617,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <div className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Общие расходы
                   </div>
-                  <div className="text-base font-black font-mono tracking-tight mt-0.5 text-emerald-500">
+                  <div className="text-base font-medium font-mono tracking-tight mt-0.5 text-emerald-500">
                     {fmtRub(totalExpenses)}
                   </div>
                 </div>

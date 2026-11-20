@@ -26,6 +26,7 @@ import { LicensePlateBadge } from "./LicensePlateBadge";
 import { CarCascadeSelector } from "./CarCascadeSelector";
 import { CarBodyType, findGeneration } from "../carCatalog";
 import { decodeVin } from "../mobile/barcodeScannerService";
+import { RoundedSelect } from "./RoundedSelect";
 
 const STANDARD_VEHICLE_COLOR = "#dc2626";
 
@@ -780,22 +781,27 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 max="2030"
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-0 focus:border-brand"
                 required
               />
             </div>
             <div>
-              <label htmlFor="vehiclemodal-market" className="block font-semibold text-neutral-700 mb-1">Рынок автомобиля</label>
-              <select id="vehiclemodal-market" value={market} onChange={(event) => setMarket(event.target.value)} className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-bold">
-                <option value="">Не указан</option>
-                <option value="RU">Россия / ЕАЭС</option>
-                <option value="EU">Европа</option>
-                <option value="US">США / Канада</option>
-                <option value="JP">Япония</option>
-                <option value="TH">Таиланд</option>
-                <option value="OTHER">Другой рынок</option>
-              </select>
-              <p className="mt-1 text-[10px] text-neutral-500">Берётся из документов автомобиля, не по месту текущей регистрации</p>
+              <label htmlFor="vehiclemodal-market" className="block font-semibold text-neutral-700 mb-1">Рынок поставки</label>
+              <RoundedSelect
+                id="vehiclemodal-market"
+                value={market}
+                onChange={setMarket}
+                placeholder="Не указан"
+                options={[
+                  { value: "RU", label: "Россия / ЕАЭС" },
+                  { value: "EU", label: "Европа" },
+                  { value: "US", label: "США / Канада" },
+                  { value: "JP", label: "Япония" },
+                  { value: "TH", label: "Таиланд" },
+                  { value: "OTHER", label: "Другой рынок" },
+                ]}
+              />
+              <p className="mt-1 text-[10px] text-neutral-500">Страна, для которой выпущен автомобиль</p>
             </div>
             <div>
               <label htmlFor="vehiclemodal-field-1" className="block font-semibold text-neutral-700 mb-1">

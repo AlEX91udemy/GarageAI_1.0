@@ -18,6 +18,7 @@ import {
   RotateCcw,
   History,
   FileDown,
+  Sparkles,
 } from "lucide-react";
 import { ServiceRecord, Vehicle, MaintenanceCategory } from "../types";
 import { exportServiceBookToPdf } from "../utils/serviceBookPdfExport";
@@ -29,6 +30,7 @@ interface ServiceLogViewProps {
   onScanReceipt: () => void;
   onDeleteRecord: (id: string) => void;
   onExportPdf?: () => void;
+  onAskMechanic: (record: ServiceRecord) => void;
 }
 
 export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
@@ -38,6 +40,7 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
   onScanReceipt,
   onDeleteRecord,
   onExportPdf,
+  onAskMechanic,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -430,6 +433,15 @@ export const ServiceLogView: React.FC<ServiceLogViewProps> = ({
                         </div>
 
                         {/* Notes & Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => onAskMechanic(record)}
+                          className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-600"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Получить совет по этому ремонту
+                        </button>
+
                         <div className="flex items-center justify-between pt-1">
                           <div className="text-[11px] text-neutral-500 italic">
                             {record.notes || "Гарантия на работы согласно заказ-наряду."}

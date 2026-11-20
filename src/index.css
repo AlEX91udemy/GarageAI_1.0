@@ -22,6 +22,7 @@
 
 /* Theme variables */
 :root {
+  --app-font-family: "Segoe UI", Arial, sans-serif;
   --app-bg: #f4f5f8;
   --app-card: #ffffff;
   --app-subcard: #f8fafc;
@@ -496,7 +497,15 @@ html:not(.dark) .light-car-header {
 /* Workshop UI: shared interaction rules; layout exceptions stay component-scoped. */
 html { color-scheme: light; scroll-padding-top: 130px; }
 html.dark { color-scheme: dark; }
-body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; line-height: 1.5; }
+body { margin: 0; font-family: var(--app-font-family); line-height: 1.5; }
+/* Shared dialogs can mount outside the mobile root, including in a body portal. */
+body:has(.garage-mobile) {
+  --font-sans: var(--app-font-family);
+  --font-mono: var(--app-font-family);
+}
+.mobile-stat-card { @apply grid row-span-3 grid-cols-1 grid-rows-subgrid gap-y-0 min-w-0 px-2 py-3; }
+.mobile-stat-label { @apply flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 mb-1; }
+.mobile-stat-value { @apply text-sm font-medium leading-tight tracking-tight tabular-nums; }
 .connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: rgba(245, 158, 11, 0.12); color: #B45309; font-size: 14px; text-align: center; }
 button { transition-property: color, background-color, border-color, opacity, transform; }
 td, .font-mono { font-variant-numeric: tabular-nums; }
@@ -661,12 +670,19 @@ input[type="number"] { -moz-appearance: textfield; }
   border-radius: 1rem !important;
   box-shadow: 0 12px 28px rgb(15 23 42 / 0.16);
 }
+:where(.app-main, [role="dialog"]) select {
+  border-radius: 1rem !important;
+}
 .dark :where(.app-main, [role="dialog"]) [role="listbox"] {
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.35);
 }
 :where(.app-main, [role="dialog"]) [role="option"] {
   border-radius: 0.75rem !important;
   color: var(--ui-field-text) !important;
+}
+:where(.app-main, [role="dialog"]) [role="option"][aria-selected="true"] {
+  background-color: #171717 !important;
+  color: #ffffff !important;
 }
 .garage-date-trigger {
   background-color: var(--ui-field-bg) !important;

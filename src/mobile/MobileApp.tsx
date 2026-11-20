@@ -82,7 +82,7 @@ interface MobileAppProps {
   onSwitchToWebView?: () => void;
   onOpenServiceBookModal?: () => void;
   onOpenRemindersModal?: () => void;
-  onOpenAiMechanicModal?: () => void;
+  onOpenAiMechanicModal?: (record?: ServiceRecord) => void;
   onOpenScanReceiptModal?: () => void;
   onOpenAddServiceModal?: (data?: Partial<ServiceRecord>) => void;
   onOpenEditVehicleModal?: () => void;
@@ -538,6 +538,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             vehicle={currentVehicle}
             onBack={() => setCurrentScreen("service")}
             onDelete={onDeleteServiceRecord}
+            onAskMechanic={(record) => onOpenAiMechanicModal?.(record)}
           />
         ) : (
           <div className="p-8 text-center text-white">Запись не найдена</div>
@@ -890,7 +891,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
   return (
     <div
-      className={`h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
+      className={`garage-mobile h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
         isWeb ? "bg-[#0D131D]" : "bg-neutral-950 sm:py-6"
       }`}
     >

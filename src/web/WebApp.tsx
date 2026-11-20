@@ -41,7 +41,7 @@ export interface WebAppProps {
   onToggleTheme: () => void;
   onOpenAddService: () => void;
   onOpenScanReceipt: () => void;
-  onOpenAiMechanic: () => void;
+  onOpenAiMechanic: (record?: ServiceRecord) => void;
   onOpenServiceBook: () => void;
   onOpenReminders: () => void;
   onOpenAddVehicle: () => void;
@@ -224,6 +224,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
           onAddRecord={onOpenAddService}
           onScanReceipt={onOpenScanReceipt}
           onDeleteRecord={onDeleteServiceRecord}
+          onAskMechanic={(record) => onOpenAiMechanic(record)}
         />
       )}
     </div>
@@ -300,7 +301,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
           { label: "Электронная сервисная книжка", action: onOpenServiceBook },
           { label: "Напоминания (ОСАГО, КАСКО, ТО, налог)", action: onOpenReminders },
           { label: "Резервная копия и синхронизация", action: onOpenBackup },
-          { label: "Garage AI: диагностика", action: onOpenAiMechanic },
+          { label: "Garage AI: диагностика", action: () => onOpenAiMechanic() },
           { label: "Параметры автомобиля", action: onOpenEditVehicle },
           { label: "Добавить автомобиль", action: onOpenAddVehicle },
           { label: "Мобильная версия", action: onSwitchToMobile },
@@ -507,7 +508,7 @@ export const WebApp: React.FC<WebAppProps> = (props) => {
               setHistoryTab("history");
               setActiveView("history");
             }}
-            onOpenAiDiagnostic={onOpenAiMechanic}
+            onOpenAiDiagnostic={() => onOpenAiMechanic()}
             onOpenExpenses={() => setActiveView("expenses")}
             onOpenScanReceipt={onOpenScanReceipt}
             onOpenOemSchedule={() => {
