@@ -6,11 +6,18 @@
 - Domains: only `garageai.site` and the current Worker hostname are supported. `www.garageai.site` and `ww.garageai.site` are intentionally excluded from origin configuration and DNS work.
 - Email: the owner will inspect the test mailbox manually. The required evidence is limited to delivery, code accepted/rejected, logout, replay rejection, and expiry rejection.
 - OCR/mobile: OCR remains beta until an anonymized 30+ document ground-truth set is supplied and iOS/Android smoke is completed by a device operator.
-- Git history: proposed maintenance window is 2026-11-21 10:00–11:00 Asia/Yekaterinburg. Force-push is not authorized. The legacy backup may remain in restricted storage for 30 days, then must be deleted after fresh-clone, Gitleaks, and secret-rotation checks.
+- The owner authorized the Git history rewrite on 2026-11-20. The agreed retention for the restricted legacy backup is 30 days, with deletion after fresh-clone, Gitleaks, and secret-rotation checks.
 - Catalog: configurations without OEM evidence remain `provisional`; promotion requires an OEM-source owner confirmation.
 - Observation: 48 hours, with 5xx below 1%, no P0/P1 incidents, no unresolved Cloud SQL/email/AI errors, API p95 at or below 2 seconds, spend at or below 50 SGD, and the previous Cloud Run revision retained for rollback.
 - Cloudflare: apex-only support is accepted. Manual Wrangler deployment and public health are working; Workers Builds remains a documented CI follow-up and is not a production traffic blocker.
 - Release decision: **NO-GO** until Git history, email smoke, Vertex/private-agent smoke, OCR/mobile acceptance, and the observation window are evidenced.
+
+## Git history remediation — 2026-11-20
+
+- Six branches were updated atomically. All 48 branch tips matched the verified rewrite, and GitHub confirmed restoration of the original `main` protection. The published `main` commit was `54586a03f55c44284c87bb58b52e616331fd5d1b`.
+- Gitleaks found zero leaks in the prepared mirror (1,156 commits) and in a fresh clone (625 commits). The fresh clone passed `git fsck` and contained no history for the removed file across the fetched branches. The controlled PostgreSQL session revocation is recorded below. Production health returned HTTP 200 and anonymous data access returned HTTP 401.
+- All GitHub Actions jobs passed for the rewritten main commit. The external Cloudflare Workers Builds check on PR #55 failed. [Main CI run](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/44642660933)
+- Removed all 16 GitHub Actions caches created before the rewrite. GitHub reported zero forks. Of 51 closed PR heads still pointing to their original commits, 46 retained history for the removed file. Verified against the backup using full-history traversal. GitHub Support controls removal of these internal references and cached views. Its decision is pending.
 
 ## Verification update — 2026-11-20
 
@@ -96,7 +103,7 @@
 - OCR release acceptance still needs the approved anonymized 30+ sample regression set, ground truth, mobile/desktop smoke and latency/cost results. Existing fixtures are diagnostic only.
 - Legacy bundle provenance/ownership and privacy retention/deletion sign-off are not evidenced.
 - A post-rollout observation window with agreed 5xx, latency, Cloud SQL, email and spend thresholds is still required.
-- Historical secret remediation is prepared and backed up, but protected remote history has not been force-pushed. Follow `docs/git-history-secret-remediation.md` in an approved maintenance window; do not add allowlist suppressions.
+- GitHub Support review of the remaining closed PR references is pending. The branch rewrite and fresh-clone checks are recorded above.
 
 ## Decision
 
