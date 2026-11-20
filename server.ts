@@ -65,7 +65,9 @@ import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
-import { classifyReceiptText, parseLocalReceiptText } from "./server/receiptClassification";
+import { classifyReceiptText, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText } from "./server/receiptClassification";
+import { decodeFiscalReceiptQr } from "./server/receiptQr";
+import { normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant } from "./src/receiptFields";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -351,11 +353,13 @@ function getAi(): GoogleGenAI {
   if (!aiClient) {
     const key = process.env.GEMINI_API_KEY || "";
     const useVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI === "true";
+    const location = process.env.GOOGLE_CLOUD_LOCATION || "eu";
     aiClient = useVertex
       ? new GoogleGenAI({
           vertexai: true,
           project: process.env.GOOGLE_CLOUD_PROJECT,
-          location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+          location,
+          ...(location === "eu" ? { httpOptions: { baseUrl: "https://aiplatform.eu.rep.googleapis.com" } } : {}),
         })
       : new GoogleGenAI({
           apiKey: key,
@@ -2596,14 +2600,6 @@ app.post("/api/auth/register", async (req, res) => {
   if (credentials.error) return res.status(400).json({ error: credentials.error });
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: "Для регистрации нужен корректный email" });
-  try {
-    if (await store.getUserByName(credentials.username!)) {
-      return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
-    }
-  } catch (error) {
-    console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
-    return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
-  }
   let createdUserId: string | undefined;
   try {
     // Local development should remain usable without a configured mail provider.
@@ -2612,13 +2608,14 @@ app.post("/api/auth/register", async (req, res) => {
       && !process.env.EMAIL_CODE_CAPTURE_FILE?.trim()
       && !emailDeliveryConfigured();
     const userId = newId("user");
+    const internalUsername = `garage-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
     createdUserId = userId;
     if (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email)) {
       res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
     }
     const created = store instanceof PostgresPersistence
-      ? await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
-      : await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
+      ? await store.createUserWithEmailState(internalUsername, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
+      : await store.createUserWithEmailState(internalUsername, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
     if (localEmailVerificationBypass) {
       return res.status(201).json({ success: true, session: await establishSession(req, res, created.id, created.username, created.email) });
     }
@@ -2631,7 +2628,7 @@ app.post("/api/auth/register", async (req, res) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
-    console.error("Registration error:", error);
+    console.error("Registration failed");
     return res.status(503).json({ error: "Не удалось создать аккаунт или отправить код подтверждения" });
   }
 });
@@ -2639,22 +2636,21 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   if (await rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
-  const username = asTrimmedString(body.username, 120).toLowerCase();
+  const email = normalizeEmail(body.email ?? body.username);
+  const legacyUsername = body.email === undefined && typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!username || !password) {
-    return res.status(400).json({ error: "Введите логин и пароль" });
+  if ((!email && !/^[a-z0-9_.-]{3,32}$/.test(legacyUsername)) || !password) {
+    return res.status(400).json({ error: "Введите email и пароль" });
   }
   let user;
   try {
-    user = username.includes("@")
-      ? (store instanceof PostgresPersistence ? await store.getUserByEmail(username) : store.getUserByEmail(username))
-      : await store.getUserByName(username);
+    user = email ? await store.getUserByEmail(email) : await store.getUserByName(legacyUsername);
   } catch (error) {
     console.error("Login lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ error: "Неверный логин или пароль" });
+    return res.status(401).json({ error: "Неверный email или пароль" });
   }
   if (user.email && user.emailVerifiedAt === null) {
     return res.status(403).json({ error: "Подтвердите email кодом из письма перед входом", code: "EMAIL_NOT_VERIFIED" });
@@ -2989,7 +2985,9 @@ async function requireAgentServiceAccess(req: express.Request, res: express.Resp
     if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
       return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
     }
-    if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
+    const allowedByUsername = allowlist.includes(user.username.trim().toLowerCase());
+    const allowedByEmail = Boolean(user.emailVerifiedAt && user.email && allowlist.includes(user.email.trim().toLowerCase()));
+    if (allowlist.length > 0 && !allowedByUsername && !allowedByEmail) {
       return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
     }
 
@@ -3232,11 +3230,35 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
       return res.status(400).json({ error: "Пустое изображение чека" });
     }
 
-    const receiptPrompt = `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
-Извлеки точные данные и верни JSON со структурой:
+    const fiscal = await decodeFiscalReceiptQr(decodedImage).catch(() => null);
+    const sendReceipt = (fields: Record<string, unknown>, text = "") => {
+      const bank = fiscal ? null : parseBankReceiptText(text);
+      const result = bank ? { ...fields, ...bank } : fields;
+      const refund = fiscal ? fiscal.operation === "refund"
+        : result.operation === "refund" || isReceiptRefund(text) ||
+          (typeof result.description === "string" && isReceiptRefund(result.description));
+      return res.json({
+        ...result,
+        merchantName: normalizeReceiptMerchant(result.merchantName),
+        date: fiscal?.date ?? normalizeReceiptDate(result.date),
+        totalAmount: fiscal?.totalAmount ?? normalizeReceiptAmount(result.totalAmount),
+        operation: fiscal?.operation ?? (refund ? "refund" : "expense"),
+      });
+    };
+    const localReceipt = async () => {
+      const prepared = await prepareDocumentImage(decodedImage);
+      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+      const { rawText, ...fields } = parseLocalReceiptText(local.text);
+      return sendReceipt(fields, rawText);
+    };
+
+    const receiptPrompt = `Проанализируй фото чека, заказ-наряда или документа банка по операции.
+Игнорируй кнопки и подписи приложения вокруг документа (например, «Закрыть»). Для документа банка возьми продавца из описания операции и дату из строки операции. Если операция отменена или это возврат, укажи refund. Для отсутствующих полей верни null. Не возвращай реквизиты карты, ФИО и банковские реквизиты.
+Верни JSON со структурой:
 {
-  "merchantName": "название СТО, АЗС или магазина",
-  "date": "дата в формате YYYY-MM-DD, если есть, иначе сегодня",
+  "merchantName": "название СТО, АЗС или магазина" | null,
+  "date": "дата в формате YYYY-MM-DD" | null,
+  "operation": "expense" | "refund",
   "totalAmount": 12500,
   "category": "repair" | "fuel" | "parts" | "wash" | "tires" | "tuning" | "other",
   "description": "краткое общее описание чека",
@@ -3255,33 +3277,37 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
         const totalAmount = totalEntity?.normalizedValue?.moneyValue?.units
           ? Number(totalEntity.normalizedValue.moneyValue.units) + Number(totalEntity.normalizedValue.moneyValue.nanos || 0) / 1e9
           : totalText ? Number(String(totalText).replace(/[^0-9.,-]/g, "").replace(",", ".")) : null;
-        const googleResult = { merchantName: documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"]), date: documentEntityValue(entities, ["receipt_date", "date"]), totalAmount, category: "other", description: doc?.text || "", notes: doc?.text || "", _source: "google-document-ai" };
-        const initialClassification = classifyReceiptText(doc?.text || "", googleResult.category);
+        const docText = doc?.text || "";
+        const localFields = parseLocalReceiptText(docText);
+        const googleResult = { merchantName: normalizeReceiptMerchant(documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"])) ?? localFields.merchantName, date: normalizeReceiptDate(documentEntityValue(entities, ["receipt_date", "date"])) ?? localFields.date, totalAmount: normalizeReceiptAmount(totalAmount) ?? localFields.totalAmount, category: "other", description: localFields.description, _source: "google-document-ai" };
+        const initialClassification = classifyReceiptText(docText, googleResult.category);
+        if (isReceiptRefund(docText) || (!fiscal && parseBankReceiptText(docText))) {
+          return sendReceipt(googleResult, docText);
+        }
         if (doc?.text && getOpenRouterConfig("receipt").key) {
           try {
             const refined = await requestOpenRouterReceiptFields(doc.text);
-            return res.json({
+            const classification = classifyReceiptText(docText, refined.category || initialClassification.category);
+            return sendReceipt({
               ...googleResult,
-              merchantName: refined.merchantName || googleResult.merchantName,
-              date: refined.date || googleResult.date,
-              totalAmount: Number.isFinite(Number(refined.totalAmount)) ? Number(refined.totalAmount) : googleResult.totalAmount,
-              category: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).category,
-              fuelDetails: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).fuelDetails || refined.fuelDetails,
+              merchantName: normalizeReceiptMerchant(refined.merchantName) ?? googleResult.merchantName,
+              date: normalizeReceiptDate(refined.date) ?? googleResult.date,
+              totalAmount: normalizeReceiptAmount(refined.totalAmount) ?? googleResult.totalAmount,
+              ...classification,
+              fuelDetails: classification.fuelDetails ?? refined.fuelDetails,
               description: refined.description || googleResult.description,
-              notes: refined.notes || googleResult.notes,
+              notes: refined.notes,
               _source: "google-document-ai+openrouter-text",
-            });
+            }, docText);
           }
-          catch (error) { console.warn("OpenRouter receipt refinement failed; using Google result:", error); }
+          catch { console.warn("OpenRouter receipt refinement failed; using Google result"); }
         }
-        return res.json({ ...googleResult, ...initialClassification });
-      } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
+        return sendReceipt({ ...googleResult, ...initialClassification }, docText);
+      } catch { console.warn("Document AI receipt failed, using vision fallback"); }
     }
     const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
     if (!hasReceiptOpenRouter && !hasGeminiConfiguration(process.env) && !documentReceiptId) {
-      const prepared = await prepareDocumentImage(decodedImage);
-      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
-      return res.json(parseLocalReceiptText(local.text));
+      return await localReceipt();
     }
     let responseText = "";
     try {
@@ -3295,29 +3321,24 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
             }).then((result) => result.text || ""),
             new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Receipt vision timeout")), 15_000)),
           ]);
-    } catch (providerError) {
+    } catch {
       // A configured provider can still be unavailable for the selected model
       // or region. Keep the basic scanner usable through local OCR and expose
       // only the safe source marker to the client.
-      console.warn("Receipt vision provider unavailable; using local OCR fallback", providerError instanceof Error ? providerError.message : "unknown");
-      const prepared = await prepareDocumentImage(decodedImage);
-      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
-      return res.json(parseLocalReceiptText(local.text));
+      console.warn("Receipt vision provider unavailable; using local OCR fallback");
+      return await localReceipt();
     }
     if (!responseText.trim()) {
-      const prepared = await prepareDocumentImage(decodedImage);
-      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
-      return res.json(parseLocalReceiptText(local.text));
+      return await localReceipt();
     }
     const parsed = parseJsonSafely(responseText, null);
-    const parsedRecord = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return await localReceipt();
+    const parsedRecord = parsed as Record<string, unknown>;
     const classification = classifyReceiptText(
       `${responseText}\n${JSON.stringify(parsed)}`,
       parsedRecord.category,
     );
-    res.json({
+    sendReceipt({
       ...parsedRecord,
       category: classification.category,
       ...(classification.fuelDetails && !("fuelDetails" in parsedRecord)
@@ -3325,7 +3346,7 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
         : {}),
     });
   } catch (error: any) {
-    console.error("Receipt OCR error:", error);
+    console.error("Receipt OCR failed");
     res.status(500).json({
       error: "Не удалось распознать чек.",
     });

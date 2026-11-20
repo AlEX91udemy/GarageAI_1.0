@@ -68,15 +68,11 @@ export function sanitizeDiagnosticResult(value: Record<string, unknown>): Record
   return safeResult;
 }
 
-export function validateCredentials(input: unknown): { username?: string; password?: string; error?: string } {
+export function validateCredentials(input: unknown): { password?: string; error?: string } {
   const body = (input || {}) as Record<string, unknown>;
-  const username = asTrimmedString(body.username, 120).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
-  if (!/^[a-z0-9_.-]{3,32}$/.test(username) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
-    return { error: "Укажите корректную электронную почту" };
-  }
   if (password.length < 8 || password.length > 200) {
     return { error: "Пароль должен содержать от 8 до 200 символов" };
   }
-  return { username, password };
+  return { password };
 }

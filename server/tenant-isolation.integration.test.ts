@@ -49,7 +49,7 @@ async function register(username: string): Promise<Auth> {
   const response = await fetch(`${baseUrl}/api/auth/register`, {
     method: "POST",
     headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": testClientIp },
-    body: JSON.stringify({ username, password: "TestPassword-123!", email }),
+    body: JSON.stringify({ email, password: "TestPassword-123!" }),
   });
   const body = await response.json() as { pendingEmailVerification?: boolean; error?: string };
   if (response.status !== 202 || !body.pendingEmailVerification) {
@@ -104,11 +104,13 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
           GOOGLE_CLOUD_PROJECT: "",
           AGENTS_SERVICE_URL: "https://garageai-agents-test.example",
           AGENTS_API_TOKEN: "integration-test-token",
-          AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation",
+          AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation@example.test",
           ALLOWED_ORIGINS: baseUrl,
           TRUSTED_PROXY_HOPS: "1",
           EMAIL_CODE_SECRET: "integration-test-email-secret",
           EMAIL_CODE_CAPTURE_FILE: emailCaptureFile,
+          RESEND_API_KEY: "integration-test-resend-key",
+          EMAIL_FROM: "GarageAI <test@example.test>",
         },
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -153,6 +155,62 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
   it("rejects anonymous access to private garage routes", async () => {
     const response = await fetch(`${baseUrl}/api/vehicles`);
     expect(response.status).toBe(401);
+  });
+
+  it("uses email for password login and rejects an unknown legacy username", async () => {
+    const owner = await register("email-only-login");
+
+    const loginWithEmail = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.36" },
+      body: JSON.stringify({ email: " EMAIL-ONLY-LOGIN@example.test ", password: "TestPassword-123!" }),
+    });
+    expect(loginWithEmail.status).toBe(200);
+    expect((await loginWithEmail.json() as { session?: { email?: string } }).session?.email).toBe("email-only-login@example.test");
+
+    const loginWithoutEmail = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.37" },
+      body: JSON.stringify({ username: "email-only-login", password: "TestPassword-123!" }),
+    });
+    expect(loginWithoutEmail.status).toBe(401);
+    expect(owner.cookie).toBeTruthy();
+  });
+
+  it("resets a password by email and revokes the previous session", async () => {
+    const owner = await register("password-reset-owner");
+    const requestReset = await fetch(baseUrl + "/api/auth/password/reset/request", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.41" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test" }),
+    });
+    expect(requestReset.status).toBe(200);
+
+    const lines = fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean);
+    const resetMessage = lines.map((line) => JSON.parse(line) as { email: string; code: string }).reverse().find((item) => item.email === "password-reset-owner@example.test");
+    expect(resetMessage).toBeDefined();
+
+    const confirmReset = await fetch(baseUrl + "/api/auth/password/reset/confirm", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.42" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", code: resetMessage!.code, password: "ChangedPassword-456!" }),
+    });
+    expect(confirmReset.status).toBe(200);
+    expect((await fetch(baseUrl + "/api/auth/session", { headers: { cookie: owner.cookie } })).status).toBe(401);
+
+    const oldPasswordLogin = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.43" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", password: "TestPassword-123!" }),
+    });
+    expect(oldPasswordLogin.status).toBe(401);
+
+    const newPasswordLogin = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.44" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", password: "ChangedPassword-456!" }),
+    });
+    expect(newPasswordLogin.status).toBe(200);
   });
 
   it("prevents one user from reading, updating, deleting, or exporting another user's records", async () => {
@@ -416,17 +474,17 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     expect(unknownAgent.status).toBe(400);
   });
 
-  it("returns conflict when two registrations race for the same username", async () => {
+  it("returns conflict when two registrations race for the same email", async () => {
     const createAccount = () => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": "198.51.100.77" },
-      body: JSON.stringify({ username: "concurrent-signup", password: "TestPassword-123!", email: "concurrent-signup@example.test" }),
+      body: JSON.stringify({ email: "concurrent-signup@example.test", password: "TestPassword-123!" }),
     });
 
     const responses = await Promise.all([createAccount(), createAccount()]);
     expect(responses.map((response) => response.status).sort()).toEqual([202, 409]);
     const bodies = await Promise.all(responses.map((response) => response.json() as Promise<{ error?: string }>));
-    expect(bodies.some((body) => body.error === "Пользователь с таким логином уже существует")).toBe(true);
+    expect(bodies.some((body) => body.error === "Пользователь с таким email уже существует")).toBe(true);
   });
 
   it("enforces five registrations per trusted client IP without resetting the bucket", async () => {
@@ -434,7 +492,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     const create = (index: number) => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": ip },
-      body: JSON.stringify({ username: `quota-${index}`, password: "TestPassword-123!", email: `quota-${index}@example.test` }),
+      body: JSON.stringify({ email: `quota-${index}@example.test`, password: "TestPassword-123!" }),
     });
     const responses = await Promise.all([1, 2, 3, 4, 5].map(create));
     expect(responses.every((response) => response.status === 202)).toBe(true);
@@ -593,7 +651,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     const loginAfterDeletion = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: { origin: baseUrl, "content-type": "application/json" },
-      body: JSON.stringify({ username: "delete-account-owner", password }),
+      body: JSON.stringify({ email: "delete-account-owner@example.test", password }),
     });
     expect(loginAfterDeletion.status).toBe(401);
   });

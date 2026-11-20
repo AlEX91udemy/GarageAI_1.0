@@ -52,14 +52,14 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(email: string, password: string, legacyEmail?: string): Promise<AuthSession | PendingRegistration> {
-  const address = (legacyEmail || email).trim();
-  const username = legacyEmail ? email : `garage-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+export async function register(email: string, password: string): Promise<AuthSession | PendingRegistration> {
+  const address = email.trim();
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password, email: address }),
+    // Compatibility with the deployed API, which also requires an internal username.
+    body: JSON.stringify({ email: address, password, username: "garage-" + crypto.randomUUID().replace(/-/g, "").slice(0, 16) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
@@ -71,12 +71,12 @@ export async function register(email: string, password: string, legacyEmail?: st
   return data.session;
 }
 
-export async function login(username: string, password: string): Promise<AuthSession> {
+export async function login(email: string, password: string): Promise<AuthSession> {
   const res = await authenticatedFetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email: email.trim(), password, username: email.trim() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось войти");

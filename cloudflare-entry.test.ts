@@ -26,12 +26,12 @@ describe("Cloudflare API proxy boundary", () => {
     const request = new Request("https://garageai.site/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "demo", password: "secret" }),
+      body: JSON.stringify({ email: "demo@example.test", password: "secret" }),
     });
 
     const forwarded = apiRequest(request, "https://origin.example");
 
     expect(forwarded.method).toBe("POST");
-    expect(await forwarded.json()).toEqual({ username: "demo", password: "secret" });
+    expect(await forwarded.json()).toEqual({ email: "demo@example.test", password: "secret" });
   });
 });

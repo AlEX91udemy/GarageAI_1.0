@@ -290,7 +290,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         {/* Field 1: Make (Марка) */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
+            <label id="car-cascade-make-label" className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
               <span>Марка автомобиля</span>
               <span className="text-brand-strong">*</span>
             </label>
@@ -326,9 +326,11 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           ) : (
             <div className="relative">
               <RoundedSelect
+                ariaLabelledBy="car-cascade-make-label"
                 value={matchedMake ? matchedMake.name : make ? "__custom__" : ""}
                 onChange={handleSelectMake}
                 placeholder="— Выберите марку автомобиля —"
+                required
                 options={[...CAR_CATALOG.map((item) => ({ value: item.name, label: `${item.flag} ${item.name}` })), { value: "__custom__", label: "✏️ Другая марка (ввести вручную)..."}]}
               />
             </div>
@@ -338,7 +340,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         {/* Field 2: Model (Модель) - Dynamically restricted to selected Make */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
+            <label id="car-cascade-model-label" className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
               <span>Модель</span>
               <span className="text-brand-strong">*</span>
               {matchedMake && (
@@ -380,9 +382,11 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           ) : (
             <div className="relative">
               <RoundedSelect
+                ariaLabelledBy="car-cascade-model-label"
                 value={matchedModel ? matchedModel.name : model ? "__custom__" : ""}
                 onChange={handleSelectModel}
                 placeholder={`— Выберите модель ${matchedMake.name} —`}
+                required
                 options={[...availableModels.map((item) => ({ value: item.name, label: `${item.name}${item.generations.length > 0 ? ` (${item.generations.length} пок.)` : ""}`})), { value: "__custom__", label: "✏️ Другая модель (ввести вручную)..."}]}
               />
             </div>
@@ -395,7 +399,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
         {/* Field 3: Generation (Поколение) */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
+            <label id="car-cascade-generation-label" className="font-semibold text-neutral-800 text-xs flex items-center gap-1">
               <Layers className="w-3.5 h-3.5 text-neutral-500" />
               <span>Поколение / Модификация</span>
             </label>
@@ -430,6 +434,7 @@ export const CarCascadeSelector: React.FC<CarCascadeSelectorProps> = ({
           ) : (
             <div className="relative">
               <RoundedSelect
+                ariaLabelledBy="car-cascade-generation-label"
                 value={matchedGen ? matchedGen.name : generation ? "__custom__" : ""}
                 onChange={handleSelectGeneration}
                 placeholder={`— Выберите поколение ${model || "автомобиля"} —`}

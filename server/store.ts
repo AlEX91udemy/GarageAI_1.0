@@ -16,7 +16,7 @@ export interface GarageData {
 
 export class UserAlreadyExistsError extends Error {
   constructor() {
-    super("Пользователь с таким логином уже существует");
+    super("Пользователь с таким email уже существует");
     this.name = "UserAlreadyExistsError";
   }
 }

@@ -16,18 +16,18 @@ GarageAI — production веб-приложение для ведения циф
 
 **Уровень 5 из 10**
 
-`XP 13/24`
+`XP 15/24`
 
-`[█████░░░░░] 54%`
+`[██████░░░░] 63%`
 
 Каждая закрытая release-задача даёт 1 XP. Следующий уровень начинается с 15 XP (63%). Подробный список задач и отметки `[x]`/`[ ]` находятся в [чек-листе релиза](tasks/project-checklist-2026-11-20.md). Текущий статус публичного запуска: **NO-GO**.
 
 * **Web/API:** Cloudflare Worker + Cloud Run + PostgreSQL/Cloud SQL.
-* **Private agents:** Cloud Run revision `garageai-agents-00053-v8c`, 100% production traffic, Python image собирается из `agents_service/Dockerfile`.
+* **Private agents:** Cloud Run revision `garageai-agents-00061-jus`, 100% production traffic, Python image собирается из `agents_service/Dockerfile`; Vertex smoke подтверждён через `eu`, paid-agent allowlist пуст.
 * **CI:** TypeScript, production build, PostgreSQL integration/smoke, Python audit и secret scanning проходят на `main`; текущая ветка дополнительно проходит 35 файлов и 197 unit-тестов.
 * **Безопасность:** HttpOnly-сессии, CSRF-защита, rate limits, tenant isolation, fail-closed production storage guard и секреты вне frontend.
 
-Открытые задачи приёмки перечислены в [issue #52](https://github.com/AlEX91udemy/GarageAI_1.0/issues/52) и [release evidence](docs/release-evidence-2026-11-14.md): независимый mailbox smoke, проверка Vertex/agents, OCR-корпус с достоверной разметкой, подтверждение происхождения перенесённых данных и процедур приватности, окно production-наблюдения и согласованные действия по историческим секретам. Их выполнение требует подходящих данных и доступа владельца инфраструктуры; зелёная сборка и доступный health endpoint сами по себе не закрывают эти проверки. См. [план готовности](tasks/project-readiness-plan-2026-11-14.md).
+Открытые задачи приёмки перечислены в [issue #52](https://github.com/AlEX91udemy/GarageAI_1.0/issues/52) и [release evidence](docs/release-evidence-2026-11-14.md): независимый mailbox smoke, OCR-корпус с достоверной разметкой, подтверждение происхождения перенесённых данных и процедур приватности, окно production-наблюдения и согласованные действия по историческим секретам. Сверка workspace/deployed состояния и готовые формы приёмки находятся в [release reconciliation](docs/release-reconciliation-2026-11-20.md). Их выполнение требует подходящих данных и доступа владельца инфраструктуры; зелёная сборка и доступный health endpoint сами по себе не закрывают эти проверки. См. [план готовности](tasks/project-readiness-plan-2026-11-14.md).
 
 ## Ключевые возможности
 

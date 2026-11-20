@@ -12,6 +12,7 @@ import {
   fetchPublicKnowledgeSources,
   refreshPublicKnowledgeSources,
   register,
+  login,
   verifyEmailCode,
   requestPasswordReset,
   confirmPasswordReset,
@@ -126,8 +127,15 @@ describe("registration email verification contract", () => {
   it("returns a pending state without creating a client session", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pendingEmailVerification: true, email: "new@example.test", message: "check inbox" }), { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(register("new-user", "Password-123!", "new@example.test")).resolves.toMatchObject({ pendingEmailVerification: true, email: "new@example.test" });
-    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ username: "new-user", password: "Password-123!", email: "new@example.test" }));
+    await expect(register("new@example.test", "Password-123!")).resolves.toMatchObject({ pendingEmailVerification: true, email: "new@example.test" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "new@example.test", password: "Password-123!", username: expect.stringMatching(/^garage-[0-9a-f]{16}$/) });
+  });
+
+  it("passes the email as the login identifier for both API versions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "internal-user", email: "new@example.test", csrfToken: "csrf" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(login(" new@example.test ", "Password-123!")).resolves.toMatchObject({ email: "new@example.test" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "new@example.test", password: "Password-123!", username: "new@example.test" });
   });
 });
 

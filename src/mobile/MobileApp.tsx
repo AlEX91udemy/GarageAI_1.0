@@ -803,32 +803,14 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onBack={() => setCurrentScreen("service")}
             onConfirmFuel={(fuel) => {
               onAddFuelRecord?.({
-                id: `fuel-scan-${Date.now()}`,
-                vehicleId: currentVehicle.id,
-                date: fuel.date || new Date().toISOString().slice(0, 10),
-                mileage: currentVehicle.currentMileage,
-                liters: fuel.liters || 0,
-                pricePerLiter: fuel.pricePerLiter || 0,
-                totalCost: fuel.totalCost || 0,
-                fuelType: fuel.fuelType || "АИ-95",
-                isFullTank: true,
-                station: fuel.station || "АЗС",
+                ...fuel,
+                id: `fuel-scan-${crypto.randomUUID()}`,
               });
             }}
             onConfirmRecord={(rec) => {
               onAddServiceRecord?.({
-                id: `srv-scan-${Date.now()}`,
-                vehicleId: currentVehicle.id,
-                title: rec.title || "Заказ-наряд",
-                category: rec.category || "ТО и замена жидкостей",
-                date: rec.date || new Date().toISOString().slice(0, 10),
-                mileage: currentVehicle.currentMileage,
-                totalCost: rec.totalCost || 0,
-                laborCost: rec.laborCost || 0,
-                description: rec.description || "Распознано AI OCR",
-                serviceCenter: rec.serviceCenter || "Сервис",
-                parts: rec.parts || [],
-                receiptImages: rec.receiptImages || [],
+                ...rec,
+                id: `srv-scan-${crypto.randomUUID()}`,
               });
             }}
           />

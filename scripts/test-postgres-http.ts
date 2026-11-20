@@ -106,7 +106,7 @@ async function register(baseUrl: string, username: string, password: string, ema
   const email = `${username}@example.test`;
   const { response, body } = await requestJson(baseUrl, "/api/auth/register", {
     method: "POST",
-    body: JSON.stringify({ username, password, email }),
+    body: JSON.stringify({ email, password }),
   });
   assert(response.status === 202 && body.pendingEmailVerification === true, "registration failed with HTTP " + response.status);
   const lines = fs.existsSync(emailCaptureFile) ? fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean) : [];
@@ -242,7 +242,7 @@ async function main() {
       body: JSON.stringify({ password: userB.password }),
     });
     assert(deleteB.response.status === 200, "account deletion failed with HTTP " + deleteB.response.status);
-    const deletedUserRows = await db`SELECT count(*)::integer AS count FROM garageai_users WHERE username = ${userB.username}`;
+    const deletedUserRows = await db`SELECT count(*)::integer AS count FROM garageai_users WHERE email = ${userB.username + "@example.test"}`;
     assert(Number(deletedUserRows[0]?.count ?? -1) === 0, "deleted account remained in PostgreSQL");
     const deletedSession = await requestJson(baseUrl, "/api/auth/session", { headers: { cookie: authB.cookie } });
     assert(deletedSession.response.status === 401, "deleted account session remained active");
@@ -251,7 +251,7 @@ async function main() {
     child = await startApi(port);
     const login = await requestJson(baseUrl, "/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username: userA.username, password: userA.password }),
+      body: JSON.stringify({ email: `${userA.username}@example.test`, password: userA.password }),
     });
     assert(login.response.status === 200, "login after restart failed with HTTP " + login.response.status);
     const loginCookie = (login.response.headers.get("set-cookie") || "").split(";")[0];
@@ -283,7 +283,7 @@ async function main() {
     if (agentBuckets.length) {
       await db`DELETE FROM garageai_rate_limits WHERE scope = 'ai' AND bucket_key IN ${db(agentBuckets)}`.catch(() => undefined);
     }
-    await db`DELETE FROM garageai_users WHERE username IN (${userA.username}, ${userB.username})`.catch(() => undefined);
+    await db`DELETE FROM garageai_users WHERE email IN (${userA.username + "@example.test"}, ${userB.username + "@example.test"})`.catch(() => undefined);
     await db.end({ timeout: 5 });
     fs.rmSync(emailCaptureFile, { force: true });
   }

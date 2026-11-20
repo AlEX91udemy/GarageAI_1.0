@@ -25,7 +25,7 @@ const password = "palette-qa-password-123";
 const email = `${username}@example.test`;
 const emailCaptureFile = process.env.EMAIL_CODE_CAPTURE_FILE;
 const register = await context.request.post(`${BASE}/api/auth/register`, {
-  data: { username, password, email },
+  data: { email, password },
 });
 if (register.status() !== 202 || !emailCaptureFile) throw new Error(`registration now requires email-code verification and EMAIL_CODE_CAPTURE_FILE: ${register.status()} ${await register.text()}`);
 const capturedLines = fs.existsSync(emailCaptureFile) ? fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean) : [];

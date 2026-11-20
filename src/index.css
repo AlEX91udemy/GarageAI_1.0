@@ -527,7 +527,7 @@ body { margin: 0; font-family: var(--app-font-family); line-height: 1.5; }
 body:has(.garage-mobile) { --font-sans: var(--app-font-family); --font-mono: var(--app-font-mono); }
 .mobile-stat-card { @apply grid row-span-3 grid-cols-1 grid-rows-subgrid gap-y-0 min-w-0 px-2 py-3; }
 .mobile-stat-label { @apply flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 mb-1; }
-.mobile-stat-value { @apply text-sm font-medium leading-tight tracking-tight tabular-nums; }
+.mobile-stat-value { @apply text-sm font-normal leading-tight tracking-tight tabular-nums; }
 .connection-notice { position: sticky; top: 0; z-index: 60; padding: 12px 20px; background: rgba(245, 158, 11, 0.12); color: #B45309; font-size: 14px; text-align: center; }
 button { transition-property: color, background-color, border-color, opacity, transform; }
 td, .font-mono { font-variant-numeric: tabular-nums; }
@@ -611,6 +611,7 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .app-main .font-bold { font-weight: var(--type-weight-semibold); }
 .app-main .font-semibold { font-weight: var(--type-weight-semibold); }
 .app-main .font-medium { font-weight: var(--type-weight-medium); }
+.app-main .font-normal { font-weight: var(--type-weight-regular); }
 .app-main :where(.bg-white, [class~="bg-white/90"], [class~="bg-white/80"]) {
   background-color: var(--app-card) !important;
 }

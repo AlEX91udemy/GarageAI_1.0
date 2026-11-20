@@ -1,3 +1,5 @@
+import { normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant } from "../src/receiptFields";
+
 export type ReceiptCategory = "repair" | "fuel" | "parts" | "wash" | "tires" | "tuning" | "other";
 
 export interface ReceiptClassification {
@@ -21,6 +23,7 @@ export interface LocalReceiptFields {
   parts: Array<{ name: string; quantity: number; price: number | null }>;
   notes: string | null;
   rawText: string;
+  operation?: "refund";
   _source: "local-tesseract";
 }
 
@@ -32,21 +35,31 @@ function parseRussianNumber(value: string): number | null {
 }
 
 function parseDate(value: string): string | null {
-  const match = value.match(/(?:^|[^0-9])(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})(?:[^0-9]|$)/);
-  if (!match) {
-    const reverse = value.match(/(?:^|[^0-9])(\d{1,2})[.\-/](\d{1,2})[.\-/](20\d{2})(?:[^0-9]|$)/);
-    if (!reverse) return null;
-    const [, day, month, year] = reverse;
-    return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  for (const match of value.matchAll(/(?<!\d)(20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}|\d{1,2}[.\-/]\d{1,2}[.\-/](?:20\d{2}|\d{2}))(?!\d)/g)) {
+    const candidate = normalizeReceiptDate(match[1]);
+    if (candidate) return candidate;
   }
-  const [, year, month, day] = match;
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  return null;
 }
 
-function parseMoney(value: string): number | null {
-  const normalized = value.replace(/\s/g, "").replace(/,/g, ".");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+export function isReceiptRefund(text: string): boolean {
+  return /отмен[аы]\s+(?:оплаты|платежа|операции)|возврат\s+(?:прихода|расхода|покупки|оплаты|средств)|(?:^|\n)\s*(?:кассовый чек[.\s]+)?возврат\s*(?:[.!]|\n|$)|\b(?:payment reversal|refund)\b/i.test(text);
+}
+
+export function parseBankReceiptText(text: string) {
+  const table = /сумма\s+в\s+валюте|дата\s+и\s+время\s+операции/i.exec(text);
+  if (!table && !/документ по операции/i.test(text)) return null;
+  const operationText = table ? text.slice(table.index) : text;
+  const merchant = operationText.match(/(?:отмена\s+оплаты|оплата\s+в)\s+([^\r\n|]+)/i)?.[1];
+  const amounts = [...operationText.matchAll(/(?<![\d.,])(\d+(?:[ \u00a0]\d{3})*[.,]\d{2})[ \t]*(?:RUB\b|РУБ(?:\.|\s)|₽)/gi)];
+  const merchantName = normalizeReceiptMerchant(merchant);
+  return {
+    merchantName,
+    date: table ? parseDate(operationText) : null,
+    totalAmount: normalizeReceiptAmount(amounts.at(-1)?.[1]),
+    category: "other" as const,
+    description: merchantName ? "Операция в " + merchantName : "Операция по банковскому документу",
+  };
 }
 
 function parseFuelDisplay(text: string): { liters: number | null; pricePerLiter: number | null; currency: string | null } {
@@ -67,17 +80,20 @@ export function parseLocalReceiptText(text: string): LocalReceiptFields {
   const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const classification = classifyReceiptText(rawText);
   const fuelDisplay = classification.category === "fuel" ? parseFuelDisplay(rawText) : { liters: null, pricePerLiter: null, currency: null };
-  const totalMatch = rawText.match(/(?:итог|всего|сумма|к оплате|total)[^0-9]{0,12}([0-9][0-9\s]*(?:[.,][0-9]{1,2})?)/i);
-  const totalAmount = totalMatch ? parseMoney(totalMatch[1]) : null;
+  const totalMatch = rawText.match(/(?:^|[\s|])(?:итого?|всего(?: к оплате)?|к оплате|(?:grand )?total)\s*[:=|]?\s*[₽$€£]?\s*(\d+(?:[ \u00a0]\d{3})*(?:[.,]\d{1,2})?)(?![\d.,])/im)
+    ?? rawText.match(/(?:^|\n)\s*сумма[ \t]*:[ \t]*(\d+(?:[ \u00a0]\d{3})*(?:[.,]\d{1,2})?)(?![\d.,])/i);
+  const totalAmount = normalizeReceiptAmount(totalMatch?.[1]);
   const date = parseDate(rawText);
-  const merchantCandidates = lines.filter((line) =>
+  const merchantCandidates = lines.slice(0, 12).filter((line) =>
+    normalizeReceiptMerchant(line) &&
     !/(итог|всего|сумма|дата|время|кассир|адрес|телефон|чек|фп|ккт|сканер|документ|освещение|назад|фото|интерфейс|amocrm|garageai|функции|статус|топливо|цена|объем|объём|факт|данным|подтвердите|действие|gallons?|price|fuel|receipt)/i.test(line) &&
     /[а-яёa-z]{3,}/i.test(line) &&
     !/^.{0,3}\d+.{0,3}$/.test(line)
   );
-  const merchantName = classification.category === "fuel"
+  const legalName = lines.slice(0, 12).join("\n").match(/(?:ООО|АО|ИП|ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ)[ \t]+[«"]([^»"\n]+(?:\n[^»"\n]+)?)[»"]/i)?.[1];
+  const merchantName = normalizeReceiptMerchant(legalName) ?? (classification.category === "fuel"
     ? merchantCandidates.find((line) => /(азс|лукойл|газпром|роснефть|shell|bp|топливо)/i.test(line)) || null
-    : merchantCandidates[0] || null;
+    : merchantCandidates[0] || null);
   const description = classification.category === "fuel"
     ? `Заправка${classification.fuelDetails?.fuelType ? ` ${classification.fuelDetails.fuelType}` : ""}`
     : merchantName ? `Расход по чеку ${merchantName}` : "Расход по распознанному чеку";
@@ -99,6 +115,8 @@ export function parseLocalReceiptText(text: string): LocalReceiptFields {
     parts: [],
     notes: rawText ? "Поля извлечены локальным OCR. Проверьте данные перед сохранением." : null,
     rawText,
+    ...(parseBankReceiptText(rawText) ?? {}),
+    ...(isReceiptRefund(rawText) ? { operation: "refund" as const } : {}),
     _source: "local-tesseract",
   };
 }
@@ -116,7 +134,7 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
     (/(литр(?:а|ов|ы)?|л\.?\s*(?:×|x|по|\d))/i.test(normalized) &&
       /(?:₽\s*\/\s*л|руб(?:\.|лей)?\s*(?:за|\/)?\s*литр|цена\s*за\s*литр|колонка)/i.test(normalized));
   const repairSignal = /(?:^|[^а-яё])сто(?:$|[^а-яё])|заказ[- ]?наряд|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту/i.test(normalized);
-  const partsSignal = /(магазин автозапчастей|автозапчасти|артикул|каталожный номер)/i.test(normalized);
+  const partsSignal = /(магазин автозапчастей|автозапчасти|артикул|каталожный номер|домкрат)/i.test(normalized);
 
   if (strongFuelSignal && !repairSignal) category = "fuel";
   else if (category === "other" && repairSignal) category = "repair";

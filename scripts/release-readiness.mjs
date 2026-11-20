@@ -56,7 +56,7 @@ if (!process.env.DATABASE_URL?.trim()) {
 fileEvidence("Release evidence", "docs/release-evidence-2026-11-14.md", (content) => content.includes("Still open release gates"));
 fileEvidence("Scanner gate plan", "tasks/scanner-verification-plan-2026-11-14.md", (content) => content.includes("минимум из 30") && content.includes("ручной smoke-test"));
 fileEvidence("History remediation runbook", "docs/git-history-secret-remediation.md", (content) => content.includes("Gitleaks"));
-const externalPending = ["Authenticated Vertex/private-agent smoke", "Independent mailbox delivery and full email flow", "OCR regression set with ground truth and device smoke", "Legacy bundle provenance and privacy sign-off", "Post-rollout observation window with thresholds", "Approved Git history rewrite and secret/session rotation", "Full OEM evidence for every catalog configuration"];
+const externalPending = ["Independent mailbox delivery and full email/password flow after backend rollout", "OCR regression set with ground truth and device smoke", "Legacy bundle provenance and privacy sign-off", "Post-rollout observation window with thresholds", "GitHub Support decision for affected closed PR history references", "Full OEM evidence for every catalog configuration"];
 const followUps = ["Cloudflare Workers Builds owner log and repair (manual Wrangler workaround is documented and production health is verified)"];
 const passed = checks.filter((check) => check.status === "passed").length;
 const failed = checks.filter((check) => check.status === "failed").length;

@@ -56,12 +56,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   syncStatus = "loading",
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-  const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = React.useState<string | null>(null);
   const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
   const [resetMode, setResetMode] = React.useState(false);
   const [resetRequested, setResetRequested] = React.useState(false);
-  const [authUsername, setAuthUsername] = React.useState("");
   const [authPassword, setAuthPassword] = React.useState("");
   const [authEmail, setAuthEmail] = React.useState("");
   const [authEmailCode, setAuthEmailCode] = React.useState("");
@@ -75,13 +73,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     restoreSession()
       .then((session) => {
         setIsAuthenticated(Boolean(session));
-        setSessionUsername(session?.username ?? null);
         setSessionEmail(session?.email ?? null);
       })
       .catch(() => {
         // Treat an unavailable API as the normal guest/offline state.
         setIsAuthenticated(false);
-        setSessionUsername(null);
         setSessionEmail(null);
       });
   }, []);
@@ -117,7 +113,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           setResetMode(false);
           setResetRequested(false);
           setAuthMode("login");
-          setAuthUsername(authEmail.trim());
           setAuthPassword("");
           setAuthEmailCode("");
           setAuthError(null);
@@ -130,7 +125,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ? await verifyEmailCode(authEmail.trim(), authEmailCode.trim())
           : (await requestEmailCode(authEmail.trim()), setEmailCodeRequested(true), null))
         : authMode === "login"
-          ? await login(authUsername.trim(), authPassword)
+          ? await login(authEmail.trim(), authPassword)
           : await register(authEmail.trim(), authPassword);
       if (session && "pendingEmailVerification" in session) {
         setAuthEmail(session.email);
@@ -140,7 +135,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       }
       if (!session) return;
       setIsAuthenticated(true);
-      setSessionUsername(session.username);
       setSessionEmail(session.email ?? (authEmail.trim() || null));
       setAuthMode(null);
       setAuthPassword("");
@@ -151,9 +145,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ошибка авторизации";
       setAuthError(
-        message === "Пользователь с таким логином уже существует"
-          ? "Этот логин уже занят. Выберите другой."
-          : message
+        message
       );
     } finally {
       setAuthBusy(false);
@@ -183,7 +175,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-black text-neutral-900 truncate">
-              {isAuthenticated ? sessionUsername ?? "Владелец гаража" : "Гостевой профиль"}
+              {isAuthenticated ? "Владелец гаража" : "Гостевой профиль"}
             </h3>
             {isAuthenticated && (sessionEmail || userEmail) && (
               <div className="text-xs text-neutral-500 font-mono truncate">
@@ -320,10 +312,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <>
                     <input
                       type="email"
-                      value={authUsername}
-                      onChange={(event) => setAuthUsername(event.target.value)}
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
                       placeholder="Электронная почта"
-                      autoComplete="username"
+                      autoComplete="email"
                       required
                       className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
@@ -342,7 +334,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 {authError && <p role="alert" className="rounded-xl border border-red-100 bg-red-50/80 px-3 py-2 text-[12px] font-semibold leading-[1.25] text-red-700">{authError}</p>}
                 {authNotice && <p role="status" className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[12px] font-semibold leading-[1.25] text-emerald-800">{authNotice}</p>}
                 {!emailMode && !resetMode && (
-                  <button type="button" onClick={() => { setResetMode(true); setResetRequested(false); setAuthEmail(authMode === "login" ? authUsername.trim() : authEmail.trim()); setAuthPassword(""); setAuthError(null); }} className="w-full py-1 text-xs font-semibold text-brand-strong hover:text-brand-hover">
+                  <button type="button" onClick={() => { setResetMode(true); setResetRequested(false); setAuthEmail(authEmail.trim()); setAuthPassword(""); setAuthError(null); }} className="w-full py-1 text-xs font-semibold text-brand-strong hover:text-brand-hover">
                     Восстановить пароль
                   </button>
                 )}
@@ -463,7 +455,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <button
             onClick={() => {
               setIsAuthenticated(false);
-              setSessionUsername(null);
               setSessionEmail(null);
               setAuthMode(null);
               setEmailMode(false);

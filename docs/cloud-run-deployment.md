@@ -70,7 +70,7 @@ gcloud run deploy garageai-agents \
   --image "europe-west1-docker.pkg.dev/$PROJECT_ID/garageai/garageai-agents:latest" \
   --region europe-west1 \
   --no-allow-unauthenticated \
-  --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=europe-west1,GEMINI_MODEL=gemini-3.8-flash" \
+  --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=eu,GEMINI_MODEL=gemini-3.8-flash" \
   --set-secrets "AGENTS_API_TOKEN=agents-api-token:latest"
 ```
 
@@ -78,7 +78,7 @@ This is a template, not a completed deployment. Check model availability and com
 
 ## Connect the web service to the private agent service
 
-The Node API exposes an authenticated `POST /api/agents/run` proxy. It validates the task and allowed agent names, limits each run to at most three selected agents to bound paid model fan-out, applies per-user Node-side rate limits, and calls `POST /agents/run` on the private Python service. In production it obtains a Google ID token from the Cloud Run metadata server and also sends `X-Agents-Token`; neither token is returned to the browser. A separate `AGENTS_ALLOWED_USERNAMES` allowlist restricts paid agent calls to named project administrators; in production an empty allowlist disables the feature.
+The Node API exposes an authenticated `POST /api/agents/run` proxy. It validates the task and allowed agent names, limits each run to at most three selected agents to bound paid model fan-out, applies per-user Node-side rate limits, and calls `POST /agents/run` on the private Python service. In production it obtains a Google ID token from the Cloud Run metadata server and also sends `X-Agents-Token`; neither token is returned to the browser. The `AGENTS_ALLOWED_USERNAMES` allowlist accepts administrator emails (or existing internal usernames); in production an empty allowlist disables paid-agent calls.
 
 Do this only after the JSON store/session persistence blockers are resolved and the Python dependency audit is clean:
 
@@ -107,7 +107,7 @@ Environment settings:
 - `AGENTS_SERVICE_URL`: exact Cloud Run service URL returned by `gcloud run services describe`.
 - `AGENTS_SERVICE_AUDIENCE`: normally the same service URL; use a custom value only when Cloud Run is configured for that audience.
 - `AGENTS_API_TOKEN`: same high-entropy secret in both services, stored in Secret Manager. Never commit or send it to the browser.
-- `AGENTS_ALLOWED_USERNAMES`: comma-separated usernames for authorized project administrators. Set at least one deliberate admin account in production; an empty value fails closed.
+- `AGENTS_ALLOWED_USERNAMES`: comma-separated administrator emails (or existing internal usernames). Set only deliberately approved administrators; an empty value fails closed.
 - `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_CLOUD_LOCATION`: only when the web service uses Vertex AI directly.
 
 The proxy is covered by client-level unit tests and route input-validation tests. Real OIDC, IAM policy, Vertex AI and model invocation must still be smoke-tested in the actual project; this runbook does not indicate that cloud setup has been executed.

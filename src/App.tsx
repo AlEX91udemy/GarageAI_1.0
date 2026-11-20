@@ -966,16 +966,9 @@ export default function App() {
           }}
           onApplyFuel={(fuelData) => {
             handleAddFuelRecord({
+              ...fuelData,
               id: "fuel-" + crypto.randomUUID(),
               vehicleId: currentVehicle.id,
-              date: fuelData.date || new Date().toISOString().split("T")[0],
-              mileage: fuelData.mileage || currentVehicle.currentMileage,
-              liters: fuelData.liters || 50,
-              pricePerLiter: fuelData.pricePerLiter || 60,
-              totalCost: fuelData.totalCost || 3000,
-              fuelType: fuelData.fuelType || "АИ-95",
-              isFullTank: true,
-              station: fuelData.station || "АЗС",
             });
             setActiveView("expenses");
           }}
