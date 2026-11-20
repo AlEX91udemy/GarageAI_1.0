@@ -3372,7 +3372,7 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
   }
 });
 
-// 2a. Structured OCR for a Russian vehicle registration certificate (STS)
+// 2a. Structured OCR for Russian vehicle registration and title documents
 app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
@@ -3383,11 +3383,12 @@ app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное изображение СТС." });
     if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение СТС." });
     const prompt = [
-      "Ты высокоточный OCR российского свидетельства о регистрации транспортного средства (СТС).",
-      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай.",
+      "Ты высокоточный OCR автомобильных документов России и ЕАЭС.",
+      "Сначала определи тип документа: СТС (свидетельство о регистрации), ПТС/ЭПТС (паспорт транспортного средства), ТТС (таможенный документ о транспортном средстве) или VIN без документа. Верни documentType: sts, pts, tts, vin или unknown.",
+      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай. Если изображение не относится к транспортному средству или VIN не читается, верни documentType unknown и пустые поля.",
       "Верни только JSON. Для отсутствующих или нечитабельных полей используй null.",
-      JSON.stringify({ make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
-      "Подсказка по полям СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест.",
+      JSON.stringify({ documentType: "unknown", make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
+      "Для СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест. Для ПТС/ЭПТС/ТТС считывай те же значения только по явным подписям/полям документа.",
       "Дату верни в формате YYYY-MM-DD. Мощность в л.с. вычисляй из кВт только если P.2 прочитано уверенно. Не подменяй VIN номером свидетельства."
     ].join("\n");
     const responseText = getOpenRouterConfig("document").key

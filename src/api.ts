@@ -604,6 +604,7 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
 }
 
 export interface VehicleDocumentOcrResult {
+  documentType?: "sts" | "pts" | "tts" | "vin" | "unknown";
   make?: string;
   model?: string;
   generation?: string;
@@ -622,8 +623,8 @@ export interface VehicleDocumentOcrResult {
   registrationDate?: string;
   stsNumber?: string;
   stsIssueDate?: string;
-  confidence?: Record<string, number>;
   rawText?: string;
+  confidence?: Record<string, number>;
 }
 
 export async function requestVehicleDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<VehicleDocumentOcrResult> {
