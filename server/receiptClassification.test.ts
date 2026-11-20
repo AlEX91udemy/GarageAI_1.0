@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyReceiptText, parseLocalReceiptText, parseReceiptText } from "./receiptClassification";
+import { classifyReceiptText, getReceiptContentRejection, parseLocalReceiptText, parseReceiptText } from "./receiptClassification";
 import { parseFiscalReceiptQr } from "./receiptQr";
 
 describe("classifyReceiptText", () => {
@@ -32,6 +32,23 @@ describe("classifyReceiptText", () => {
     expect(parseReceiptText("Закрыто\nДата: 05.06.2026\nИтого: 1 200 ₽", { merchantName: "Закрыто" })).toMatchObject({ merchantName: null, totalAmount: 1200 });
   });
 
+  it("accepts an ordinary grocery receipt and keeps it in the other category", () => {
+    const receipt = "Магазин Продукты\nКассовый чек\nМолоко 2 шт 180 ₽\nИтого: 180 ₽\n05.06.2026";
+    expect(getReceiptContentRejection(receipt, { merchantName: "Магазин Продукты", totalAmount: 180, category: "parts" })).toBeNull();
+    expect(classifyReceiptText(receipt, "parts").category).toBe("other");
+  });
+
+  it("blocks explicit obscene content and input without receipt evidence", () => {
+    expect(getReceiptContentRejection("письки и сиськи")).toBe("inappropriate");
+    expect(getReceiptContentRejection("Членский взнос 500 рублей, чек, итог 500 ₽")).toBeNull();
+    expect(getReceiptContentRejection("фото кота", { description: "кот" })).toBe("not_receipt");
+    expect(getReceiptContentRejection("Чек Итого 500 ₽", { notReceipt: true, totalAmount: 500 })).toBe("not_receipt");
+  });
+
+  it("allows a photographed fuel-pump screen with strong fuel signals", () => {
+    expect(getReceiptContentRejection("17.853 gallons Price per gallon: $3.469", { category: "fuel", totalAmount: 39.72 })).toBeNull();
+  });
+
   it("classifies a Russian fuel receipt and extracts liters and unit price", () => {
     const result = classifyReceiptText(
       "АЗС ЛУКОЙЛ. Топливо: АИ-95-К5. Объем: 55.40 л. Цена за литр: 59.80 ₽. ИТОГ: 3 312.92 ₽",
@@ -53,8 +70,8 @@ describe("classifyReceiptText", () => {
     expect(result.category).toBe("repair");
   });
 
-  it("preserves an already recognized non-other category unless fuel evidence is strong", () => {
-    expect(classifyReceiptText("Покупка в магазине", "parts").category).toBe("parts");
+  it("does not trust an automotive category without matching receipt evidence", () => {
+    expect(classifyReceiptText("Покупка в магазине", "parts").category).toBe("other");
     expect(classifyReceiptText("АЗС, бензин АИ-95, 40 л, цена за литр 60 ₽", "other").category).toBe("fuel");
   });
 

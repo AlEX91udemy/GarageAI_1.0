@@ -65,7 +65,7 @@ import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
-import { classifyReceiptText, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText, parseReceiptText } from "./server/receiptClassification";
+import { classifyReceiptText, getReceiptContentRejection, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText, parseReceiptText } from "./server/receiptClassification";
 import { decodeFiscalReceiptQr } from "./server/receiptQr";
 import { normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant } from "./src/receiptFields";
 import {
@@ -540,7 +540,7 @@ async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<s
       messages: [
         {
           role: "user",
-          content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${safeOcrText}`,
+          content: `Извлеки поля только если OCR-текст содержит чек или подтверждение покупки; иначе верни {"notReceipt": true}. Не классифицируй продукты и бытовые покупки как автозапчасти. Автокатегорию ставь только при явных признаках, иначе укажи other. Не угадывай отсутствующие значения. Для даты используй YYYY-MM-DD; сумма должна быть итогом к оплате. Верни JSON: {"notReceipt": boolean, "merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${safeOcrText}`,
         },
       ],
       temperature: 0,
@@ -3200,6 +3200,9 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
       const parsed: Record<string, any> = getOpenRouterConfig("receipt").key
         ? await requestOpenRouterReceiptFields(receiptText.slice(0, 12_000)).catch(() => ({}))
         : {};
+      if (parsed.notReceipt === true) return res.status(422).json({ error: "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+      const rejection = getReceiptContentRejection(receiptText, parsed);
+      if (rejection) return res.status(422).json({ error: rejection === "inappropriate" ? "Документ содержит недопустимое содержимое. Загрузите фото чека." : "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
       const { rawText, ...result } = parseReceiptText(receiptText.slice(0, 12_000), parsed);
       return res.json(result);
     }
@@ -3241,6 +3244,10 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
 
     const fiscal = await decodeFiscalReceiptQr(decodedImage).catch(() => null);
     const sendReceipt = (fields: Record<string, unknown>, text = "") => {
+      const rejection = getReceiptContentRejection(text, fields);
+      if (rejection) {
+        return res.status(422).json({ error: rejection === "inappropriate" ? "Документ содержит недопустимое содержимое. Загрузите фото чека." : "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+      }
       const bank = fiscal ? null : parseBankReceiptText(text);
       const result = bank ? { ...fields, ...bank } : fields;
       const refund = fiscal ? fiscal.operation === "refund"
@@ -3262,7 +3269,7 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
     };
 
     const receiptPrompt = `Проанализируй фото чека, заказ-наряда или документа банка по операции.
-Игнорируй кнопки и подписи приложения вокруг документа (например, «Закрыть»). Для документа банка возьми продавца из описания операции и дату из строки операции. Если операция отменена или это возврат, укажи refund. Для отсутствующих полей верни null. Не возвращай реквизиты карты, ФИО и банковские реквизиты.
+Игнорируй кнопки и подписи приложения вокруг документа (например, «Закрыть»). Для документа банка возьми продавца из описания операции и дату из строки операции. Если операция отменена или это возврат, укажи refund. Если изображение не является чеком, заказ-нарядом или подтверждением покупки, верни {"notReceipt": true}. Продукты и бытовые покупки не классифицируй как автозапчасти. Для отсутствующих полей верни null. Не возвращай реквизиты карты, ФИО и банковские реквизиты.
 Верни JSON со структурой:
 {
   "merchantName": "название СТО, АЗС или магазина" | null,
@@ -3343,6 +3350,9 @@ app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
     const parsed = parseJsonSafely(responseText, null);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return await localReceipt();
     const parsedRecord = parsed as Record<string, unknown>;
+    if (parsedRecord.notReceipt === true) {
+      return res.status(422).json({ error: "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+    }
     const classification = classifyReceiptText(
       `${responseText}\n${JSON.stringify(parsed)}`,
       parsedRecord.category,

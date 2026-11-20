@@ -134,11 +134,36 @@ export function parseReceiptText(text: string, extractedFields: Record<string, u
   };
 }
 
+const INAPPROPRIATE_RECEIPT_CONTENT = /(?:^|[^\p{L}\p{N}])(?:письк\p{L}*|сиськ\p{L}*|пенис\p{L}*|вагин\p{L}*|порн\p{L}*|хуй\p{L}*|ху[йеия]\p{L}*|пизд\p{L}*|ебл\p{L}*|ебат\p{L}*|ебан\p{L}*|сперм\p{L}*|pussy|boobs?|tits?|penis|dicks?|cock|porn|nudes?)($|[^\p{L}\p{N}])/iu;
+
+/** Rejects obvious non-receipts while allowing ordinary retail purchases. */
+export function getReceiptContentRejection(text: string, fields: Record<string, unknown> = {}): "inappropriate" | "not_receipt" | null {
+  if (fields.notReceipt === true) return "not_receipt";
+  const fieldText = [fields.merchantName, fields.description, fields.notes]
+    .filter((value): value is string => typeof value === "string")
+    .concat(
+      ...(Array.isArray(fields.parts) ? fields.parts.map((part: any) => typeof part?.name === "string" ? part.name : "") : []),
+      ...(Array.isArray(fields.works) ? fields.works.map((work: any) => typeof work?.description === "string" ? work.description : "") : []),
+    )
+    .join(" ");
+  const content = `${text} ${fieldText}`.normalize("NFKC");
+  if (INAPPROPRIATE_RECEIPT_CONTENT.test(content)) return "inappropriate";
+
+  const hasReceiptLabel = /(?:^|[^\p{L}\p{N}])(?:чек|кассов\p{L}*|фискал\p{L}*|покупк\p{L}*|оплат\p{L}*|receipt|invoice|subtotal)(?=$|[^\p{L}\p{N}])/iu.test(content);
+  const hasAmount = /(?:итог\w*|всего|к оплате|сумм\w*|total|amount|₽|руб(?:\.|лей)?|RUB|[$€£])/i.test(content) || normalizeReceiptAmount(fields.totalAmount) !== null;
+  const hasDate = /(?<!\d)(?:20\d{2}[.\-/]\d{1,2}[.\-/]\d{1,2}|\d{1,2}[.\-/]\d{1,2}[.\-/](?:20\d{2}|\d{2}))(?!\d)/.test(content) || normalizeReceiptDate(fields.date) !== null;
+  const hasMerchant = normalizeReceiptMerchant(fields.merchantName) !== null;
+  const hasLineItems = (Array.isArray(fields.parts) && fields.parts.length > 0) || (Array.isArray(fields.works) && fields.works.length > 0);
+  const hasFuelEvidence = classifyReceiptText(content, fields.category).category === "fuel";
+  if ((hasReceiptLabel && hasAmount) || (hasAmount && (hasDate || hasMerchant || hasLineItems || hasFuelEvidence))) return null;
+  return "not_receipt";
+}
+
 export function classifyReceiptText(text: string, currentCategory?: unknown): ReceiptClassification {
   const normalized = text.toLocaleLowerCase("ru-RU");
   const current = typeof currentCategory === "string" ? currentCategory.toLowerCase() : "";
   const valid = new Set<ReceiptCategory>(["repair", "fuel", "parts", "wash", "tires", "tuning", "other"]);
-  let category: ReceiptCategory = valid.has(current as ReceiptCategory) ? current as ReceiptCategory : "other";
+  const requestedCategory = valid.has(current as ReceiptCategory) ? current as ReceiptCategory : "other";
 
   const strongFuelSignal =
     /(азс|заправк[а-я]*|топлив[а-я]*|бензин|дизельное топливо|дизтопливо|дт)/i.test(normalized) ||
@@ -148,10 +173,23 @@ export function classifyReceiptText(text: string, currentCategory?: unknown): Re
       /(?:₽\s*\/\s*л|руб(?:\.|лей)?\s*(?:за|\/)?\s*литр|цена\s*за\s*литр|колонка)/i.test(normalized));
   const repairSignal = /(?:^|[^а-яё])сто(?:$|[^а-яё])|заказ[- ]?наряд|автосервис|ремонт|замена масла|нормо[- ]?час|работы по ремонту/i.test(normalized);
   const partsSignal = /(магазин автозапчастей|автозапчасти|артикул|каталожный номер|домкрат)/i.test(normalized);
+  const washSignal = /(автомойк|мойка автомобил|детейлинг|химчистк салон)/i.test(normalized);
+  const tiresSignal = /(шиномонтаж|шины|покрышк|диск колес|балансировк колес)/i.test(normalized);
+  const tuningSignal = /(тюнинг автомобил|стайлинг автомобил|чип[- ]тюнинг)/i.test(normalized);
+
+  let category: ReceiptCategory = "other";
+  if (requestedCategory === "repair" && repairSignal) category = "repair";
+  else if (requestedCategory === "parts" && partsSignal) category = "parts";
+  else if (requestedCategory === "wash" && washSignal) category = "wash";
+  else if (requestedCategory === "tires" && tiresSignal) category = "tires";
+  else if (requestedCategory === "tuning" && tuningSignal) category = "tuning";
 
   if (strongFuelSignal && !repairSignal) category = "fuel";
-  else if (category === "other" && repairSignal) category = "repair";
+  else if (repairSignal) category = "repair";
   else if (category === "other" && partsSignal) category = "parts";
+  else if (category === "other" && washSignal) category = "wash";
+  else if (category === "other" && tiresSignal) category = "tires";
+  else if (category === "other" && tuningSignal) category = "tuning";
 
   if (category !== "fuel") return { category };
 
