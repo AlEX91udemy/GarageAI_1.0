@@ -17,9 +17,11 @@
 - Six branches were updated atomically. All 48 branch tips matched the verified rewrite, and GitHub confirmed restoration of the original `main` protection. The published `main` commit was `54586a03f55c44284c87bb58b52e616331fd5d1b`.
 - Gitleaks found zero leaks in the prepared mirror (1,156 commits) and in a fresh clone (625 commits). The fresh clone passed `git fsck` and contained no history for the removed file across the fetched branches. The controlled PostgreSQL session revocation is recorded below. Production health returned HTTP 200 and anonymous data access returned HTTP 401.
 - All GitHub Actions jobs passed for the rewritten main commit. The external Cloudflare Workers Builds check on PR #55 failed. [Main CI run](https://github.com/AlEX91udemy/GarageAI_1.0/actions/runs/44642660933)
-- Removed all 16 GitHub Actions caches created before the rewrite. GitHub reported zero forks. Of 51 closed PR heads still pointing to their original commits, 46 retained history for the removed file. Verified against the backup using full-history traversal. GitHub Support controls removal of these internal references and cached views. Its decision is pending.
+- Removed all 16 GitHub Actions caches created before the rewrite. GitHub reported zero forks. Of 51 closed PR heads still pointing to their original commits, 46 retained history for the removed file. Verified against the backup using full-history traversal. A private GitHub Support request was filed on 2026-11-20 and verified as Open in the support portal. It identifies the 46 affected PRs and asks GitHub to review the references, cached views, and applicable server-side cleanup.
 
 ## Verification update — 2026-11-20
+
+- Vertex runtime-identity smoke completed on 2026-11-20 using one short-lived Cloud Run Job from image digest `sha256:8c2c33fe8d285d11f91655b4afc3c597efe3e49676715c705fd3fb416675be9f` (revision `garageai-agents-00053-v8c`, source SHA `94e26247bd26100096f732073ad1838c46eae825`). The job ran as `garageai-agents-runtime@garage-ai-512223.iam.gserviceaccount.com`, confirmed `gemini-3.8-flash`, and returned HTTP 200 with model version `gemini-3.8-flash` and the expected bounded `OK` response in 1.63 seconds through `aiplatform.eu.rep.googleapis.com` with location `eu`. The regional endpoint `europe-west1` returned HTTP 404 NOT_FOUND for the same model, so `eu` is the supported production location for this model. The current revision still declares `GOOGLE_CLOUD_LOCATION=europe-west1`, therefore a production configuration update and an equivalent post-update smoke are required before enabling paid agents. The temporary Job and its execution resources were deleted after log capture. Paid agents and the administrator allowlist remain disabled pending the separate owner decision.
 
 - Fresh baseline probes at 2026-11-19 23:01 UTC: apex and Worker health each returned 10/10 HTTP 200 responses; anonymous `/api/data` returned HTTP 401 on all observed samples. Health response times were approximately 0.82–1.04 s for the apex and 0.82–0.95 s for the Worker in this short sample. This is a baseline only, not the required 48-hour observation window.
 - Fresh local acceptance checks passed: `server/emailCodeAuth.test.ts` 4/4 tests, `npm run test:scanner` 39/39 tests, `npm run catalog:audit` (110 configurations; 100 provisional, 10 partially verified, 0 verified), and `npm run catalog:recommendations` (1,550 checks, 0 errors). None of these results closes the independent mailbox, Vertex runtime-identity, device, OEM, Git-history, or observation gates.
@@ -103,7 +105,7 @@
 - OCR release acceptance still needs the approved anonymized 30+ sample regression set, ground truth, mobile/desktop smoke and latency/cost results. Existing fixtures are diagnostic only.
 - Legacy bundle provenance/ownership and privacy retention/deletion sign-off are not evidenced.
 - A post-rollout observation window with agreed 5xx, latency, Cloud SQL, email and spend thresholds is still required.
-- GitHub Support review of the remaining closed PR references is pending. The branch rewrite and fresh-clone checks are recorded above.
+- The support request is open. GitHub's cleanup decision and verification of the affected closed PR references are pending. The branch rewrite and fresh-clone checks are recorded above.
 
 ## Decision
 
