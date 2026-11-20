@@ -1,8 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { classifyReceiptText, parseLocalReceiptText } from "./receiptClassification";
+import { classifyReceiptText, parseLocalReceiptText, parseReceiptText } from "./receiptClassification";
 import { parseFiscalReceiptQr } from "./receiptQr";
 
 describe("classifyReceiptText", () => {
+  it("extracts a text-based PDF receipt without inventing absent fields", () => {
+    const result = parseReceiptText([
+      "ООО Лукойл-Уралнефтепродукт",
+      "АЗС Лукойл",
+      "Дата: 05.06.2026",
+      "Топливо: АИ-95",
+      "Объем: 40 л",
+      "Цена за литр: 60 ₽",
+      "Итого: 2 400 ₽",
+    ].join("\n"));
+
+    expect(result).toMatchObject({
+      merchantName: "ООО Лукойл-Уралнефтепродукт",
+      date: "2026-06-05",
+      totalAmount: 2400,
+      category: "fuel",
+      fuelDetails: { fuelType: "АИ-95", liters: 40, pricePerLiter: 60 },
+      operation: "expense",
+    });
+  });
+
+  it("keeps refunds marked as refunds in text-based receipts", () => {
+    expect(parseReceiptText("Отмена оплаты").operation).toBe("refund");
+  });
+
+  it("does not treat the closed dialog label as the receipt merchant", () => {
+    expect(parseReceiptText("Закрыто\nДата: 05.06.2026\nИтого: 1 200 ₽", { merchantName: "Закрыто" })).toMatchObject({ merchantName: null, totalAmount: 1200 });
+  });
+
   it("classifies a Russian fuel receipt and extracts liters and unit price", () => {
     const result = classifyReceiptText(
       "АЗС ЛУКОЙЛ. Топливо: АИ-95-К5. Объем: 55.40 л. Цена за литр: 59.80 ₽. ИТОГ: 3 312.92 ₽",

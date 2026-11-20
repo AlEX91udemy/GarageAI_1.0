@@ -121,6 +121,19 @@ export function parseLocalReceiptText(text: string): LocalReceiptFields {
   };
 }
 
+export function parseReceiptText(text: string, extractedFields: Record<string, unknown> = {}) {
+  const local = parseLocalReceiptText(text);
+  return {
+    ...local,
+    ...extractedFields,
+    category: classifyReceiptText(text, extractedFields.category ?? local.category).category,
+    merchantName: normalizeReceiptMerchant(extractedFields.merchantName) ?? local.merchantName,
+    date: normalizeReceiptDate(extractedFields.date) ?? local.date,
+    totalAmount: normalizeReceiptAmount(extractedFields.totalAmount) ?? local.totalAmount,
+    operation: isReceiptRefund(text) ? "refund" as const : "expense" as const,
+  };
+}
+
 export function classifyReceiptText(text: string, currentCategory?: unknown): ReceiptClassification {
   const normalized = text.toLocaleLowerCase("ru-RU");
   const current = typeof currentCategory === "string" ? currentCategory.toLowerCase() : "";

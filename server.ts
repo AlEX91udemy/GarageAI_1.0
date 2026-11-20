@@ -65,7 +65,7 @@ import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
-import { classifyReceiptText, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText } from "./server/receiptClassification";
+import { classifyReceiptText, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText, parseReceiptText } from "./server/receiptClassification";
 import { decodeFiscalReceiptQr } from "./server/receiptQr";
 import { normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant } from "./src/receiptFields";
 import {
@@ -3193,7 +3193,16 @@ ${exactManualContext}
 // 2. Receipt OCR Scanner
 app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
   try {
-    const { imageBase64, mimeType } = req.body;
+    const { imageBase64, mimeType, receiptText } = req.body;
+    if (typeof receiptText === "string" && receiptText.trim()) {
+      if (receiptText.length > 12_000) return res.status(413).json({ error: "Текст чека слишком большой" });
+      if (imageBase64 !== "" || mimeType !== "text/plain") return res.status(400).json({ error: "Некорректный текст PDF-чека" });
+      const parsed: Record<string, any> = getOpenRouterConfig("receipt").key
+        ? await requestOpenRouterReceiptFields(receiptText.slice(0, 12_000)).catch(() => ({}))
+        : {};
+      const { rawText, ...result } = parseReceiptText(receiptText.slice(0, 12_000), parsed);
+      return res.json(result);
+    }
 
     if (typeof imageBase64 !== "string" || !imageBase64) {
       return res.status(400).json({ error: "Изображение чека не предоставлено." });

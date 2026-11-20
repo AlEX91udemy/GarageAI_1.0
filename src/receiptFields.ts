@@ -1,7 +1,7 @@
 export function normalizeReceiptMerchant(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const name = value.trim().replace(/\s+/g, " ");
-  if (!/[а-яёa-z]/i.test(name) || /^(?:закры(?:ть|то|та|т)|назад|отмена|документ по операции|чек|не указано|не указана|нечитаемо|не удалось распознать)[.!]?$/i.test(name)) return null;
+  if (!/[а-яёa-z]/i.test(name) || /^(?:закры(?:ть|то|та|т)|назад|отмена)(?:\s*[:.!-]|\s*$)|^(?:документ по операции|чек|не указано|не указана|нечитаемо|не удалось распознать)[.!]?$/i.test(name)) return null;
   return name;
 }
 
@@ -25,3 +25,5 @@ export function normalizeReceiptAmount(value: unknown): number | null {
 export const RECEIPT_REFUND_MESSAGE = "Распознана отмена оплаты или возврат. Такой документ не добавляется в расходы.";
 export const RECEIPT_INCOME_MESSAGE = "Распознан чек расхода продавца. Проверьте, что у вас есть чек об оплате покупки.";
 export const MAX_RECEIPT_IMAGE_BYTES = 6_700_000;
+export const MAX_RECEIPT_DOCUMENT_BYTES = 6_700_000;
+export const MAX_RECEIPT_DOCUMENT_PAGES = 5;

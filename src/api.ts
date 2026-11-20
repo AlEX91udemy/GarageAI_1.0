@@ -586,11 +586,11 @@ export async function requestAiDiagnosis(payload: {
   return res.json();
 }
 
-export async function requestReceiptOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<any> {
+export async function requestReceiptOcr(imageBase64: string, mimeType = "image/jpeg", receiptText?: string): Promise<any> {
   const res = await authenticatedFetch("/api/ai/scan-receipt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64, mimeType }),
+    body: JSON.stringify({ imageBase64, mimeType, ...(receiptText ? { receiptText } : {}) }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

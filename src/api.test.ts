@@ -183,6 +183,18 @@ describe("OCR scanner API contracts", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ imageBase64: "data:image/jpeg;base64,AAAA", mimeType: "image/jpeg" });
   });
 
+  it("sends extracted PDF receipt text through the receipt OCR endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ category: "fuel", totalAmount: 2500 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestReceiptOcr("", "text/plain", "АЗС Лукойл\nИтого 2500");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      imageBase64: "",
+      mimeType: "text/plain",
+      receiptText: "АЗС Лукойл\nИтого 2500",
+    });
+  });
+
   it("rejects malformed OCR response shapes for all scanner endpoints", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify([]), { status: 200 })));
 
