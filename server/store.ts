@@ -39,6 +39,7 @@ export interface EmailAuthChallengeRecord {
   attempts: number;
   consumedAtMs?: number;
   createdAtMs: number;
+  purpose?: "login" | "password_reset";
 }
 
 interface StoreShape {
@@ -274,6 +275,22 @@ export class GarageStore {
     return this.state.users.find((user) => user.id === id);
   }
 
+  async updatePassword(userId: string, passwordHash: string): Promise<boolean> {
+    const task = this.writeChain.then(() => {
+      const user = this.state.users.find((item) => item.id === userId);
+      if (!user) return false;
+      const nextUsers = this.state.users.map((item) => item.id === userId ? { ...item, passwordHash } : item);
+      this.persistUsers(nextUsers);
+      this.state.users = nextUsers;
+      return true;
+    });
+    this.writeChain = task.then(() => undefined, (error) => {
+      this.lastPersistError = error instanceof Error ? error : new Error(String(error));
+      return undefined;
+    });
+    return task;
+  }
+
   listUsers(): UserRecord[] {
     return this.state.users.map((u) => ({ ...u }));
   }
@@ -394,10 +411,12 @@ export class GarageStore {
     await task;
   }
 
-  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5, purpose: "login" | "password_reset" = "login"): Promise<boolean> {
     const task = this.writeChain.then(() => {
       const challenge = this.state.emailChallenges
-        .filter((item) => item.userId === userId && !item.consumedAtMs)
+        .filter((item) => item.userId === userId && !item.consumedAtMs && (purpose === "password_reset"
+          ? item.purpose === "password_reset" || item.id.startsWith("email-reset-")
+          : item.purpose !== "password_reset" && (item.purpose === "login" || item.id.startsWith("email-challenge-") || !item.purpose)))
         .sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
       if (!challenge || challenge.expiresAtMs <= now || challenge.attempts >= maxAttempts) return false;
       challenge.attempts += 1;
@@ -407,6 +426,32 @@ export class GarageStore {
       return accepted;
     });
     this.writeChain = task.then(() => undefined, () => undefined);
+    return task;
+  }
+
+  async resetPasswordWithEmailChallenge(userId: string, code: string, secret: string, passwordHash: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+    const task = this.writeChain.then(() => {
+      const challenge = this.state.emailChallenges
+        .filter((item) => item.userId === userId && !item.consumedAtMs && (item.purpose === "password_reset" || item.id.startsWith("email-reset-")))
+        .sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
+      if (!challenge || challenge.expiresAtMs <= now || challenge.attempts >= maxAttempts) return false;
+      challenge.attempts += 1;
+      const accepted = challenge.codeHash === hashEmailCode(challenge.id, code, secret);
+      if (!accepted) {
+        writeJsonAtomic(this.emailChallengesFile, this.state.emailChallenges);
+        return false;
+      }
+      challenge.consumedAtMs = now;
+      writeJsonAtomic(this.emailChallengesFile, this.state.emailChallenges);
+      const nextUsers = this.state.users.map((item) => item.id === userId ? { ...item, passwordHash } : item);
+      this.persistUsers(nextUsers);
+      this.state.users = nextUsers;
+      return true;
+    });
+    this.writeChain = task.then(() => undefined, (error) => {
+      this.lastPersistError = error instanceof Error ? error : new Error(String(error));
+      return undefined;
+    });
     return task;
   }
 

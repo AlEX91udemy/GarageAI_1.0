@@ -6,11 +6,12 @@ interface RoundedSelectProps {
   value: string;
   options: Array<{ value: string; label: string }>;
   placeholder: string;
+  required?: boolean;
   onChange: (value: string) => void;
 }
 
 export const RoundedSelect: React.FC<RoundedSelectProps> = ({
-  id, value, options, placeholder, onChange,
+  id, value, options, placeholder, required = false, onChange,
 }) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -26,6 +27,7 @@ export const RoundedSelect: React.FC<RoundedSelectProps> = ({
 
   return (
     <div ref={rootRef} className="relative min-w-0">
+      <input type="hidden" name={id} value={value} required={required} />
       <button
         id={id}
         type="button"

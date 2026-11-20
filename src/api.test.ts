@@ -12,6 +12,9 @@ import {
   fetchPublicKnowledgeSources,
   refreshPublicKnowledgeSources,
   register,
+  verifyEmailCode,
+  requestPasswordReset,
+  confirmPasswordReset,
   type GarageAiAgentName,
 } from "./api";
 
@@ -47,7 +50,7 @@ describe("account-scoped backup APIs", () => {
   });
 
   it("deletes an account only through the authenticated endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "person", csrfToken: "csrf", email: "person@example.test" } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(deleteAccount("CurrentPassword-123!")).resolves.toBeUndefined();
@@ -56,6 +59,40 @@ describe("account-scoped backup APIs", () => {
       body: JSON.stringify({ password: "CurrentPassword-123!" }),
     }));
     expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
+  });
+});
+
+describe("password reset API", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("requests a reset code using only the email", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(requestPasswordReset("person@example.test")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/password/reset/request", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test" }),
+    }));
+  });
+
+  it("submits the reset code and new password without changing client session state", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(confirmPasswordReset("person@example.test", "123456", "New-password-123!")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/password/reset/confirm", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test", code: "123456", password: "New-password-123!" }),
+    }));
+  });
+
+  it("keeps the login verification contract separate from password-reset codes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "person", csrfToken: "csrf", email: "person@example.test" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(verifyEmailCode("person@example.test", "123456")).resolves.toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/email/verify", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test", code: "123456" }),
+    }));
   });
 });
 

@@ -38,3 +38,7 @@ Use focused checks during iteration, then run the relevant final checks after th
 ## Delivery
 
 Keep changes small and reviewable. Report files changed, checks run, and any external production gate that cannot be verified from this workstation.
+
+## Cloudflare Worker deployment
+
+After every user-facing code or asset change, publish the current build to the Cloudflare Worker with `npm run cloudflare:deploy`, then verify the apex and Worker public endpoints. Do not report a frontend change as complete until the Worker deployment and public smoke checks succeed.

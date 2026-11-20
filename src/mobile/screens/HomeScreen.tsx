@@ -589,7 +589,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <div className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                     Последняя работа
                   </div>
-                  <div className="text-base font-black tracking-tight mt-0.5">
+                  <div className="text-base font-medium tracking-tight mt-0.5">
                     {lastVehicleService ? fmtDate(lastVehicleService.date) : "—"}
                   </div>
                 </div>

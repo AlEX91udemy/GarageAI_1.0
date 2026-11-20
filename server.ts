@@ -781,6 +781,8 @@ app.use("/api", (req, res, next) => {
     req.path === "/auth/email/request-code" ||
     req.path === "/auth/email/verify" ||
     req.path === "/auth/email/verify-code" ||
+    req.path === "/auth/password/reset/request" ||
+    req.path === "/auth/password/reset/confirm" ||
     req.path.startsWith("/auth/session");
   if (isPublic) return next();
   if (req.path === "/health" || !fullPath) return next();
@@ -2572,16 +2574,16 @@ async function establishSession(req: express.Request, res: express.Response, use
   return { username, email, csrfToken: record.csrfSecret };
 }
 
-async function issueEmailChallenge(userId: string, email: string): Promise<void> {
+async function issueEmailChallenge(userId: string, email: string, purpose: "login" | "password_reset" = "login"): Promise<void> {
   const secret = process.env.EMAIL_CODE_SECRET?.trim();
   if (!secret) throw new Error("Email code secret is not configured");
-  const id = newId("email-challenge");
+  const id = newId(purpose === "login" ? "email-challenge" : "email-reset");
   const code = generateEmailCode();
   const createdAtMs = Date.now();
-  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs };
+  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs, purpose };
   await store.createEmailChallenge(record);
   try {
-    await sendEmailCode(email, code);
+    await sendEmailCode(email, code, purpose);
   } catch (error) {
     await store.consumeEmailChallenge(userId, id, Date.now());
     throw error;
@@ -2637,14 +2639,16 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   if (await rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
-  const username = asTrimmedString(body.username, 32).toLowerCase();
+  const username = asTrimmedString(body.username, 120).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
   if (!username || !password) {
     return res.status(400).json({ error: "Введите логин и пароль" });
   }
   let user;
   try {
-    user = await store.getUserByName(username);
+    user = username.includes("@")
+      ? (store instanceof PostgresPersistence ? await store.getUserByEmail(username) : store.getUserByEmail(username))
+      : await store.getUserByName(username);
   } catch (error) {
     console.error("Login lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
@@ -2714,7 +2718,7 @@ async function consumeEmailVerifyLimit(req: express.Request, email: string): Pro
   return true;
 }
 
-async function sendEmailCode(email: string, code: string): Promise<void> {
+async function sendEmailCode(email: string, code: string, purpose: "login" | "password_reset" = "login"): Promise<void> {
   const captureFile = process.env.EMAIL_CODE_CAPTURE_FILE?.trim();
   if (process.env.NODE_ENV === "test" && captureFile) {
     fs.mkdirSync(path.dirname(captureFile), { recursive: true });
@@ -2726,7 +2730,7 @@ async function sendEmailCode(email: string, code: string): Promise<void> {
   if (!apiKey || !from) throw new Error("Email provider is not configured");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
+    body: JSON.stringify({ from, to: [email], subject: purpose === "login" ? "Ваш код входа в GarageAI" : "Восстановление пароля GarageAI", text: "Код для " + (purpose === "login" ? "входа" : "сброса пароля") + ": " + code + ". Он действует " + Math.floor(EMAIL_CODE_TTL_MS / 60000) + " минут." }),
   });
   if (!response.ok) throw new Error("Email provider rejected the request");
 }
@@ -2778,6 +2782,60 @@ app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, 
     return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch {
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
+  }
+});
+
+app.post("/api/auth/password/reset/request", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Введите корректный email" });
+  if (!(await consumeEmailCodeLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много запросов. Повторите позже." });
+  }
+  if (!emailDeliveryConfigured() || !process.env.EMAIL_CODE_SECRET?.trim()) {
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (user) await issueEmailChallenge(user.id, email, "password_reset");
+    return res.json({ success: true, message: "Если аккаунт с таким email существует, код восстановления отправлен." });
+  } catch {
+    console.error("Password reset request failed");
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+  }
+});
+
+app.post("/api/auth/password/reset/confirm", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Введите email и шестизначный код" });
+  if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Пароль должен содержать от 8 до 200 символов" });
+  if (!(await consumeEmailVerifyLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много попыток. Повторите позже." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (!user || user.emailVerifiedAt === null) return res.status(400).json({ error: "Неверный или просроченный код" });
+    const secret = process.env.EMAIL_CODE_SECRET?.trim();
+    if (!secret) return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+    const accepted = store instanceof PostgresPersistence
+      ? await store.resetPasswordWithEmailChallenge(user.id, code, secret, hashPassword(password))
+      : await store.resetPasswordWithEmailChallenge(user.id, code, secret, hashPassword(password));
+    if (!accepted) return res.status(400).json({ error: "Неверный или просроченный код" });
+    if (store instanceof PostgresPersistence) {
+      // Password, one-time code and active sessions are updated atomically by the repository.
+    } else {
+      const now = Date.now();
+      for (const session of sessions.values()) {
+        if (session.userId === user.id && !session.revokedAt) session.revokedAt = now;
+      }
+      await persistSessions();
+    }
+    return res.json({ success: true, message: "Пароль изменён. Войдите с новым паролем." });
+  } catch {
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
   }
 });
 

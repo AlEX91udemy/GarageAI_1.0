@@ -23,14 +23,34 @@
 /* Theme variables */
 :root {
   --app-font-family: "Segoe UI", Arial, sans-serif;
+  --app-font-mono: "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  --font-sans: var(--app-font-family);
+  --font-mono: var(--app-font-mono);
+  --type-size-caption: 0.75rem;
+  --type-size-body: 0.875rem;
+  --type-size-body-lg: 1rem;
+  --type-size-subtitle: 1.125rem;
+  --type-size-title: 1.375rem;
+  --type-size-display: 1.875rem;
+  --type-weight-regular: 400;
+  --type-weight-medium: 500;
+  --type-weight-semibold: 600;
+  --type-weight-bold: 700;
+  --type-leading-body: 1.5;
+  --type-leading-tight: 1.25;
   --app-bg: #f4f5f8;
   --app-card: #ffffff;
   --app-subcard: #f8fafc;
   --app-border: #e2e8f0;
   --app-text: #0f172a;
+  --app-text-secondary: #334155;
   --app-text-muted: #536171;
   --app-accent: #b91c1c;
   --app-brand-mark: #ef3038;
+  --app-success: #059669;
+  --app-warning: #b45309;
+  --app-info: #2563eb;
+  --app-danger: #dc2626;
   --anim-duration: 180ms;
   --anim-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --anim-hover-y: -2px;
@@ -45,8 +65,13 @@ html.dark, :root.dark, .dark {
   --app-subcard: #0d131d;
   --app-border: #243044;
   --app-text: #f8fafc;
+  --app-text-secondary: #cbd5e1;
   --app-text-muted: #94A3B8;
   --app-accent: #ef3038;
+  --app-success: #34d399;
+  --app-warning: #fbbf24;
+  --app-info: #60a5fa;
+  --app-danger: #f87171;
   --card-hover-shadow: 0 10px 24px -8px rgba(0, 0, 0, 0.4);
 }
 
@@ -499,10 +524,7 @@ html { color-scheme: light; scroll-padding-top: 130px; }
 html.dark { color-scheme: dark; }
 body { margin: 0; font-family: var(--app-font-family); line-height: 1.5; }
 /* Shared dialogs can mount outside the mobile root, including in a body portal. */
-body:has(.garage-mobile) {
-  --font-sans: var(--app-font-family);
-  --font-mono: var(--app-font-family);
-}
+body:has(.garage-mobile) { --font-sans: var(--app-font-family); --font-mono: var(--app-font-mono); }
 .mobile-stat-card { @apply grid row-span-3 grid-cols-1 grid-rows-subgrid gap-y-0 min-w-0 px-2 py-3; }
 .mobile-stat-label { @apply flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 mb-1; }
 .mobile-stat-value { @apply text-sm font-medium leading-tight tracking-tight tabular-nums; }
@@ -518,11 +540,11 @@ button, [role="button"], input:not([type="checkbox"]):not([type="radio"]):not([t
 }
 button { min-width: 44px; touch-action: manipulation; }
 button:disabled { cursor: not-allowed; opacity: .55; }
-:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+:where(button, a, [role="button"], [tabindex]:not(input):not(select):not(textarea)):focus-visible:not([class*="focus:ring"]) {
   outline: 3px solid var(--app-accent) !important;
   outline-offset: 3px;
 }
-.dark :where(button, a, input, select, textarea, [tabindex]):focus-visible { outline-color: #ff9b9b !important; }
+.dark :where(button, a, [role="button"], [tabindex]:not(input):not(select):not(textarea)):focus-visible:not([class*="focus:ring"]) { outline-color: #ff9b9b !important; }
 input, select, textarea { font: inherit; }
 input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacity: 1; }
 :where(h1, h2, h3, h4) { text-wrap: balance; }
@@ -573,7 +595,69 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .app-navigation button { white-space: nowrap; }
 .app-navigation button[aria-current="page"] { border-bottom: 2px solid var(--app-accent); }
 .app-main { padding-top: 24px; }
-.app-main :where([class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"]) { font-size: 12px; }
+/* Keep application typography on a readable, role-based scale. */
+.app-main :where([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"]) {
+  font-size: var(--type-size-caption);
+  line-height: var(--type-leading-tight);
+}
+.app-main .text-xs { font-size: var(--type-size-caption); line-height: var(--type-leading-tight); }
+.app-main .text-sm { font-size: var(--type-size-body); line-height: var(--type-leading-body); }
+.app-main .text-base { font-size: var(--type-size-body-lg); line-height: var(--type-leading-body); }
+.app-main .text-lg { font-size: var(--type-size-subtitle); line-height: var(--type-leading-tight); }
+.app-main .text-xl { font-size: var(--type-size-title); line-height: var(--type-leading-tight); }
+.app-main .text-2xl { font-size: 1.5rem; line-height: var(--type-leading-tight); }
+.app-main .text-3xl { font-size: 1.875rem; line-height: 1.2; }
+.app-main :where(.font-black, .font-extrabold) { font-weight: var(--type-weight-bold); }
+.app-main .font-bold { font-weight: var(--type-weight-semibold); }
+.app-main .font-semibold { font-weight: var(--type-weight-semibold); }
+.app-main .font-medium { font-weight: var(--type-weight-medium); }
+.app-main :where(.bg-white, [class~="bg-white/90"], [class~="bg-white/80"]) {
+  background-color: var(--app-card) !important;
+}
+.app-main .bg-neutral-50,
+.app-main .bg-slate-50,
+.app-main .bg-gray-50 { background-color: var(--app-subcard) !important; }
+.app-main .bg-neutral-100,
+.app-main .bg-slate-100,
+.app-main .bg-gray-100 { background-color: var(--app-card) !important; }
+.app-main .border-neutral-200,
+.app-main .border-neutral-300,
+.app-main .border-slate-200 { border-color: var(--app-border) !important; }
+.app-main .text-neutral-900,
+.app-main .text-slate-900,
+.app-main .text-neutral-800,
+.app-main .text-slate-800 { color: var(--app-text) !important; }
+.app-main .text-neutral-700,
+.app-main .text-slate-700 { color: var(--app-text-secondary) !important; }
+.app-main .text-neutral-500,
+.app-main .text-neutral-400,
+.app-main .text-slate-500,
+.app-main .text-slate-400 { color: var(--app-text-muted) !important; }
+.app-main .text-emerald-500,
+.app-main .text-emerald-600,
+.app-main .text-emerald-700 { color: var(--app-success) !important; }
+.app-main .text-amber-500,
+.app-main .text-amber-600,
+.app-main .text-amber-700 { color: var(--app-warning) !important; }
+.app-main .text-blue-500,
+.app-main .text-blue-600,
+.app-main .text-blue-700 { color: var(--app-info) !important; }
+.app-main,
+[role="dialog"] {
+  font-family: var(--app-font-family);
+}
+:where([role="dialog"]) :where([class*="text-[7px]"], [class*="text-[8px]"], [class*="text-[9px]"], [class*="text-[10px]"], [class*="text-[11px]"]) {
+  font-size: var(--type-size-caption);
+  line-height: var(--type-leading-tight);
+}
+:where([role="dialog"]) .text-xs { font-size: var(--type-size-caption); line-height: var(--type-leading-tight); }
+:where([role="dialog"]) .text-sm { font-size: var(--type-size-body); line-height: var(--type-leading-body); }
+:where([role="dialog"]) .text-base { font-size: var(--type-size-body-lg); line-height: var(--type-leading-body); }
+:where([role="dialog"]) .text-lg { font-size: var(--type-size-subtitle); line-height: var(--type-leading-tight); }
+:where([role="dialog"]) :where(.font-black, .font-extrabold) { font-weight: var(--type-weight-bold); }
+:where([role="dialog"]) .font-bold { font-weight: var(--type-weight-semibold); }
+:where([role="dialog"]) .font-semibold { font-weight: var(--type-weight-semibold); }
+:where([role="dialog"]) .font-medium { font-weight: var(--type-weight-medium); }
 .vehicle-hero { background: var(--app-card) !important; border-color: var(--app-border); border-radius: 20px; box-shadow: none; padding: 20px; }
 .vehicle-hero h1 { font-weight: 700; font-size: clamp(24px, 3vw, 34px); }
 .vehicle-hero [class*="bg-gradient"] { background-image: none; }
@@ -584,8 +668,8 @@ input::placeholder, textarea::placeholder { color: var(--app-text-muted); opacit
 .vehicle-stage-placeholder { height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--app-text-muted); padding: 20px; text-align: center; }
 .vehicle-stage-placeholder p { font-size: 18px; color: var(--app-text); font-weight: 600; }
 .vehicle-stage-placeholder span { font-size: 12px; }
-.stage-cta { background: #b91c1c; color: white; }
-.stage-cta:hover { background: #991b1b; }
+.stage-cta { background: var(--app-accent); color: white; }
+.stage-cta:hover { background: var(--app-brand-mark); }
 .vehicle-stage-media { position: relative; width: 100%; aspect-ratio: 640 / 360; }
 .vehicle-stage-photo { display: block; width: 100%; height: 100%; object-fit: contain; }
 .vehicle-stage-paint-layer { inset: 0; }
@@ -613,24 +697,18 @@ html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35
 .dashboard .uppercase { text-transform: none; letter-spacing: .02em; }
 .dashboard [class*="blur-"] { filter: none; }
 .dashboard .animate-pulse { animation: none; }
-.app-main .bg-brand-strong, [role="dialog"] .bg-brand-strong { background-color: #b91c1c; }
-.app-main .text-amber-500 { color: #B45309; }
-.dark .app-main .text-amber-500 { color: #fbbf24; }
-.app-main .text-brand-strong { color: #b91c1c; }
-.dark .app-main .text-brand-strong { color: #f87171; }
+.app-main .bg-brand-strong, [role="dialog"] .bg-brand-strong { background-color: var(--app-accent); }
+.app-main .text-amber-500 { color: var(--app-warning); }
+.dark .app-main .text-amber-500 { color: var(--app-warning); }
+.app-main .text-brand-strong { color: var(--app-accent); }
+.dark .app-main .text-brand-strong { color: var(--app-brand-mark); }
 
 /* Project form standard: fields, native selects, suggestions and date controls. */
 :where(.app-main, [role="dialog"]) {
-  --ui-field-bg: #f8fafc;
-  --ui-field-border: #e2e8f0;
-  --ui-field-text: #0f172a;
-  --ui-field-muted: #64748b;
-}
-.dark :where(.app-main, [role="dialog"]) {
-  --ui-field-bg: #0d131d;
-  --ui-field-border: #243044;
-  --ui-field-text: #f8fafc;
-  --ui-field-muted: #94a3b8;
+  --ui-field-bg: var(--app-subcard);
+  --ui-field-border: var(--app-border);
+  --ui-field-text: var(--app-text);
+  --ui-field-muted: var(--app-text-muted);
 }
 :where(.app-main, [role="dialog"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
   background-color: var(--ui-field-bg) !important;
@@ -641,8 +719,11 @@ html.dark .vehicle-model-renderer { background: radial-gradient(circle at 50% 35
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 :where(.app-main, [role="dialog"]) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea):focus {
-  border-color: var(--color-brand) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 16%, transparent) !important;
+  border-color: var(--app-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent) !important;
+}
+:where([role="dialog"]) .vehicle-year-field:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-accent) 15%, transparent) !important;
 }
 :where(.app-main, [role="dialog"]) :where(input, textarea)::placeholder {
   color: var(--ui-field-muted) !important;

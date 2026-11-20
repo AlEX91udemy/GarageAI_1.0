@@ -26,12 +26,12 @@
 - [x] Worker `garageai-1-0` опубликован, `API_ORIGIN` указывает на текущий Cloud Run service URL.
 - [x] Production smoke подтвердил health `200`, защищенный `/api/data` `401`, гостевой OCR `200` и рекомендации для LADA Vesta.
 - [x] Образ production зафиксирован digest `sha256:23c8b9afd1ebb324984b39a51dbde542bd3e2405d927a799fb43db87102c0207`; рабочее дерево чистое и ветка синхронизирована с origin.
-- [x] Vertex smoke выполнен из одноразового Cloud Run Job с runtime identity `garageai-agents-runtime@garage-ai-512223.iam.gserviceaccount.com`; `gemini-3.8-flash` подтвердил ответ через европейский мультирегион `eu`.
+- [x] Vertex location `eu` развернута на Cloud Run revision `garageai-agents-00061-jus`; Vertex и authenticated private-agent smoke прошли, предыдущая revision сохранена для rollback.
 
 ## Осталось сделать
 
 - [ ] Завершить email smoke в тестовом mailbox: доставка, принятие/отказ кода, logout, повторное использование и срок действия.
-- [ ] После подтверждения модели получить отдельное разрешение на платных агентов и только затем заполнить allowlist.
+- [ ] Получить отдельное разрешение владельца на платных агентов с месячным лимитом 50 SGD и только затем заполнить allowlist.
 - [ ] Получить обезличенный OCR regression set минимум из 30 документов с ground truth и зафиксировать метрики.
 - [ ] Провести smoke-проверки мобильного приложения на iOS и Android.
 - [x] Для Cloudflare Workers Builds зафиксирован обход: manual Wrangler deploy из корня репозитория; dry-run и production health проходят. Исторический build `2087658f-d332-49a3-ab78-b664d56b0725` не содержит доступного первичного лога, поэтому причина остаётся внешним CI-ограничением.
@@ -46,7 +46,7 @@
 
 ## Аудит закрытия — 20.11.2026
 
-Локальная часть перепроверена: 35 файлов / 205 тестов, scanner 39/39, MobileApp/AddEvent/BarcodeScanner 14/14, TypeScript, production build, config contract, dependency audit (0 уязвимостей), оба public health endpoint и каталог/recommendation matrix проходят. Для девяти оставшихся задач нужны mailbox, отдельное разрешение платных агентов, реальные iOS/Android устройства, OEM-документы, письменные решения владельца, ответ GitHub Support или фактические 48-часовые production метрики. До получения этих доказательств сохраняется **NO-GO**.
+Локальная часть перепроверена: 35 файлов / 205 тестов, scanner 39/39, MobileApp/AddEvent/BarcodeScanner 14/14, TypeScript, production build, config contract, dependency audit (0 уязвимостей), оба public health endpoint и каталог/recommendation matrix проходят. Для девяти оставшихся задач нужны mailbox, отдельное разрешение платных агентов, реальные iOS/Android устройства, OEM-документы, письменные решения владельца, ответ GitHub Support или фактические 48-часовые production метрики. Vertex и private-agent production smoke теперь подтверждены. До получения остальных доказательств сохраняется **NO-GO**.
 
 ## Условия наблюдения
 

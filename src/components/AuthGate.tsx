@@ -47,7 +47,7 @@ export const AuthGate: React.FC<
       try {
         const next = emailMode
           ? (codeRequested ? await verifyEmailCode(email, emailCode) : (await requestEmailCode(email), setCodeRequested(true), null))
-          : (mode === "login" ? await login(username, password) : await register(username, password, email));
+          : (mode === "login" ? await login(username, password) : await register(email, password));
         if (next && "pendingEmailVerification" in next) {
           setEmail(next.email);
           setEmailMode(true);
@@ -109,26 +109,27 @@ export const AuthGate: React.FC<
             </button>
           </div>
           <button type="button" className="w-full text-xs text-slate-400 hover:text-white" onClick={() => { setEmailMode((value) => !value); setError(null); setCodeRequested(false); }}>
-            {emailMode ? "Войти по логину и паролю" : "Войти по email-коду"}
+            {emailMode ? "Войти по почте и паролю" : "Войти по коду из письма"}
           </button>
 
           {emailMode ? <label className="block text-sm text-slate-300">
-            Email
+            Электронная почта
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />
             {codeRequested && <input inputMode="numeric" pattern="[0-9]{6}" value={emailCode} onChange={(e) => setEmailCode(e.target.value)} placeholder="Код из письма" className="mt-2 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />}
           </label> : <>{mode === "register" && <label className="block text-sm text-slate-300">
-            Email для подтверждения регистрации
+            Электронная почта
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60" required />
-          </label>}<label className="block text-sm text-slate-300">
-            Логин
+          </label>}{mode === "login" && <label className="block text-sm text-slate-300">
+            Электронная почта
             <input
+              type="email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               className="mt-1 w-full rounded-lg bg-[#0D131D] border border-[#243044] px-3 py-2 text-slate-100 outline-none focus:border-brand/60"
               required
             />
-          </label></>}
+          </label>} </>}
           {!emailMode && <label className="block text-sm text-slate-300">
             Пароль
             <input

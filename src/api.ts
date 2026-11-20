@@ -52,12 +52,14 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string, email: string): Promise<AuthSession | PendingRegistration> {
+export async function register(email: string, password: string, legacyEmail?: string): Promise<AuthSession | PendingRegistration> {
+  const address = (legacyEmail || email).trim();
+  const username = legacyEmail ? email : `garage-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password, email: email.trim() }),
+    body: JSON.stringify({ username, password, email: address }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
@@ -106,6 +108,24 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
   authSessionActive = true;
   setActiveUsername(data.session.username);
   return data.session;
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/password/reset/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось запросить восстановление пароля");
+}
+
+export async function confirmPasswordReset(email: string, code: string, password: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/password/reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({ email, code, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось изменить пароль");
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {

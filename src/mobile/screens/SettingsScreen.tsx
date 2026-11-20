@@ -281,6 +281,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <h3 className={`font-bold uppercase tracking-wider text-[11px] ${headingClass}`}>
             Правовая информация
           </h3>
+          <p className={`pt-1 text-[10px] leading-4 ${mutedClass}`}>
+            Документы описывают обработку данных, условия использования и необходимые cookie.
+            Перед загрузкой документов проверьте, что они не содержат лишних чужих данных.
+          </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <a href="/privacy" className={`block rounded-lg py-2 text-xs font-semibold transition-colors ${isDark ? "text-slate-300 hover:text-white" : "text-neutral-700 hover:text-neutral-950"}`}>
             Политика конфиденциальности
@@ -293,7 +297,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </a>
           </div>
           <a href="mailto:founder@garageai.site" className={`block pt-1 text-[10px] transition-colors ${isDark ? "text-slate-500 hover:text-slate-300" : "text-neutral-500 hover:text-neutral-800"}`}>
-            founder@garageai.site
+            Контакты по вопросам данных: founder@garageai.site
           </a>
         </div>
       </div>

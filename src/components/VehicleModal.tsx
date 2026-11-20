@@ -781,12 +781,12 @@ export const VehicleModal: React.FC<VehicleModalProps> = ({
                 max="2030"
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-0 focus:border-brand"
+                className="vehicle-year-field w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:ring-0 focus:border-brand"
                 required
               />
             </div>
             <div>
-              <label htmlFor="vehiclemodal-market" className="block font-semibold text-neutral-700 mb-1">Рынок поставки</label>
+              <label htmlFor="vehiclemodal-market" className="block font-semibold text-neutral-700 mb-1">Страна / рынок поставки</label>
               <RoundedSelect
                 id="vehiclemodal-market"
                 value={market}

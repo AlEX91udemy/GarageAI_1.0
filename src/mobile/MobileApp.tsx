@@ -466,6 +466,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setInitialQuickActionType("service");
               setCurrentScreen("add_event");
             }}
+            onOpenScanReceipt={() => setCurrentScreen("scan_receipt")}
             onEditVehicle={() => {
               if (typeof onOpenEditVehicleModal === "function") {
                 onOpenEditVehicleModal();
