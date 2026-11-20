@@ -1,5 +1,13 @@
 # Release evidence: 2026-11-14 (updated 2026-11-20)
 
+## Email and receipt scanner hotfix — 2026-11-20
+
+- Cloud Run serves the image built from source `e8dd97e8e755ac51c9451b9b4b374aeab8063172` on revision `garageai-web-canary-receipt-e8dd97e`. The main worktree was on `fb1d94b` with local changes. The release came from a clean, separate worktree. Cloud Build `b7504167-9488-4fb5-a291-c2b0f48588db` reported `LOGGING_FAILURE`. Artifact Registry confirmed image digest `sha256:2199a8d59e789139d201aba77b3b85dc37ccc4d4c7216de8e83e0b73ed2f56b2`.
+- The tagged revision passed health, anonymous data protection, email form validation and synthetic payment and reversal OCR at zero traffic. The revision had zero error-level log entries during these checks. Traffic switched to the new revision and `garageai-web-canary-00040-yeh` remains available for rollback.
+- Read-only Cloud Run Job `garageai-receipt-db-e8dd97e` ran with the web runtime identity and Cloud SQL Unix socket. Execution `garageai-receipt-db-e8dd97e-cpwln` succeeded and reported schema version 3 and aggregate counts only. The Job was deleted and the execution evidence was retrieved from Cloud Logging.
+- Worker version `5e22180e-4548-45d9-a3ae-4f981ea89bc3` serves the new app on both public hostnames. Both passed health (200), anonymous data protection (401), email API validation and synthetic payment and reversal OCR. The Worker assets exclude the Express bundle and source map.
+- Release checks passed TypeScript, 216 tests in 35 files, the production build and the environment contract. The three supplied documents passed local OCR checks. Desktop and mobile browser checks confirmed reversal blocking and editable purchase fields. The desktop check also confirmed that the bank payment amount survives transfer to the service form. Live mailbox delivery and checks on physical iOS and Android devices remain unverified.
+
 ## Owner decisions — 2026-11-20
 
 - AI provider: Vertex AI remains primary. The authenticated runtime-identity Vertex smoke and private-agent smoke succeeded on `garageai-agents-00061-jus` using `gemini-3.8-flash` at `eu`. Paid agents stay disabled and the allowlist remains empty until separate explicit owner authorization. Spending remains `0 SGD`; any later enablement requires a `50 SGD/month` cap. OpenRouter is not an approved fallback.
