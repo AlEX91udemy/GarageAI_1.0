@@ -38,6 +38,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [pendingImport, setPendingImport] = useState<FullGarageData | null>(null);
   const [confirmAccountDeletion, setConfirmAccountDeletion] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
   const [dbStats, setDbStats] = useState<{
@@ -53,6 +54,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     if (isOpen) {
       setStatusMessage(null);
       setConfirmReset(false);
+      setPendingImport(null);
       setConfirmAccountDeletion(false);
       setDeletePassword("");
       loadStats();
@@ -126,16 +128,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const json = JSON.parse(event.target?.result as string);
-        if (!window.confirm("Подтвердить импорт резервной копии? Текущие данные гаража будут изменены.")) {
-          setStatusMessage({ type: "success", text: "Импорт отменён. Данные гаража не изменены." });
-          return;
-        }
-        await importDatabaseBackup(json);
-        const refreshed = await fetchGarageData();
-        onDataReloaded(refreshed);
-        loadStats();
-        setStatusMessage({ type: "success", text: "Резервная копия успешно восстановлена на сервере!" });
+        setPendingImport(JSON.parse(event.target?.result as string) as FullGarageData);
       } catch (err: any) {
         setStatusMessage({ type: "error", text: "Ошибка импорта: " + (err.message || "Неверный формат JSON") });
       } finally {
@@ -151,6 +144,24 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
       setStatusMessage({ type: "error", text: "Чтение файла резервной копии было прервано." });
     };
     reader.readAsText(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport) return;
+    setIsProcessing(true);
+    setStatusMessage(null);
+    try {
+      await importDatabaseBackup(pendingImport);
+      const refreshed = await fetchGarageData();
+      onDataReloaded(refreshed);
+      loadStats();
+      setPendingImport(null);
+      setStatusMessage({ type: "success", text: "Резервная копия успешно восстановлена на сервере!" });
+    } catch (err: any) {
+      setStatusMessage({ type: "error", text: "Ошибка импорта: " + (err.message || "Неверный формат JSON") });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleResetDemo = async () => {
@@ -223,6 +234,16 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
 
         {/* Modal Body */}
         <div className="overflow-y-auto p-4 sm:p-6 flex-1 space-y-4">
+          {pendingImport && (
+            <div role="alertdialog" aria-modal="true" aria-labelledby="backup-import-title" aria-describedby="backup-import-description" className="rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+              <h3 id="backup-import-title" className="text-sm font-bold text-neutral-900 dark:text-white">Заменить данные резервной копией?</h3>
+              <p id="backup-import-description" className="text-xs text-neutral-700 dark:text-neutral-200">Текущие данные гаража будут изменены. Проверьте, что выбрали нужный файл.</p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" onClick={() => setPendingImport(null)} className="min-h-11 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-200 text-xs font-semibold rounded-xl transition">Отмена</button>
+                <button type="button" onClick={handleConfirmImport} disabled={isProcessing} className="min-h-11 px-4 py-2.5 bg-brand-strong hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition disabled:opacity-50">Восстановить копию</button>
+              </div>
+            </div>
+          )}
           {/* Notifications */}
           {statusMessage && (
             <div
@@ -441,7 +462,7 @@ export const DataSyncBackupModal: React.FC<DataSyncBackupModalProps> = ({
           <span>Garage AI Server v2.4 • Данные защищены сессией владельца</span>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-neutral-200/80 hover:bg-neutral-200 text-neutral-800 rounded-xl font-bold transition cursor-pointer"
+            className="min-h-11 px-4 py-2.5 bg-neutral-200/80 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl transition cursor-pointer"
           >
             Закрыть
           </button>

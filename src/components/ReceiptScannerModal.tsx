@@ -16,13 +16,14 @@ import {
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord } from "../types";
 import { SAMPLE_RECEIPT_IMAGE } from "../mockData";
-import { authenticatedFetch } from "../api";
+import { fetchVehicleRecommendations, requestReceiptOcr } from "../api";
+import { MAX_RECEIPT_IMAGE_BYTES, normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant, RECEIPT_INCOME_MESSAGE, RECEIPT_REFUND_MESSAGE } from "../receiptFields";
 
 interface ReceiptScannerModalProps {
   vehicle: Vehicle;
   onClose: () => void;
   onApplyService: (data: Partial<ServiceRecord>) => void;
-  onApplyFuel: (data: Partial<FuelRecord>) => void;
+  onApplyFuel: (data: Omit<FuelRecord, "id" | "vehicleId">) => void;
 }
 
 export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
@@ -103,6 +104,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
     setIsScanning(true);
     setScanError(null);
+    setScanResult(null);
 
     try {
       let detectedMime = "image/jpeg";
@@ -111,29 +113,35 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         if (match) detectedMime = match[1];
       }
 
-      const response = await authenticatedFetch("/api/ai/scan-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: imageToScan,
-          mimeType: detectedMime,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Ошибка при распознавании чека сервером.");
+      // Fetch the reviewed instruction guidance in parallel with OCR.
+      const recommendationsPromise = fetchVehicleRecommendations(vehicle).catch(() => null);
+      const data = await requestReceiptOcr(imageToScan, detectedMime);
+      if (data.operation === "refund" || data.operation === "income") {
+        setScanResult(null);
+        setScanError(data.operation === "refund" ? RECEIPT_REFUND_MESSAGE : RECEIPT_INCOME_MESSAGE);
+        return;
       }
-
-      const data = await response.json();
-      setScanResult(data);
-    } catch (err: any) {
-      console.error(err);
+      setScanResult({
+        ...data,
+        merchantName: normalizeReceiptMerchant(data.merchantName) ?? "",
+        date: normalizeReceiptDate(data.date) ?? "",
+        totalAmount: normalizeReceiptAmount(data.totalAmount) ?? "",
+        recommendations: [],
+      });
+      void recommendationsPromise.then((recommendations) => {
+        if (!recommendations) return;
+        setScanResult((current: any) => current ? { ...current, recommendations: recommendations.recommendations.slice(0, 3) } : current);
+      });
+    } catch (error) {
       // Demo presets may use a local fallback when the AI service is unavailable.
       // Never infer a receipt type by searching inside an encoded image data URL.
       if (fallbackResult) {
-        setScanResult(fallbackResult);
+        setScanResult({ ...fallbackResult, recommendations: [] });
+        void fetchVehicleRecommendations(vehicle).then((recommendations) => {
+          setScanResult((current: any) => current ? { ...current, recommendations: recommendations.recommendations.slice(0, 3) } : current);
+        }).catch(() => undefined);
       } else {
-        setScanError("Не удалось разобрать изображение. Проверьте качество фото и подключение к серверу.");
+        setScanError(error instanceof Error ? error.message : "Не удалось разобрать изображение. Проверьте качество фото.");
       }
     } finally {
       setIsScanning(false);
@@ -152,8 +160,8 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       setScanError("Выберите файл изображения (JPG, PNG или WebP).");
       return;
     }
-    if (file.size > 9 * 1024 * 1024) {
-      setScanError("Фото слишком большое. Максимальный размер — 9 МБ.");
+    if (file.size > MAX_RECEIPT_IMAGE_BYTES) {
+      setScanError("Фото слишком большое. Максимальный размер — 6,7 МБ.");
       return;
     }
 
@@ -195,25 +203,24 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       (sum: number, w: any) => sum + (Number.isFinite(Number(w?.cost)) && Number(w.cost) >= 0 ? Number(w.cost) : 0),
       0
     );
-    const calculatedTotal = laborCost + parts.reduce((sum: number, part: { unitPrice: number; quantity: number }) => sum + part.unitPrice * part.quantity, 0);
-    const totalCost = Number.isFinite(Number(scanResult.totalAmount)) && Number(scanResult.totalAmount) >= 0
-      ? Number(scanResult.totalAmount)
-      : calculatedTotal;
-    const date = typeof scanResult.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(scanResult.date) && !Number.isNaN(Date.parse(scanResult.date))
-      ? scanResult.date
-      : new Date().toISOString().split("T")[0];
+    const totalCost = normalizeReceiptAmount(scanResult.totalAmount);
+    const date = normalizeReceiptDate(scanResult.date);
+    if (!date || !totalCost) {
+      setScanError("Укажите дату операции и сумму больше нуля.");
+      return;
+    }
 
     const recordData: Partial<ServiceRecord> = {
       date,
       mileage: vehicle.currentMileage,
-      category: "ТО и замена жидкостей",
-      title: scanResult.description || `Обслуживание в ${scanResult.merchantName || "автосервисе"}`,
-      description: `Чек от ${scanResult.merchantName || "сервиса"}. ` +
+      category: scanResult.category === "tires" ? "Шины и диски" : "Другое",
+      title: scanResult.description || "Расход по документу",
+      description:
         (Array.isArray(scanResult.works) ? scanResult.works.map((w: any) => typeof w?.description === "string" ? w.description.trim() : "").filter(Boolean).join(", ") : ""),
       laborCost: laborCost,
       parts: parts,
       totalCost,
-      serviceCenter: scanResult.merchantName || "Автосервис",
+      serviceCenter: scanResult.merchantName.trim(),
       receiptImages: imagePreview ? [imagePreview] : [],
       notes: scanResult.notes || "Распознано через AI-сканер чеков Garage AI.",
     };
@@ -225,26 +232,24 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const handleApplyToFuel = () => {
     if (!scanResult) return;
 
-    const liters = Number(scanResult.fuelDetails?.liters);
-    const pricePerLiter = Number(scanResult.fuelDetails?.pricePerLiter);
-    const totalCost = Number(scanResult.totalAmount);
-    if (!Number.isFinite(liters) || liters <= 0 || !Number.isFinite(pricePerLiter) || pricePerLiter < 0 || !Number.isFinite(totalCost) || totalCost < 0) {
-      setScanError("Не удалось распознать объём, цену за литр или итоговую сумму. Проверьте чек и повторите сканирование.");
+    const liters = normalizeReceiptAmount(scanResult.fuelDetails?.liters);
+    const pricePerLiter = normalizeReceiptAmount(scanResult.fuelDetails?.pricePerLiter);
+    const totalCost = normalizeReceiptAmount(scanResult.totalAmount);
+    const date = normalizeReceiptDate(scanResult.date);
+    const fuelType = typeof scanResult.fuelDetails?.fuelType === "string" ? scanResult.fuelDetails.fuelType.trim() : "";
+    if (!date || !liters || !pricePerLiter || !totalCost || !fuelType) {
+      setScanError("Укажите дату, сумму, тип топлива, объём и цену за литр.");
       return;
     }
-    const date = typeof scanResult.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(scanResult.date) && !Number.isNaN(Date.parse(scanResult.date))
-      ? scanResult.date
-      : new Date().toISOString().split("T")[0];
-
-    const fuelData: Partial<FuelRecord> = {
+    const fuelData: Omit<FuelRecord, "id" | "vehicleId"> = {
       date,
       mileage: vehicle.currentMileage,
       liters,
       pricePerLiter,
       totalCost,
-      fuelType: scanResult.fuelDetails?.fuelType || "АИ-95",
-      isFullTank: true,
-      station: scanResult.merchantName || "АЗС",
+      fuelType,
+      isFullTank: false,
+      station: scanResult.merchantName.trim(),
     };
 
     onApplyFuel(fuelData);
@@ -298,6 +303,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                 <button
                   key={i}
                   type="button"
+                  disabled={isScanning}
                   onClick={() => {
                     setImagePreview(preset.dataUrl);
                     setSampleFallbackResult(preset.fallbackResult);
@@ -337,6 +343,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                       type="file"
                       accept="image/*"
                       capture="environment"
+                      disabled={isScanning}
                       onChange={handleFileUpload}
                       className="hidden"
                     />
@@ -376,6 +383,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     type="file"
                     accept="image/*"
                     capture="environment"
+                    disabled={isScanning}
                     onChange={handleFileUpload}
                     className="hidden"
                   />
@@ -386,7 +394,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
           {/* Scan Error */}
           {scanError && (
-            <div className="p-3 bg-brand-soft border border-brand-border rounded-2xl flex items-center gap-2 text-xs text-brand-hover">
+            <div role="alert" className="p-3 bg-brand-soft border border-brand-border rounded-2xl flex items-center gap-2 text-xs text-brand-hover">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{scanError}</span>
             </div>
@@ -398,26 +406,27 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Чек успешно распознан!</span>
+                  <span>{scanResult._source === "local-tesseract" ? "Распознано локально, проверьте поля" : "Чек успешно распознан"}</span>
                 </div>
-                <span className="text-sm font-extrabold font-mono text-emerald-900">
-                  {Number(scanResult.totalAmount || 0).toLocaleString("ru-RU")} ₽
-                </span>
+                {Number.isFinite(Number(scanResult.totalAmount)) && Number(scanResult.totalAmount) > 0 && (
+                  <span className="text-sm font-extrabold font-mono text-emerald-900">
+                    {Number(scanResult.totalAmount).toLocaleString("ru-RU")} {scanResult.currency || "₽"}
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-neutral-500">Организация:</span>{" "}
-                  <strong className="text-neutral-900">
-                    {scanResult.merchantName || "Не указана"}
-                  </strong>
-                </div>
-                <div>
-                  <span className="text-neutral-500">Дата:</span>{" "}
-                  <strong className="text-neutral-900 font-mono">
-                    {scanResult.date || "Сегодня"}
-                  </strong>
-                </div>
+                {([["Организация", "merchantName", "text"], ["Дата операции", "date", "date"], ["Сумма, ₽", "totalAmount", "number"]] as const).map(([label, key, type]) => (
+                  <label key={key} className="block text-neutral-600">{label}
+                    <input type={type} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} value={scanResult[key]} onChange={e => setScanResult({ ...scanResult, [key]: e.target.value })} className="w-full mt-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-neutral-900" />
+                  </label>
+                ))}
+                <label className="block text-neutral-600">Запись
+                  <select value={scanResult.category === "fuel" ? "fuel" : "other"} onChange={e => setScanResult({ ...scanResult, category: e.target.value })} className="w-full mt-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-neutral-900">
+                    <option value="other">Журнал обслуживания</option>
+                    <option value="fuel">Расходы на топливо</option>
+                  </select>
+                </label>
                 <div className="col-span-2">
                   <span className="text-neutral-500">Назначение:</span>{" "}
                   <strong className="text-neutral-900">
@@ -456,12 +465,30 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               )}
 
               {/* Parsed Fuel details */}
-              {scanResult.fuelDetails && scanResult.fuelDetails.liters && (
-                <div className="p-2 bg-white rounded-xl border border-emerald-100 text-xs flex items-center justify-between">
-                  <span>
-                    Топливо: <strong>{scanResult.fuelDetails.fuelType || "Бензин"}</strong>,{" "}
-                    <strong>{scanResult.fuelDetails.liters} л</strong> по {scanResult.fuelDetails.pricePerLiter} ₽/л
-                  </span>
+              {scanResult.category === "fuel" && (
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {([["Тип топлива", "fuelType", "text"], ["Объём, л", "liters", "number"], ["Цена за литр, ₽", "pricePerLiter", "number"]] as const).map(([label, key, type]) => (
+                    <label key={key} className="block text-neutral-600">{label}
+                      <input type={type} min={type === "number" ? 0 : undefined} step={type === "number" ? "any" : undefined} value={scanResult.fuelDetails?.[key] ?? ""} onChange={e => setScanResult({ ...scanResult, fuelDetails: { ...scanResult.fuelDetails, [key]: e.target.value } })} className="w-full mt-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-neutral-900" />
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {Array.isArray(scanResult.recommendations) && scanResult.recommendations.length > 0 && (
+                <div className="rounded-2xl border border-brand-200 bg-brand-50 p-3">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-bold text-brand-strong">
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                    Рекомендации по инструкции
+                  </div>
+                  <div className="space-y-2">
+                    {scanResult.recommendations.map((item: any) => (
+                      <div key={item.id} className="text-xs leading-relaxed text-neutral-700">
+                        <strong>{item.title}:</strong> {item.text}
+                        <span className="ml-1 text-[10px] text-neutral-500">({item.confidence === "high" ? "подтверждено руководством" : "сверьте с руководством"})</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -474,7 +501,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
                   >
                     <Fuel className="w-4 h-4" />
-                    <span>Записать в журнал заправок ({scanResult.totalAmount} ₽)</span>
+                    <span>Записать в журнал заправок</span>
                   </button>
                 ) : (
                   <button
@@ -483,7 +510,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                     className="w-full py-2.5 bg-brand-strong hover:bg-brand text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95"
                   >
                     <Wrench className="w-4 h-4" />
-                    <span>Создать запись ремонта с запчастями ({scanResult.totalAmount} ₽)</span>
+                    <span>Перенести в журнал обслуживания</span>
                   </button>
                 )}
               </div>

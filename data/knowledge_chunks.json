@@ -1,0 +1,56 @@
+[
+  {
+    "id": "kb-nissan-xtrail-t32-th-cvt-fluid",
+    "text": "Для моделей с бесступенчатой трансмиссией (CVT) используйте только оригинальную жидкость NISSAN CVT Fluid NS-3. Применение другой трансмиссионной жидкости может повредить CVT.",
+    "metadata": {
+      "heading": "Жидкость бесступенчатой трансмиссии",
+      "brand": "Nissan",
+      "model": "X-Trail",
+      "generation": "T32-A",
+      "market": "TH",
+      "yearStart": 2014,
+      "yearEnd": 2014,
+      "engine": "MR20DD",
+      "engineCode": "MR20DD",
+      "transmission": "CVT",
+      "category": "transmission",
+      "source": "Nissan X-Trail T32-A Owner Manual (Thailand, 2014)",
+      "sourceType": "official_manual",
+      "sourceId": "source-nissan-xtrail-thailand-t32",
+      "reviewedAt": "2026-11-18"
+    },
+    "citation": {
+      "locator": "Technical information, p. 9-3 (PDF page 379)",
+      "documentHash": "00936a546890987087bcd85b6c66ef4217f6fda2ab88ef1c849099989d6513b9",
+      "documentName": "Nissan X-Trail T32-A Owner Manual, Edit 2014/11/7",
+      "sourceUrl": "https://en.nissan.co.th/content/dam/Nissan/th/owners/OwnerManual-170612/X-Trail%20Owner%20Manual%20EN.pdf"
+    }
+  },
+  {
+    "id": "kb-nissan-xtrail-t32-th-engine-oil-check",
+    "text": "Для двигателя MR20DD уровень моторного масла проверяют на ровной площадке: прогрейте двигатель примерно 5 минут, заглушите его и подождите не менее 10 минут перед проверкой щупом.",
+    "metadata": {
+      "heading": "Проверка уровня моторного масла",
+      "brand": "Nissan",
+      "model": "X-Trail",
+      "generation": "T32-A",
+      "market": "TH",
+      "yearStart": 2014,
+      "yearEnd": 2014,
+      "engine": "MR20DD",
+      "engineCode": "MR20DD",
+      "transmission": "CVT",
+      "category": "fluids",
+      "source": "Nissan X-Trail T32-A Owner Manual (Thailand, 2014)",
+      "sourceType": "official_manual",
+      "sourceId": "source-nissan-xtrail-thailand-t32",
+      "reviewedAt": "2026-11-18"
+    },
+    "citation": {
+      "locator": "Maintenance and do-it-yourself, section 8-10, p. 8-10 (PDF page 346)",
+      "documentHash": "00936a546890987087bcd85b6c66ef4217f6fda2ab88ef1c849099989d6513b9",
+      "documentName": "Nissan X-Trail T32-A Owner Manual, Edit 2014/11/7",
+      "sourceUrl": "https://en.nissan.co.th/content/dam/Nissan/th/owners/OwnerManual-170612/X-Trail%20Owner%20Manual%20EN.pdf"
+    }
+  }
+]

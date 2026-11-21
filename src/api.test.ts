@@ -12,6 +12,10 @@ import {
   fetchPublicKnowledgeSources,
   refreshPublicKnowledgeSources,
   register,
+  login,
+  verifyEmailCode,
+  requestPasswordReset,
+  confirmPasswordReset,
   type GarageAiAgentName,
 } from "./api";
 
@@ -47,7 +51,7 @@ describe("account-scoped backup APIs", () => {
   });
 
   it("deletes an account only through the authenticated endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "person", csrfToken: "csrf", email: "person@example.test" } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(deleteAccount("CurrentPassword-123!")).resolves.toBeUndefined();
@@ -56,6 +60,40 @@ describe("account-scoped backup APIs", () => {
       body: JSON.stringify({ password: "CurrentPassword-123!" }),
     }));
     expect(fetchMock.mock.calls[0][1].headers.get("x-admin-key")).toBeNull();
+  });
+});
+
+describe("password reset API", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("requests a reset code using only the email", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(requestPasswordReset("person@example.test")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/password/reset/request", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test" }),
+    }));
+  });
+
+  it("submits the reset code and new password without changing client session state", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(confirmPasswordReset("person@example.test", "123456", "New-password-123!")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/password/reset/confirm", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test", code: "123456", password: "New-password-123!" }),
+    }));
+  });
+
+  it("keeps the login verification contract separate from password-reset codes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "person", csrfToken: "csrf", email: "person@example.test" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(verifyEmailCode("person@example.test", "123456")).resolves.toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/email/verify", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ email: "person@example.test", code: "123456" }),
+    }));
   });
 });
 
@@ -89,8 +127,15 @@ describe("registration email verification contract", () => {
   it("returns a pending state without creating a client session", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pendingEmailVerification: true, email: "new@example.test", message: "check inbox" }), { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(register("new-user", "Password-123!", "new@example.test")).resolves.toMatchObject({ pendingEmailVerification: true, email: "new@example.test" });
-    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ username: "new-user", password: "Password-123!", email: "new@example.test" }));
+    await expect(register("new@example.test", "Password-123!")).resolves.toMatchObject({ pendingEmailVerification: true, email: "new@example.test" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "new@example.test", password: "Password-123!", username: expect.stringMatching(/^garage-[0-9a-f]{16}$/) });
+  });
+
+  it("passes the email as the login identifier for both API versions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, session: { username: "internal-user", email: "new@example.test", csrfToken: "csrf" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(login(" new@example.test ", "Password-123!")).resolves.toMatchObject({ email: "new@example.test" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ email: "new@example.test", password: "Password-123!", username: "new@example.test" });
   });
 });
 
@@ -136,6 +181,18 @@ describe("OCR scanner API contracts", () => {
     await expect(requestReceiptOcr("data:image/jpeg;base64,AAAA", "image/jpeg")).resolves.toEqual({ category: "fuel", totalAmount: 2500 });
     expect(fetchMock.mock.calls[0][0]).toBe("/api/ai/scan-receipt");
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ imageBase64: "data:image/jpeg;base64,AAAA", mimeType: "image/jpeg" });
+  });
+
+  it("sends extracted PDF receipt text through the receipt OCR endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ category: "fuel", totalAmount: 2500 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await requestReceiptOcr("", "text/plain", "АЗС Лукойл\nИтого 2500");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      imageBase64: "",
+      mimeType: "text/plain",
+      receiptText: "АЗС Лукойл\nИтого 2500",
+    });
   });
 
   it("rejects malformed OCR response shapes for all scanner endpoints", async () => {

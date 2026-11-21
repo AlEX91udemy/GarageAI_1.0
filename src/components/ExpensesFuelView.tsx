@@ -11,10 +11,12 @@ import {
   ChevronRight,
   ArrowDownRight,
   Zap,
+  X,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, FuelRecord } from "../types";
 import { getVolumeUnit, toDisplayVolume, toLiters, toDisplayVolumePrice, toPricePerLiter, volumeUnitLabel } from "../mobile/units";
 import { GARAGE_SETTINGS_CHANGE_EVENT } from "../mobile/settings";
+import { useModalFocus } from "./useModalFocus";
 
 // Palette for expense category chart slices and badges
 const CATEGORY_PALETTE = [
@@ -94,6 +96,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<"overview" | "fuel_log">("overview");
   const [showAddFuelModal, setShowAddFuelModal] = useState(false);
+  const fuelDialogRef = useModalFocus(() => setShowAddFuelModal(false));
   const [chartMode, setChartMode] = useState<"pie" | "bar">("pie");
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<
@@ -903,14 +906,17 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
 
       {/* Add Fuel Modal */}
       {showAddFuelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
+        <div ref={fuelDialogRef} role="dialog" aria-modal="true" aria-label="Добавить заправку" tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm overflow-hidden" onClick={(event) => { if (event.target === event.currentTarget) setShowAddFuelModal(false); }}>
+          <div className="bg-white dark:bg-neutral-900 rounded-3xl w-full max-w-md shadow-2xl border border-neutral-200 dark:border-neutral-700 flex flex-col max-h-[92dvh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="p-4 sm:p-5 pb-3 border-b border-neutral-100 dark:border-neutral-800 shrink-0 flex items-center justify-between">
+              <h2 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white leading-tight flex items-center gap-2">
               <Fuel className="w-5 h-5 text-emerald-600" />
               <span>Добавить заправку</span>
-            </h3>
+              </h2>
+              <button type="button" onClick={() => setShowAddFuelModal(false)} aria-label="Закрыть окно" className="shrink-0 w-11 h-11 inline-flex items-center justify-center rounded-full text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition"><X className="w-5 h-5" /></button>
+            </div>
 
-            <form onSubmit={handleSaveFuel} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveFuel} className="overflow-y-auto p-4 sm:p-6 flex-1 space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block font-semibold text-neutral-700 mb-1">
@@ -920,7 +926,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                     type="date"
                     value={fuelDate}
                     onChange={(e) => setFuelDate(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs"
+                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs"
                     required
                   />
                 </div>
@@ -933,7 +939,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                     type="number"
                     value={fuelMileage}
                     onChange={(e) => setFuelMileage(Number(e.target.value))}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold"
                     required
                   />
                 </div>
@@ -950,7 +956,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                     min="1"
                     value={liters}
                     onChange={(e) => setLiters(Number(e.target.value))}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs font-mono font-bold"
                     required
                   />
                 </div>
@@ -979,7 +985,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                   <select
                     value={fuelType}
                     onChange={(e) => setFuelType(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs"
+                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs"
                   >
                     <option value="АИ-92">АИ-92</option>
                     <option value="АИ-95">АИ-95</option>
@@ -1000,7 +1006,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                     placeholder="Лукойл, Газпромнефть, Роснефть..."
                     value={station}
                     onChange={(e) => setStation(e.target.value)}
-                    className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 text-xs"
+                    className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl px-3 py-2 text-xs"
                   />
                 </div>
               </div>
@@ -1015,7 +1021,7 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                 />
                 <label
                   htmlFor="fullTankCheckbox"
-                  className="font-medium text-neutral-700 cursor-pointer text-xs"
+                  className="font-medium text-neutral-700 dark:text-neutral-200 cursor-pointer text-xs"
                 >
                   Заправка до полного бака (для расчета расхода)
                 </label>
@@ -1028,17 +1034,17 @@ export const ExpensesFuelView: React.FC<ExpensesFuelViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="sticky bottom-0 flex justify-end gap-2 pt-4 border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-900">
                 <button
                   type="button"
                   onClick={() => setShowAddFuelModal(false)}
-                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl"
+                  className="min-h-11 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-200 text-xs font-semibold rounded-xl transition"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md"
+                  className="min-h-11 px-5 py-2.5 bg-brand-strong hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition"
                 >
                   Сохранить
                 </button>

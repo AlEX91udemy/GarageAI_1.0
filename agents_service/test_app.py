@@ -292,6 +292,50 @@ class AgentClientLifecycleTests(unittest.IsolatedAsyncioTestCase):
             "Act as QA.",
         )
 
+    async def test_eu_vertex_uses_european_multiregion_endpoint(self):
+        from types import SimpleNamespace
+        from agents_service.app import _run_agent
+
+        client_options = []
+
+        class FakeModels:
+            async def generate_content(self, **_kwargs):
+                return SimpleNamespace(text="agent answer")
+
+        class FakeAio:
+            models = FakeModels()
+
+            async def aclose(self):
+                pass
+
+        class FakeClient:
+            aio = FakeAio()
+
+            def __init__(self, **kwargs):
+                client_options.append(kwargs)
+
+        with patch("agents_service.app.genai.Client", FakeClient):
+            with patch.dict(
+                os.environ,
+                {
+                    "GOOGLE_GENAI_USE_VERTEXAI": "true",
+                    "GOOGLE_CLOUD_LOCATION": "eu",
+                    "GOOGLE_CLOUD_PROJECT": "garage-ai-test",
+                },
+                clear=False,
+            ):
+                await _run_agent(
+                    {"model": "gemini-test", "instruction": "Act as QA."},
+                    "qa",
+                    "Check endpoint selection.",
+                )
+
+        self.assertEqual(client_options[0]["location"], "eu")
+        self.assertEqual(
+            client_options[0]["http_options"].base_url,
+            "https://aiplatform.eu.rep.googleapis.com",
+        )
+
     async def test_client_closes_when_provider_call_raises(self):
         from types import SimpleNamespace
 

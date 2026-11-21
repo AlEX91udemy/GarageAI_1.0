@@ -49,7 +49,7 @@ async function register(username: string): Promise<Auth> {
   const response = await fetch(`${baseUrl}/api/auth/register`, {
     method: "POST",
     headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": testClientIp },
-    body: JSON.stringify({ username, password: "TestPassword-123!", email }),
+    body: JSON.stringify({ email, password: "TestPassword-123!" }),
   });
   const body = await response.json() as { pendingEmailVerification?: boolean; error?: string };
   if (response.status !== 202 || !body.pendingEmailVerification) {
@@ -90,6 +90,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
         env: {
           ...process.env,
           NODE_ENV: "test",
+          DISABLE_HMR: "true",
           // The HTTP integration server uses disposable test files, never real production data.
           GARAGE_ALLOW_EPHEMERAL_STORAGE: "true",
           PORT: String(port),
@@ -103,11 +104,13 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
           GOOGLE_CLOUD_PROJECT: "",
           AGENTS_SERVICE_URL: "https://garageai-agents-test.example",
           AGENTS_API_TOKEN: "integration-test-token",
-          AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation",
+          AGENTS_ALLOWED_USERNAMES: "agent-proxy-validation@example.test",
           ALLOWED_ORIGINS: baseUrl,
           TRUSTED_PROXY_HOPS: "1",
           EMAIL_CODE_SECRET: "integration-test-email-secret",
           EMAIL_CODE_CAPTURE_FILE: emailCaptureFile,
+          RESEND_API_KEY: "integration-test-resend-key",
+          EMAIL_FROM: "GarageAI <test@example.test>",
         },
         stdio: ["pipe", "pipe", "pipe"],
       },
@@ -152,6 +155,62 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
   it("rejects anonymous access to private garage routes", async () => {
     const response = await fetch(`${baseUrl}/api/vehicles`);
     expect(response.status).toBe(401);
+  });
+
+  it("uses email for password login and rejects an unknown legacy username", async () => {
+    const owner = await register("email-only-login");
+
+    const loginWithEmail = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.36" },
+      body: JSON.stringify({ email: " EMAIL-ONLY-LOGIN@example.test ", password: "TestPassword-123!" }),
+    });
+    expect(loginWithEmail.status).toBe(200);
+    expect((await loginWithEmail.json() as { session?: { email?: string } }).session?.email).toBe("email-only-login@example.test");
+
+    const loginWithoutEmail = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.37" },
+      body: JSON.stringify({ username: "email-only-login", password: "TestPassword-123!" }),
+    });
+    expect(loginWithoutEmail.status).toBe(401);
+    expect(owner.cookie).toBeTruthy();
+  });
+
+  it("resets a password by email and revokes the previous session", async () => {
+    const owner = await register("password-reset-owner");
+    const requestReset = await fetch(baseUrl + "/api/auth/password/reset/request", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.41" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test" }),
+    });
+    expect(requestReset.status).toBe(200);
+
+    const lines = fs.readFileSync(emailCaptureFile, "utf8").trim().split(/\r?\n/).filter(Boolean);
+    const resetMessage = lines.map((line) => JSON.parse(line) as { email: string; code: string }).reverse().find((item) => item.email === "password-reset-owner@example.test");
+    expect(resetMessage).toBeDefined();
+
+    const confirmReset = await fetch(baseUrl + "/api/auth/password/reset/confirm", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.42" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", code: resetMessage!.code, password: "ChangedPassword-456!" }),
+    });
+    expect(confirmReset.status).toBe(200);
+    expect((await fetch(baseUrl + "/api/auth/session", { headers: { cookie: owner.cookie } })).status).toBe(401);
+
+    const oldPasswordLogin = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.43" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", password: "TestPassword-123!" }),
+    });
+    expect(oldPasswordLogin.status).toBe(401);
+
+    const newPasswordLogin = await fetch(baseUrl + "/api/auth/login", {
+      method: "POST",
+      headers: { origin: baseUrl, "content-type": "application/json", "x-forwarded-for": "198.51.100.44" },
+      body: JSON.stringify({ email: "password-reset-owner@example.test", password: "ChangedPassword-456!" }),
+    });
+    expect(newPasswordLogin.status).toBe(200);
   });
 
   it("prevents one user from reading, updating, deleting, or exporting another user's records", async () => {
@@ -415,17 +474,17 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     expect(unknownAgent.status).toBe(400);
   });
 
-  it("returns conflict when two registrations race for the same username", async () => {
+  it("returns conflict when two registrations race for the same email", async () => {
     const createAccount = () => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": "198.51.100.77" },
-      body: JSON.stringify({ username: "concurrent-signup", password: "TestPassword-123!", email: "concurrent-signup@example.test" }),
+      body: JSON.stringify({ email: "concurrent-signup@example.test", password: "TestPassword-123!" }),
     });
 
     const responses = await Promise.all([createAccount(), createAccount()]);
     expect(responses.map((response) => response.status).sort()).toEqual([202, 409]);
     const bodies = await Promise.all(responses.map((response) => response.json() as Promise<{ error?: string }>));
-    expect(bodies.some((body) => body.error === "Пользователь с таким логином уже существует")).toBe(true);
+    expect(bodies.some((body) => body.error === "Пользователь с таким email уже существует")).toBe(true);
   });
 
   it("enforces five registrations per trusted client IP without resetting the bucket", async () => {
@@ -433,7 +492,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     const create = (index: number) => fetch(`${baseUrl}/api/auth/register`, {
       method: "POST",
       headers: { "content-type": "application/json", origin: baseUrl, "x-forwarded-for": ip },
-      body: JSON.stringify({ username: `quota-${index}`, password: "TestPassword-123!", email: `quota-${index}@example.test` }),
+      body: JSON.stringify({ email: `quota-${index}@example.test`, password: "TestPassword-123!" }),
     });
     const responses = await Promise.all([1, 2, 3, 4, 5].map(create));
     expect(responses.every((response) => response.status === 202)).toBe(true);
@@ -444,8 +503,9 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
   it("validates public knowledge recommendation input and exposes instance-local refresh scope", async () => {
     const sources = await fetch(`${baseUrl}/api/knowledge/sources`);
     expect(sources.status).toBe(200);
-    const sourceBody = await sources.json() as { statusScope?: string };
+    const sourceBody = await sources.json() as { statusScope?: string; sources?: Array<{ id: string; excerptCount?: number; availableForRecommendations?: boolean }> };
     expect(sourceBody.statusScope).toBe("instance-local");
+    expect(sourceBody.sources?.find((source) => source.id === "source-nissan-xtrail-thailand-t32")).toMatchObject({ excerptCount: 2, availableForRecommendations: true });
 
     const nonFiniteMileage = await fetch(`${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify({ currentMileage: "NaN" }))}`);
     expect(nonFiniteMileage.status).toBe(400);
@@ -463,6 +523,42 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     expect(valid.status).toBe(200);
     const validBody = await valid.json() as { recommendations?: Array<{ id: string }> };
     expect(validBody.recommendations?.some((item) => item.id === "rule-lada-manual")).toBe(true);
+  });
+
+  it("allows guest OCR requests to reach the local fallback instead of returning an auth error", async () => {
+    const response = await fetch(`${baseUrl}/api/ai/scan-receipt`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ imageBase64: "not-base64", mimeType: "image/jpeg" }),
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Некорректное base64-изображение" });
+  });
+
+  it("serves reviewed manual excerpts only for the exact supported vehicle configuration", async () => {
+    const requestRecommendations = (vehicle: Record<string, unknown>) => fetch(
+      `${baseUrl}/api/knowledge/recommendations?vehicle=${encodeURIComponent(JSON.stringify(vehicle))}&q=${encodeURIComponent("масла")}`,
+    );
+    const exact = await requestRecommendations({ make: "Nissan", model: "X-Trail", generation: "T32 (2013–2017)", market: "TH", year: 2014, engine: "2.0L MR20DD (144 л.с.)", transmission: "Вариатор CVT" });
+    expect(exact.status).toBe(200);
+    const exactBody = await exact.json() as { recommendations?: Array<{ id: string; evidenceType?: string; citation?: { locator?: string; documentHash?: string } }> };
+    const excerpts = exactBody.recommendations?.filter((item) => item.evidenceType === "vehicle_document_excerpt") || [];
+    expect(excerpts.map((item) => item.id)).toEqual(["kb-nissan-xtrail-t32-th-engine-oil-check"]);
+    expect(excerpts[0].citation?.locator).toContain("8-10");
+    expect(excerpts[0].citation?.documentHash).toMatch(/^[a-f0-9]{64}$/);
+
+    for (const vehicle of [
+      { make: "Nissan", model: "X-Trail", generation: "T31", market: "RU", year: 2008, engine: "MR20DE", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "RU", year: 2014, engine: "MR20DD", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2015, engine: "MR20DD", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2014, engine: "QR25DE", transmission: "CVT" },
+      { make: "Nissan", model: "X-Trail", generation: "T32", market: "TH", year: 2014, engine: "MR20DD", transmission: "e-CVT" },
+    ]) {
+      const response = await requestRecommendations(vehicle);
+      expect(response.status).toBe(200);
+      const body = await response.json() as { recommendations?: Array<{ evidenceType?: string }> };
+      expect(body.recommendations?.some((item) => item.evidenceType === "vehicle_document_excerpt")).toBe(false);
+    }
   });
 
   it("does not drop records when one user creates vehicles concurrently", async () => {
@@ -555,7 +651,7 @@ describe("HTTP tenant isolation", { timeout: 60_000 }, () => {
     const loginAfterDeletion = await fetch(`${baseUrl}/api/auth/login`, {
       method: "POST",
       headers: { origin: baseUrl, "content-type": "application/json" },
-      body: JSON.stringify({ username: "delete-account-owner", password }),
+      body: JSON.stringify({ email: "delete-account-owner@example.test", password }),
     });
     expect(loginAfterDeletion.status).toBe(401);
   });

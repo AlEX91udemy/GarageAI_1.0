@@ -1,5 +1,5 @@
 import { useModalFocus } from "./useModalFocus";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   X,
   Sparkles,
@@ -15,6 +15,7 @@ import {
   Plus,
   ArrowRight,
   Lightbulb,
+  BookOpen,
 } from "lucide-react";
 import { Vehicle, ServiceRecord, ToFixTask, DiagnosticResult } from "../types";
 import { authenticatedFetch } from "../api";
@@ -22,6 +23,7 @@ import { authenticatedFetch } from "../api";
 interface AiMechanicModalProps {
   vehicle: Vehicle;
   serviceRecords: ServiceRecord[];
+  selectedServiceRecord?: ServiceRecord;
   onClose: () => void;
   onAddTaskToFix: (task: ToFixTask) => void;
 }
@@ -29,6 +31,7 @@ interface AiMechanicModalProps {
 export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
   vehicle,
   serviceRecords,
+  selectedServiceRecord,
   onClose,
   onAddTaskToFix,
 }) => {
@@ -50,8 +53,8 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
   ];
 
   const handleDiagnose = async (queryText?: string) => {
-    const query = queryText || symptomInput;
-    if (!query.trim()) return;
+    const query = queryText ?? symptomInput;
+    if (!query.trim() && !selectedServiceRecord) return;
 
     setIsLoading(true);
     setErrorMsg(null);
@@ -72,11 +75,24 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
         body: JSON.stringify({
           make: vehicle.make,
           model: vehicle.model,
+          generation: vehicle.generation,
+          market: vehicle.market,
           year: vehicle.year,
           engine: vehicle.engine,
+          transmission: vehicle.transmission,
+          driveType: vehicle.driveType,
+          fuelType: vehicle.fuelType,
           currentMileage: vehicle.currentMileage,
-          symptoms: query,
+          symptoms: query || "Разбор выполненного ремонта: " + (selectedServiceRecord?.title || "запись обслуживания"),
           serviceHistory: recentHistory,
+          ...(selectedServiceRecord ? {
+            selectedServiceRecord: {
+              date: selectedServiceRecord.date, mileage: selectedServiceRecord.mileage,
+              category: selectedServiceRecord.category, title: selectedServiceRecord.title,
+              description: selectedServiceRecord.description, serviceCenter: selectedServiceRecord.serviceCenter,
+              parts: (selectedServiceRecord.parts || []).map(({ name, brand, partNumber, quantity }) => ({ name, brand, partNumber, quantity })),
+            },
+          } : {}),
         }),
       });
 
@@ -94,6 +110,10 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (selectedServiceRecord) void handleDiagnose("");
+  }, [selectedServiceRecord?.id]);
+
   const handleAddDiagnosisToFix = () => {
     if (!diagnosticResult) return;
 
@@ -101,12 +121,14 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
       id: "tf-ai-" + Date.now(),
       vehicleId: vehicle.id,
       title: diagnosticResult.primaryDiagnosis || "Устранение неисправности",
-      description: `Рекомендация AI Rev: ${diagnosticResult.mechanicTip || ""}. Шаги: ${diagnosticResult.diagnosticSteps?.[0] || ""}`,
-      priority: diagnosticResult.urgency === "high" ? "high" : "medium",
-      estimatedCost: 6500,
-      targetMileage: vehicle.currentMileage + 500,
+      description: [
+        diagnosticResult.safetyAssessment ? `Безопасность: ${diagnosticResult.safetyAssessment}` : "",
+        diagnosticResult.mechanicTip ? `Рекомендация: ${diagnosticResult.mechanicTip}` : "",
+        diagnosticResult.diagnosticSteps?.[0] ? `Первый шаг: ${diagnosticResult.diagnosticSteps[0]}` : "",
+      ].filter(Boolean).join(" "),
+      priority: diagnosticResult.urgency === "high" ? "high" : diagnosticResult.urgency === "low" ? "low" : "medium",
       status: "pending",
-      category: "Подвеска и рулевое",
+      category: "Другое",
       createdAt: new Date().toISOString().split("T")[0],
     };
 
@@ -152,6 +174,11 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
 
         {/* Scrollable Body */}
         <div className="overflow-y-auto p-4 sm:p-6 flex-1 space-y-4">
+        {selectedServiceRecord && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Совет по ремонту от {selectedServiceRecord.date}: <strong>{selectedServiceRecord.title}</strong>
+          </div>
+        )}
           {/* Car Context Bar */}
         <div className="mt-4 p-3 rounded-2xl bg-neutral-900 text-white flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
@@ -173,12 +200,16 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
         <div className="space-y-3 mt-4">
           <div>
             <label className="block text-xs font-semibold text-neutral-700 mb-1">
-              Опишите симптомы, посторонний звук или код ошибки OBD-II (DTC):
+              {selectedServiceRecord
+                ? "Добавьте жалобу после ремонта, если она есть (необязательно):"
+                : "Опишите симптомы, посторонний звук или код ошибки OBD-II (DTC):"}
             </label>
             <div className="relative">
               <textarea
                 rows={3}
-                placeholder="например: Появился гул спереди справа на скорости выше 60 км/ч, усиливается при повороте руля влево. Или ошибка P0420..."
+                placeholder={selectedServiceRecord
+                  ? "Например: после ремонта появился стук на неровностях"
+                  : "Например: появился гул спереди справа на скорости выше 60 км/ч или ошибка P0420"}
                 value={symptomInput}
                 onChange={(e) => setSymptomInput(e.target.value)}
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-2xl p-3 text-xs text-neutral-900 focus:outline-none focus:border-amber-500"
@@ -211,7 +242,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
           <div className="flex justify-end pt-1">
             <button
               onClick={() => handleDiagnose()}
-              disabled={isLoading || !symptomInput.trim()}
+              disabled={isLoading || (!symptomInput.trim() && !selectedServiceRecord)}
               className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50 active:scale-95"
             >
               {isLoading ? (
@@ -222,7 +253,7 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Провести диагностику (Gemini AI)</span>
+                  <span>{selectedServiceRecord ? "Разобрать ремонт" : "Провести диагностику"}</span>
                 </>
               )}
             </button>
@@ -246,9 +277,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                     <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full uppercase">
                       Вероятный диагноз
                     </span>
-                    <span className="text-xs font-mono font-bold text-neutral-700">
-                      Точность: {diagnosticResult.confidence || 85}%
-                    </span>
                   </div>
                   <h3 className="text-base font-extrabold text-neutral-900 mt-1">
                     {diagnosticResult.primaryDiagnosis}
@@ -266,7 +294,21 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </span>
               </div>
 
-              {/* Causes & Probabilities */}
+              {diagnosticResult.safetyAssessment && (
+                <div className={`flex items-start gap-2 rounded-xl border p-3 text-xs ${
+                  diagnosticResult.urgency === "high"
+                    ? "border-red-200 bg-red-50 text-red-900"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+                }`}>
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <div>
+                    <div className="font-bold">Оценка безопасности движения</div>
+                    <p className="mt-1 leading-relaxed">{diagnosticResult.safetyAssessment}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnostic hypotheses */}
               {diagnosticResult.likelyCauses && (
                 <div>
                   <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">
@@ -279,9 +321,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                         className="flex items-center justify-between text-xs bg-white p-2 rounded-xl border border-neutral-200/80"
                       >
                         <span className="text-neutral-800 font-medium">{c.cause}</span>
-                        <span className="font-mono font-bold text-neutral-900 shrink-0 ml-2">
-                          {c.probability}%
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -304,32 +343,6 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </div>
               )}
 
-              {/* Recommended Parts with Brands */}
-              {diagnosticResult.recommendedParts && diagnosticResult.recommendedParts.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Package className="w-3 h-3 text-brand-strong" />
-                    <span>Рекомендуемые запчасти и проверенные бренды:</span>
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    {diagnosticResult.recommendedParts.map((part, i) => (
-                      <div
-                        key={i}
-                        className="bg-white p-2 rounded-xl border border-neutral-200/80 flex items-center justify-between"
-                      >
-                        <div>
-                          <span className="font-semibold text-neutral-900">{part.name}</span>{" "}
-                          <span className="text-neutral-500">({part.brand})</span>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-brand-strong">
-                          {part.partNumber}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Mechanic Tip */}
               {diagnosticResult.mechanicTip && (
                 <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-2 text-xs text-amber-900">
@@ -338,14 +351,31 @@ export const AiMechanicModal: React.FC<AiMechanicModalProps> = ({
                 </div>
               )}
 
-              {/* Estimated budget & Action */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-                <div className="text-xs">
-                  <span className="text-neutral-500">Примерный бюджет:</span>{" "}
-                  <strong className="text-neutral-900 font-mono">
-                    {diagnosticResult.estimatedCostRange || "По запросу"}
-                  </strong>
+              {diagnosticResult.knowledgeSources && (
+                <div className="rounded-xl border border-neutral-200 bg-white p-3 text-xs">
+                  <div className="mb-1.5 flex items-center gap-1.5 font-bold text-neutral-600">
+                    <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                    Основание ответа
+                  </div>
+                  {diagnosticResult.knowledgeSources.length === 0 ? (
+                    <p className="text-neutral-500">Точная выдержка руководства для этой конфигурации не найдена. Ответ содержит общие рекомендации и диагностические гипотезы.</p>
+                  ) : (
+                    <ul className="space-y-1.5 text-neutral-600">
+                      {diagnosticResult.knowledgeSources.map((source, index) => (
+                        <li key={`${source.title}-${index}`}>
+                          <span className="font-semibold">{source.evidenceType === "vehicle_document_excerpt" ? "Руководство" : source.evidenceType === "model_series_guidance" ? "Модельная серия" : source.evidenceType === "make_guidance" ? "Марка" : "Общее правило"}:</span>{" "}
+                          {source.documentName || source.title}{source.locator ? `, ${source.locator}` : ""}
+                          {source.sourceUrl && <a className="ml-1 underline" href={source.sourceUrl} target="_blank" rel="noreferrer">Источник</a>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
+              )}
+
+              {/* Action */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                <p className="text-xs text-neutral-500">Стоимость и артикулы требуют проверки по региону и комплектации.</p>
 
                 {taskAdded ? (
                   <div className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm animate-in fade-in duration-200">

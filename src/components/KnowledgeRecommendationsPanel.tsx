@@ -21,6 +21,12 @@ const riskClass: Record<VehicleRecommendationResponse["recommendations"][number]
   informational: "border-blue-200 bg-blue-50/70 text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100",
 };
 
+const confidenceLabel: Record<VehicleRecommendationResponse["recommendations"][number]["confidence"], string> = {
+  high: "Подтверждено для комплектации",
+  medium: "Общая рекомендация",
+  low: "Требует проверки по руководству",
+};
+
 export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPanelProps> = ({ vehicle }) => {
   const [state, setState] = useState<{ loading: boolean; data: VehicleRecommendationResponse | null; error: string | null }>({ loading: true, data: null, error: null });
   const [refreshState, setRefreshState] = useState<{ loading: boolean; message: string | null }>({ loading: false, message: null });
@@ -37,7 +43,7 @@ export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPan
       .then((data) => { if (!cancelled) setState({ loading: false, data, error: null }); })
       .catch((error) => { if (!cancelled) setState({ loading: false, data: null, error: error instanceof Error ? error.message : "Рекомендации временно недоступны" }); });
     return () => { cancelled = true; };
-  }, [hasVehicle, vehicle.id, vehicle.make, vehicle.model, vehicle.generation, vehicle.engine, vehicle.fuelType, vehicle.currentMileage]);
+  }, [hasVehicle, vehicle.id, vehicle.make, vehicle.model, vehicle.generation, vehicle.market, vehicle.year, vehicle.engine, vehicle.transmission, vehicle.fuelType, vehicle.currentMileage]);
 
   const handleRefreshSources = async () => {
     setRefreshState({ loading: true, message: null });
@@ -59,7 +65,7 @@ export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPan
           </div>
           <div>
             <h3 id="knowledge-recommendations-title" className="text-base font-bold text-neutral-900 dark:text-white">Советы по вашей машине</h3>
-            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Публичные инструкции и правила с указанием источника</p>
+            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">Выдержки руководства показываются с точной страницей и применимостью; остальные советы отмечены как общие</p>
           </div>
         </div>
         <button type="button" onClick={handleRefreshSources} disabled={refreshState.loading} className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 hover:text-brand-strong disabled:cursor-wait disabled:opacity-60" title="Проверить доступность источников">
@@ -102,7 +108,10 @@ export const KnowledgeRecommendationsPanel: React.FC<KnowledgeRecommendationsPan
               </div>
               <p className="mt-2 text-xs leading-relaxed opacity-90">{item.text}</p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] opacity-75">
+                <span>{item.evidenceType === "vehicle_document_excerpt" ? "По выдержке руководства" : item.evidenceType === "model_series_guidance" ? "По модельной серии" : item.evidenceType === "make_guidance" ? "По марке" : "Общая рекомендация"}</span>
+                <span>{confidenceLabel[item.confidence]}</span>
                 <span>{item.applicability}</span>
+                {item.citation && <span>{item.citation.documentName} · {item.citation.locator} · SHA-256 {item.citation.documentHash.slice(0, 12)}…</span>}
                 {item.sources.slice(0, 2).map((source) => (
                   <a key={source.id} href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold underline underline-offset-2 hover:no-underline">
                     {source.publisher}<ExternalLink className="h-3 w-3" aria-hidden="true" />

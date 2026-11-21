@@ -363,7 +363,12 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
         status: "pending",
       });
     } else if (eventType === "part") {
-      const pPrice = parseFloat(partPrice) || 1200;
+      const enteredPartPrice = parseFloat(partPrice);
+      if (!Number.isFinite(enteredPartPrice) || enteredPartPrice < 0) {
+        setSaveError("Укажите цену покупки детали или подтвердите её вручную.");
+        return;
+      }
+      const pPrice = enteredPartPrice;
       const pQty = parseInt(partQuantity, 10) || 1;
       onSavePart?.({
         vehicleId: vehicle.id,
@@ -426,7 +431,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
           <span>Отмена</span>
         </button>
 
-        <span className="text-xs font-bold text-neutral-900">
+        <span className="text-base font-bold text-neutral-900">
           {eventType === "part"
             ? "Добавить деталь"
             : eventType === "service"
@@ -440,7 +445,7 @@ export const AddEventScreen: React.FC<AddEventScreenProps> = ({
 
         <button
           onClick={handleSave}
-          className="px-3.5 py-1.5 rounded-xl bg-brand-strong hover:bg-brand text-white text-xs font-bold transition cursor-pointer active:scale-95 shadow-md shadow-brand-strong/30"
+          className="min-h-11 px-3.5 py-2.5 rounded-xl bg-brand-strong hover:bg-brand-hover text-white text-xs font-bold transition cursor-pointer active:scale-95"
         >
           Сохранить
         </button>

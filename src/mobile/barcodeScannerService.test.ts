@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import {
   decodeVin,
+  isPartCompatibleWithVehicle,
   parseBarcodeOrQr,
   AUTOMOTIVE_BARCODE_CATALOG,
   WMI_MAPPING,
@@ -40,12 +41,19 @@ describe("VIN Code Parser", () => {
     expect(result?.isCurrentVehicle).toBe(true);
   });
 
-  it("decodes Toyota WMI and year", () => {
+  it("decodes Toyota WMI without guessing model or year", () => {
     const result = decodeVin("JTDAGACF9P3012984");
     expect(result).not.toBeNull();
     expect(result?.make).toBe("Toyota");
     expect(result?.country).toBe("Япония");
-    expect(result?.year).toBe(2023); // 'P' is 2023
+    expect(result?.model).toBe("Автомобиль");
+    expect(result?.year).toBeUndefined();
+  });
+
+  it("uses model and year only when the exact VIN matches a garage record", () => {
+    const result = decodeVin(mockVehicle.vin!, mockVehicle, [mockVehicle]);
+    expect(result?.model).toBe("X-Trail");
+    expect(result?.year).toBe(2008);
   });
 
   it("handles VIN with prefix or spaces", () => {
@@ -53,6 +61,8 @@ describe("VIN Code Parser", () => {
     expect(result).not.toBeNull();
     expect(result?.vin).toBe("WBA8E1106GNT98231");
     expect(result?.make).toBe("BMW");
+    expect(result?.model).toBe("Автомобиль");
+    expect(result?.year).toBeUndefined();
   });
 
   it("rejects invalid length or invalid characters", () => {
@@ -79,6 +89,13 @@ describe("Barcode & QR Code Parser", () => {
     expect(scan.partInfo?.category).toBe("Тормозная система");
   });
 
+  it("confirms fitment only for an explicitly listed vehicle variant", () => {
+    const part = AUTOMOTIVE_BARCODE_CATALOG["5905179001544"];
+    expect(isPartCompatibleWithVehicle(part, { make: "Nissan", model: "X-Trail", generation: "T31" })).toBe(true);
+    expect(isPartCompatibleWithVehicle(part, { make: "Nissan", model: "X-Trail", generation: "T32" })).toBe(false);
+    expect(isPartCompatibleWithVehicle(undefined, { make: "Nissan", model: "X-Trail", generation: "T31" })).toBe(false);
+  });
+
   it("parses QR code JSON payload", () => {
     const qrJson = JSON.stringify({
       brand: "Nissan OEM",
@@ -101,11 +118,19 @@ describe("Barcode & QR Code Parser", () => {
     expect(scan.partInfo?.partNumber).toBe("W67/1");
   });
 
-  it("handles unknown barcode with sensible defaults", () => {
+  it("keeps unknown barcodes as raw codes without inventing a part or price", () => {
     const scan = parseBarcodeOrQr("4601234567890", mockVehicle);
-    expect(scan.scanType).toBe("part");
-    expect(scan.partInfo?.partNumber).toBe("4601234567890");
-    expect(scan.partInfo?.estimatedPrice).toBeGreaterThan(0);
+    expect(scan.scanType).toBe("unknown");
+    expect(scan.rawCode).toBe("4601234567890");
+    expect(scan.partInfo).toBeUndefined();
+    expect(scan.serviceInfo).toBeUndefined();
+  });
+
+  it("does not treat an unknown QR URL as a verified catalog match", () => {
+    const scan = parseBarcodeOrQr("https://example.com/parts/UNLISTED-123", mockVehicle);
+    expect(scan.scanType).toBe("unknown");
+    expect(scan.partInfo).toBeUndefined();
+    expect(scan.serviceInfo).toBeUndefined();
   });
 });
 

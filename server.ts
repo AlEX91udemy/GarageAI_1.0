@@ -44,7 +44,9 @@ import {
   top100 as catalogTop100,
   catalogSearch,
 } from "./src/catalog/database";
-import { searchKnowledge } from "./src/catalog/knowledge";
+import { ingestedKnowledgeChunks, searchKnowledge } from "./src/catalog/knowledge";
+import { acceptKnowledgeChunkImport, loadReviewedKnowledgeChunks } from "./src/catalog/ingestion";
+import type { IngestedKnowledgeChunk } from "./src/catalog/types";
 import { publicKnowledgeSources } from "./src/catalog/publicSources";
 import { getVehicleRecommendations } from "./src/catalog/recommendations";
 import { verifyModification } from "./src/catalog/verification";
@@ -57,13 +59,15 @@ import {
 } from "./server/documentOcr";
 import { GarageStore, UserAlreadyExistsError, emptyGarage, type GarageData, type EmailAuthChallengeRecord } from "./server/store";
 import { ConcurrentGarageUpdateError, PostgresPersistence } from "./server/postgresPersistence";
-import { hasAiConfiguration, hasGeminiConfiguration } from "./server/aiConfig";
+import { hasAiConfiguration, hasGeminiConfiguration, hasOcrConfiguration } from "./server/aiConfig";
 import { AgentServiceClientError, runAgentService } from "./server/agentServiceClient";
 import { assertProductionStorageSafe } from "./server/storageSafety";
 import { validateGarageBackup } from "./server/backup";
 import { generateEmailCode, hashEmailCode, normalizeEmail } from "./server/emailCodeAuth";
 import { safeHttpErrorResponse } from "./server/httpErrorResponse";
-import { classifyReceiptText } from "./server/receiptClassification";
+import { classifyReceiptText, getReceiptContentRejection, isReceiptRefund, parseBankReceiptText, parseLocalReceiptText, parseReceiptText } from "./server/receiptClassification";
+import { decodeFiscalReceiptQr } from "./server/receiptQr";
+import { normalizeReceiptAmount, normalizeReceiptDate, normalizeReceiptMerchant } from "./src/receiptFields";
 import {
   SESSION_RENEW_THRESHOLD_MS,
   SESSION_TTL_MS,
@@ -83,6 +87,7 @@ import {
   isValidYear,
   validateCredentials,
   validateDiagnosticResult,
+  sanitizeDiagnosticResult,
 } from "./server/validation";
 
 // Production logs must stay focused on request and startup failures.
@@ -157,7 +162,7 @@ app.set("trust proxy", Number.isInteger(trustedProxyHops) && trustedProxyHops >=
 app.use(express.json({ limit: "10mb" }));
 
 const ALLOWED_ORIGIN_HOSTS = new Set(
-  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://www.garageai.site,https://garageai-1-0.sambur91.workers.dev,http://localhost:3000,http://localhost:8080")
+  (process.env.ALLOWED_ORIGINS || "https://garageai.site,https://garageai-1-0.sambur91.workers.dev,http://localhost:3000,http://localhost:8080")
     .split(",")
     .map((item) => {
       try {
@@ -348,11 +353,13 @@ function getAi(): GoogleGenAI {
   if (!aiClient) {
     const key = process.env.GEMINI_API_KEY || "";
     const useVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI === "true";
+    const location = process.env.GOOGLE_CLOUD_LOCATION || "eu";
     aiClient = useVertex
       ? new GoogleGenAI({
           vertexai: true,
           project: process.env.GOOGLE_CLOUD_PROJECT,
-          location: process.env.GOOGLE_CLOUD_LOCATION || "us-central1",
+          location,
+          ...(location === "eu" ? { httpOptions: { baseUrl: "https://aiplatform.eu.rep.googleapis.com" } } : {}),
         })
       : new GoogleGenAI({
           apiKey: key,
@@ -377,14 +384,15 @@ function getOpenRouterConfig(purpose: OpenRouterPurpose = "receipt") {
 }
 
 async function requestOpenRouter(body: Record<string, unknown>, title: string, key: string) {
-  const maxAttempts = 3;
+  // OCR must fail over to local Tesseract quickly during provider outages.
+  const maxAttempts = 1;
   let currentBody: Record<string, unknown> = { ...body };
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const response = await fetch(OPENROUTER_URL, {
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(15_000),
         method: "POST",
         headers: {
           Authorization: "Bearer " + key,
@@ -402,7 +410,7 @@ async function requestOpenRouter(body: Record<string, unknown>, title: string, k
         const { response_format: _ignored, ...fallbackBody } = currentBody;
         currentBody = fallbackBody;
         const retryResponse = await fetch(OPENROUTER_URL, {
-          signal: AbortSignal.timeout(45_000),
+          signal: AbortSignal.timeout(15_000),
           method: "POST",
           headers: {
             Authorization: "Bearer " + key,
@@ -532,7 +540,7 @@ async function requestOpenRouterReceiptFields(ocrText: string): Promise<Record<s
       messages: [
         {
           role: "user",
-          content: `Извлеки поля чека только из приведенного OCR-текста. Не угадывай отсутствующие значения. Для даты используй формат YYYY-MM-DD; сумма должна быть итогом к оплате, не наличными или сдачей. Верни JSON: {"merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${safeOcrText}`,
+          content: `Извлеки поля только если OCR-текст содержит чек или подтверждение покупки; иначе верни {"notReceipt": true}. Не классифицируй продукты и бытовые покупки как автозапчасти. Автокатегорию ставь только при явных признаках, иначе укажи other. Не угадывай отсутствующие значения. Для даты используй YYYY-MM-DD; сумма должна быть итогом к оплате. Верни JSON: {"notReceipt": boolean, "merchantName": string|null, "date": string|null, "totalAmount": number|null, "currency": string|null, "category": "repair"|"fuel"|"parts"|"wash"|"tires"|"tuning"|"other", "description": string, "notes": string|null}. OCR-текст:\n${safeOcrText}`,
         },
       ],
       temperature: 0,
@@ -768,6 +776,8 @@ app.use("/api", (req, res, next) => {
     req.path === "/knowledge/search" ||
     req.path === "/knowledge/sources" ||
     req.path === "/knowledge/recommendations" ||
+    req.path === "/ai/scan-receipt" ||
+    req.path === "/ai/scan-document" ||
     req.path === "/auth/register" ||
     req.path === "/auth/login" ||
     req.path === "/auth/logout" ||
@@ -775,6 +785,8 @@ app.use("/api", (req, res, next) => {
     req.path === "/auth/email/request-code" ||
     req.path === "/auth/email/verify" ||
     req.path === "/auth/email/verify-code" ||
+    req.path === "/auth/password/reset/request" ||
+    req.path === "/auth/password/reset/confirm" ||
     req.path.startsWith("/auth/session");
   if (isPublic) return next();
   if (req.path === "/health" || !fullPath) return next();
@@ -936,7 +948,7 @@ const KNOWLEDGE_VEHICLE_MAX_LENGTH = 4_000;
 const KNOWLEDGE_REFRESH_LIMIT = 3;
 const KNOWLEDGE_REFRESH_WINDOW_MS = 15 * 60 * 1000;
 const knowledgeRefreshAttempts = new Map<string, { count: number; startedAt: number }>();
-const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
+const KNOWLEDGE_VEHICLE_KEYS = new Set(["make", "model", "generation", "market", "year", "engine", "transmission", "driveType", "fuelType", "currentMileage"]);
 const KNOWLEDGE_QUERY_KEYS = new Set(["vehicle", "q", ...KNOWLEDGE_VEHICLE_KEYS]);
 
 function parseKnowledgeVehicle(value: unknown): { vehicle?: Record<string, unknown>; error?: string } {
@@ -1018,7 +1030,9 @@ async function rateLimitKnowledgeRefresh(req: express.Request, res: express.Resp
 }
 
 app.get("/api/knowledge/sources", (_req, res) => {
-  res.json({ sources: publicKnowledgeSources, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-14", statusScope: "instance-local", note: "Реестр содержит публичные точки входа. Статусы проверки относятся к текущему экземпляру сервера и не являются доказательством содержимого документа. Для точного совета нужен документ производителя для конкретного рынка, года, двигателя и VIN." });
+  const sourceIdsWithChunks = new Set(ingestedKnowledgeChunks.map((chunk) => chunk.metadata.sourceId));
+  const inventory = publicKnowledgeSources.map((source) => ({ ...source, documentStatus: source.documentStatus || "entry_page_only", excerptCount: ingestedKnowledgeChunks.filter((chunk) => chunk.metadata.sourceId === source.id).length, availableForRecommendations: sourceIdsWithChunks.has(source.id) }));
+  res.json({ sources: inventory, statuses: Array.from(publicKnowledgeSourceStatuses.values()), generatedAt: "2026-11-18", statusScope: "instance-local", note: "Ссылка на страницу производителя не равна загруженному руководству. Рекомендации по выдержкам появляются только при наличии проверенного цитируемого фрагмента с совпадающими маркой, моделью, поколением, рынком, годом, двигателем и КПП." });
 });
 const publicKnowledgeSourceStatuses = new Map<string, { sourceId: string; checkedAt: string; status: "reachable" | "http_error" | "network_error" | "not_checked"; httpStatus?: number; responseUrl?: string; error?: string }>();
 async function refreshPublicKnowledgeSources() {
@@ -1050,6 +1064,13 @@ app.get("/api/knowledge/recommendations", (req, res) => {
   if (rawQuery.length > KNOWLEDGE_QUERY_MAX_LENGTH) return res.status(400).json({ error: "Запрос слишком длинный" });
   const query = rawQuery;
   res.json({ recommendations: getVehicleRecommendations(parsedVehicle.vehicle || {}, query), sources: publicKnowledgeSources });
+});
+
+app.post("/api/knowledge/chunks/validate", requireAuth, (req, res) => {
+  const value = req.body?.chunk;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return res.status(400).json({ valid: false, errors: ["Фрагмент должен быть объектом"] });
+  const result = (() => { try { acceptKnowledgeChunkImport(value, [...catalogSources, ...publicKnowledgeSources]); return { valid: true, errors: [] }; } catch (error) { return { valid: false, errors: [error instanceof Error ? error.message : "Фрагмент отклонён"] }; } })();
+  res.status(result.valid ? 200 : 400).json(result);
 });
 
 app.get("/api/vehicles/:id", (req, res) => {
@@ -2450,6 +2471,13 @@ function requireAiAccess(req: express.Request, res: express.Response, next: expr
   return enforceAiRateLimit(req, res, next);
 }
 
+function requireOcrAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!hasOcrConfiguration(process.env)) {
+    return res.status(503).json({ error: "OCR временно отключён на сервере." });
+  }
+  return enforceAiRateLimit(req, res, next);
+}
+
 function requireGeminiAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!hasGeminiConfiguration(process.env)) {
     return res.status(503).json({ error: "Для этой AI-функции требуется GEMINI_API_KEY или настройка Vertex AI." });
@@ -2550,16 +2578,16 @@ async function establishSession(req: express.Request, res: express.Response, use
   return { username, email, csrfToken: record.csrfSecret };
 }
 
-async function issueEmailChallenge(userId: string, email: string): Promise<void> {
+async function issueEmailChallenge(userId: string, email: string, purpose: "login" | "password_reset" = "login"): Promise<void> {
   const secret = process.env.EMAIL_CODE_SECRET?.trim();
   if (!secret) throw new Error("Email code secret is not configured");
-  const id = newId("email-challenge");
+  const id = newId(purpose === "login" ? "email-challenge" : "email-reset");
   const code = generateEmailCode();
   const createdAtMs = Date.now();
-  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs };
+  const record: EmailAuthChallengeRecord = { id, userId, codeHash: hashEmailCode(id, code, secret), expiresAtMs: createdAtMs + EMAIL_CODE_TTL_MS, attempts: 0, createdAtMs, purpose };
   await store.createEmailChallenge(record);
   try {
-    await sendEmailCode(email, code);
+    await sendEmailCode(email, code, purpose);
   } catch (error) {
     await store.consumeEmailChallenge(userId, id, Date.now());
     throw error;
@@ -2572,14 +2600,6 @@ app.post("/api/auth/register", async (req, res) => {
   if (credentials.error) return res.status(400).json({ error: credentials.error });
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: "Для регистрации нужен корректный email" });
-  try {
-    if (await store.getUserByName(credentials.username!)) {
-      return res.status(409).json({ error: "Пользователь с таким логином уже существует" });
-    }
-  } catch (error) {
-    console.error("Registration lookup failed:", error instanceof Error ? error.message : "unknown error");
-    return res.status(503).json({ error: "Сервис регистрации временно недоступен." });
-  }
   let createdUserId: string | undefined;
   try {
     // Local development should remain usable without a configured mail provider.
@@ -2588,13 +2608,14 @@ app.post("/api/auth/register", async (req, res) => {
       && !process.env.EMAIL_CODE_CAPTURE_FILE?.trim()
       && !emailDeliveryConfigured();
     const userId = newId("user");
+    const internalUsername = `garage-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
     createdUserId = userId;
     if (store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email)) {
       res.status(409).json({ error: "Пользователь с таким email уже существует" }); return;
     }
     const created = store instanceof PostgresPersistence
-      ? await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
-      : await store.createUserWithEmailState(credentials.username!, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
+      ? await store.createUserWithEmailState(internalUsername, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null)
+      : await store.createUserWithEmailState(internalUsername, hashPassword(credentials.password!), userId, email, localEmailVerificationBypass ? new Date().toISOString() : null);
     if (localEmailVerificationBypass) {
       return res.status(201).json({ success: true, session: await establishSession(req, res, created.id, created.username, created.email) });
     }
@@ -2607,7 +2628,7 @@ app.post("/api/auth/register", async (req, res) => {
     if (error instanceof UserAlreadyExistsError) {
       return res.status(409).json({ error: error.message });
     }
-    console.error("Registration error:", error);
+    console.error("Registration failed");
     return res.status(503).json({ error: "Не удалось создать аккаунт или отправить код подтверждения" });
   }
 });
@@ -2615,20 +2636,21 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   if (await rateLimitedLogin(req, res)) return;
   const body = (req.body || {}) as Record<string, unknown>;
-  const username = asTrimmedString(body.username, 32).toLowerCase();
+  const email = normalizeEmail(body.email ?? body.username);
+  const legacyUsername = body.email === undefined && typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
   const password = typeof body.password === "string" ? body.password : "";
-  if (!username || !password) {
-    return res.status(400).json({ error: "Введите логин и пароль" });
+  if ((!email && !/^[a-z0-9_.-]{3,32}$/.test(legacyUsername)) || !password) {
+    return res.status(400).json({ error: "Введите email и пароль" });
   }
   let user;
   try {
-    user = await store.getUserByName(username);
+    user = email ? await store.getUserByEmail(email) : await store.getUserByName(legacyUsername);
   } catch (error) {
     console.error("Login lookup failed:", error instanceof Error ? error.message : "unknown error");
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
   }
   if (!user || !verifyPassword(password, user.passwordHash)) {
-    return res.status(401).json({ error: "Неверный логин или пароль" });
+    return res.status(401).json({ error: "Неверный email или пароль" });
   }
   if (user.email && user.emailVerifiedAt === null) {
     return res.status(403).json({ error: "Подтвердите email кодом из письма перед входом", code: "EMAIL_NOT_VERIFIED" });
@@ -2692,7 +2714,7 @@ async function consumeEmailVerifyLimit(req: express.Request, email: string): Pro
   return true;
 }
 
-async function sendEmailCode(email: string, code: string): Promise<void> {
+async function sendEmailCode(email: string, code: string, purpose: "login" | "password_reset" = "login"): Promise<void> {
   const captureFile = process.env.EMAIL_CODE_CAPTURE_FILE?.trim();
   if (process.env.NODE_ENV === "test" && captureFile) {
     fs.mkdirSync(path.dirname(captureFile), { recursive: true });
@@ -2704,7 +2726,7 @@ async function sendEmailCode(email: string, code: string): Promise<void> {
   if (!apiKey || !from) throw new Error("Email provider is not configured");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [email], subject: "Ваш код входа в GarageAI", text: `Код входа: ${code}. Он действует ${Math.floor(EMAIL_CODE_TTL_MS / 60000)} минут.` }),
+    body: JSON.stringify({ from, to: [email], subject: purpose === "login" ? "Ваш код входа в GarageAI" : "Восстановление пароля GarageAI", text: "Код для " + (purpose === "login" ? "входа" : "сброса пароля") + ": " + code + ". Он действует " + Math.floor(EMAIL_CODE_TTL_MS / 60000) + " минут." }),
   });
   if (!response.ok) throw new Error("Email provider rejected the request");
 }
@@ -2756,6 +2778,60 @@ app.post(["/api/auth/email/verify", "/api/auth/email/verify-code"], async (req, 
     return res.json({ success: true, session: await establishSession(req, res, user.id, user.username, user.email) });
   } catch {
     return res.status(503).json({ error: "Сервис входа временно недоступен." });
+  }
+});
+
+app.post("/api/auth/password/reset/request", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) return res.status(400).json({ error: "Введите корректный email" });
+  if (!(await consumeEmailCodeLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много запросов. Повторите позже." });
+  }
+  if (!emailDeliveryConfigured() || !process.env.EMAIL_CODE_SECRET?.trim()) {
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (user) await issueEmailChallenge(user.id, email, "password_reset");
+    return res.json({ success: true, message: "Если аккаунт с таким email существует, код восстановления отправлен." });
+  } catch {
+    console.error("Password reset request failed");
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+  }
+});
+
+app.post("/api/auth/password/reset/confirm", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  if (!email || !/^\d{6}$/.test(code)) return res.status(400).json({ error: "Введите email и шестизначный код" });
+  if (password.length < 8 || password.length > 200) return res.status(400).json({ error: "Пароль должен содержать от 8 до 200 символов" });
+  if (!(await consumeEmailVerifyLimit(req, email))) {
+    res.setHeader("Retry-After", "900");
+    return res.status(429).json({ error: "Слишком много попыток. Повторите позже." });
+  }
+  try {
+    const user = store instanceof PostgresPersistence ? await store.getUserByEmail(email) : store.getUserByEmail(email);
+    if (!user || user.emailVerifiedAt === null) return res.status(400).json({ error: "Неверный или просроченный код" });
+    const secret = process.env.EMAIL_CODE_SECRET?.trim();
+    if (!secret) return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
+    const accepted = store instanceof PostgresPersistence
+      ? await store.resetPasswordWithEmailChallenge(user.id, code, secret, hashPassword(password))
+      : await store.resetPasswordWithEmailChallenge(user.id, code, secret, hashPassword(password));
+    if (!accepted) return res.status(400).json({ error: "Неверный или просроченный код" });
+    if (store instanceof PostgresPersistence) {
+      // Password, one-time code and active sessions are updated atomically by the repository.
+    } else {
+      const now = Date.now();
+      for (const session of sessions.values()) {
+        if (session.userId === user.id && !session.revokedAt) session.revokedAt = now;
+      }
+      await persistSessions();
+    }
+    return res.json({ success: true, message: "Пароль изменён. Войдите с новым паролем." });
+  } catch {
+    return res.status(503).json({ error: "Восстановление пароля временно недоступно." });
   }
 });
 
@@ -2909,7 +2985,9 @@ async function requireAgentServiceAccess(req: express.Request, res: express.Resp
     if (process.env.NODE_ENV === "production" && allowlist.length === 0) {
       return res.status(503).json({ error: "Для AI-агентов не настроен allowlist администраторов." });
     }
-    if (allowlist.length > 0 && !allowlist.includes(user.username.trim().toLowerCase())) {
+    const allowedByUsername = allowlist.includes(user.username.trim().toLowerCase());
+    const allowedByEmail = Boolean(user.emailVerifiedAt && user.email && allowlist.includes(user.email.trim().toLowerCase()));
+    if (allowlist.length > 0 && !allowedByUsername && !allowedByEmail) {
       return res.status(403).json({ error: "Запуск AI-агентов разрешён только администратору проекта." });
     }
 
@@ -2978,10 +3056,12 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
             make: req.body.make,
             model: req.body.model,
             generation: req.body.generation,
+            market: req.body.market,
             year: req.body.year,
             engine: req.body.engine,
             currentMileage: req.body.currentMileage,
             transmission: req.body.transmission,
+            fuelType: req.body.fuelType,
             driveType: req.body.driveType,
           };
     const vehicle = rawVehicle;
@@ -2993,6 +3073,7 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
     const vehicleMake = asTrimmedString(vehicle.make, 80);
     const vehicleModel = asTrimmedString(vehicle.model, 120);
     const vehicleGeneration = asTrimmedString(vehicle.generation, 120);
+    const vehicleMarket = asTrimmedString(vehicle.market, 24);
     const vehicleEngine = asTrimmedString(vehicle.engine, 120);
     const vehicleTransmission = asTrimmedString(vehicle.transmission, 80);
     const vehicleDriveType = asTrimmedString(vehicle.driveType, 80);
@@ -3008,24 +3089,43 @@ app.post("/api/ai/diagnose", requireGeminiAccess, async (req, res) => {
       brand: vehicleMake || undefined,
       model: vehicleModel || undefined,
       generation: vehicleGeneration || undefined,
+      market: vehicleMarket || undefined,
+      yearStart: vehicleYear ? Number(vehicleYear) : undefined,
+      yearEnd: vehicleYear ? Number(vehicleYear) : undefined,
+      engine: vehicleEngine || undefined,
+      transmission: vehicleTransmission || undefined,
     }).slice(0, 5);
-    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const recommendationContext = getVehicleRecommendations({ make: vehicleMake, model: vehicleModel, generation: vehicleGeneration, market: vehicleMarket, year: vehicleYear ? Number(vehicleYear) : undefined, engine: vehicleEngine, transmission: vehicleTransmission, fuelType: asTrimmedString(vehicle.fuelType, 80), driveType: vehicleDriveType, currentMileage: currentMileage ?? 0 }, problemDescription).slice(0, 5);
+    const exactManualRecommendations = recommendationContext.filter((item) => item.evidenceType === "vehicle_document_excerpt");
+    const knowledgeSources = recommendationContext.map((item) => ({
+      evidenceType: item.evidenceType || "general_guidance",
+      title: item.title,
+      documentName: item.citation?.documentName,
+      locator: item.citation?.locator,
+      sourceUrl: item.citation?.sourceUrl || item.sources[0]?.url,
+      applicability: item.applicability,
+    }));
     const retrievedRecommendations = recommendationContext.length
-      ? recommendationContext.map((item) => "[" + item.risk + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + ")").join("\n")
+      ? recommendationContext.map((item) => "[" + item.risk + "; " + item.evidenceType + "] " + item.title + ": " + item.text + " (Источники: " + item.sources.map((source) => source.title + " — " + source.url).join("; ") + (item.citation ? "; " + item.citation.locator + "; SHA-256 " + item.citation.documentHash : "") + ")").join("\n")
       : "Подходящих правил для запроса нет.";
+    const exactManualContext = exactManualRecommendations.length
+      ? exactManualRecommendations.map((item) => item.text + " (Документ: " + (item.citation?.documentName || item.sources[0]?.title || item.title) + "; " + (item.citation?.locator || "раздел не указан") + ".)").join("\n")
+      : "Точной выдержки руководства для всей конфигурации автомобиля в базе нет. Не выдавай общие правила за заводские данные.";
     const retrievedContext = knowledgeContext.length
-      ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source})`).join("\n")
+      ? knowledgeContext.map((item) => `[${item.metadata.category}] ${item.text} (Источник: ${item.metadata.source}${item.citation ? "; " + item.citation.locator + "; SHA-256 " + item.citation.documentHash : ""})`).join("\n")
       : "Подходящих подтверждённых фрагментов локальной базы нет. Не выдавай предположения за факт.";
 
     const ai = getAi();
     const prompt = `Ты — ведущий профессиональный автомеханик и диагност в сервисной системе "Garage AI Rev".
-Твоя задача: на основе точного профиля автомобиля, его пробега, истории недавних ремонтов и описанных симптомов дать структурированную, практически полезную и объективную диагностику.
+Твоя задача: по профилю автомобиля, пробегу, истории обслуживания и симптомам предложить гипотезы и безопасную последовательность проверок. Это предварительная оценка, не подтверждённый диагноз и не замена осмотру специалиста. Не выдумывай статистическую точность, цены, артикулы или доказательства.
 
 ДАННЫЕ АВТОМОБИЛЯ:
 - Марка и модель: ${vehicleMake || "Не указана"} ${vehicleModel} (${vehicleGeneration})
+- Рынок спецификации: ${vehicleMarket || "Не указан"}
 - Год выпуска: ${vehicleYear || "Не указан"}
 - Текущий пробег: ${currentMileage !== null ? currentMileage.toLocaleString("ru-RU") + " км" : "Не указан"}
 - Двигатель / КПП: ${vehicleEngine || "Стандарт"} / ${vehicleTransmission || "Стандарт"}
+- Тип топлива: ${asTrimmedString(vehicle.fuelType, 80) || "Не указан"}
 - Тип привода: ${vehicleDriveType || "Стандарт"}
 
 ИСТОРИЯ ПРЕДЫДУЩИХ ОБСЛУЖИВАНИЙ:
@@ -3038,48 +3138,35 @@ ${userNotes ? `Дополнительные примечания: ${userNotes}` 
 РЕЛЕВАНТНЫЙ КОНТЕКСТ KNOWLEDGE BASE (RAG):
 ${retrievedContext}
 
-ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ:
+ПРАКТИЧЕСКИЕ РЕКОМЕНДАЦИИ ИЗ РЕЕСТРА ПУБЛИЧНЫХ ИСТОЧНИКОВ И ВЫДЕРЖЕК РУКОВОДСТВА:
 ${retrievedRecommendations}
+Если источник имеет тип make_guidance или model_series_guidance, используй его только как низкоуверенную справочную подсказку, не как подтверждённую частоту поломок.
 
-Правила: отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если данных для точного вывода нет, скажи, что нужна проверка по официальному руководству или на СТО.
+ТОЧНЫЕ ВЫДЕРЖКИ РУКОВОДСТВА ДЛЯ ЭТОЙ КОНФИГУРАЦИИ:
+${exactManualContext}
+
+Правила: сведения с evidenceType=vehicle_document_excerpt считаются применимыми только к указанной конфигурации и должны пересказываться с сохранением ссылки на раздел/страницу. Сведения с evidenceType=general_guidance являются общими и не могут выдавать точные объёмы, интервалы, моменты затяжки или совместимость деталей. Отделяй подтверждённые сведения от диагностических гипотез; для тормозов, рулевого управления, перегрева, топлива, двигателя и подушек безопасности явно указывай уровень риска. Если точной выдержки руководства нет, скажи это прямо и направь к официальному руководству или на СТО.
 
 Сформируй ответ в формате JSON строго по следующей схеме:
 {
   "primaryDiagnosis": "Краткое название наиболее вероятной неисправности",
   "summary": "краткий профессиональный вывод (1-2 предложения)",
-  "confidence": 88,
   "urgency": "high" | "medium" | "low",
   "safetyAssessment": "оценка риска для безопасности движения",
   "likelyCauses": [
-    {
-      "cause": "название причины",
-      "probability": 80
-    },
-    {
-      "cause": "вторая возможная причина",
-      "probability": 15
-    }
+    { "cause": "проверяемая диагностическая гипотеза" }
   ],
   "possibleCauses": [
     {
       "cause": "название причины",
-      "probability": "Высокая" | "Средняя" | "Низкая",
       "explanation": "подробное объяснение механизма неисправности",
       "checkMethod": "как проверить в гараже или на СТО"
     }
   ],
   "diagnosticSteps": ["шаг 1 проверки", "шаг 2", "шаг 3"],
-  "estimatedCostRange": "диапазон стоимости (например '5 000 — 12 000 ₽')",
-  "estimatedCost": "5 000 — 12 000 ₽",
-  "recommendedParts": [
-    {
-      "name": "Наименование детали",
-      "partNumber": "каталожный номер OEM / кросс",
-      "brand": "рекомендуемые бренды (например Mann, Brembo, SKF)"
-    }
-  ],
   "mechanicTip": "совет мастера для владельца именно этого кузова/модели/мотора",
-  "proTip": "совет мастера"
+  "proTip": "совет мастера",
+  "knowledgeSources": []
 }`;
 
     const response = await ai.models.generateContent({
@@ -3094,9 +3181,9 @@ ${retrievedRecommendations}
     if (!validateDiagnosticResult(parsed)) {
       return res.status(502).json({ error: "AI вернул ответ в неподдерживаемом формате" });
     }
-    res.json(parsed);
+    res.json({ ...sanitizeDiagnosticResult(parsed), knowledgeSources });
   } catch (error: any) {
-    console.error("Diagnostic AI error:", error);
+    console.error("Diagnostic AI request failed");
     res.status(500).json({
       error: "Не удалось провести AI-диагностику.",
     });
@@ -3104,9 +3191,21 @@ ${retrievedRecommendations}
 });
 
 // 2. Receipt OCR Scanner
-app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
+app.post("/api/ai/scan-receipt", requireOcrAccess, async (req, res) => {
   try {
-    const { imageBase64, mimeType } = req.body;
+    const { imageBase64, mimeType, receiptText } = req.body;
+    if (typeof receiptText === "string" && receiptText.trim()) {
+      if (receiptText.length > 12_000) return res.status(413).json({ error: "Текст чека слишком большой" });
+      if (imageBase64 !== "" || mimeType !== "text/plain") return res.status(400).json({ error: "Некорректный текст PDF-чека" });
+      const parsed: Record<string, any> = getOpenRouterConfig("receipt").key
+        ? await requestOpenRouterReceiptFields(receiptText.slice(0, 12_000)).catch(() => ({}))
+        : {};
+      if (parsed.notReceipt === true) return res.status(422).json({ error: "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+      const rejection = getReceiptContentRejection(receiptText, parsed);
+      if (rejection) return res.status(422).json({ error: rejection === "inappropriate" ? "Документ содержит недопустимое содержимое. Загрузите фото чека." : "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+      const { rawText, ...result } = parseReceiptText(receiptText.slice(0, 12_000), parsed);
+      return res.json(result);
+    }
 
     if (typeof imageBase64 !== "string" || !imageBase64) {
       return res.status(400).json({ error: "Изображение чека не предоставлено." });
@@ -3143,11 +3242,39 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
       return res.status(400).json({ error: "Пустое изображение чека" });
     }
 
-    const receiptPrompt = `Проанализируй фото автомобильного чека, заказ-наряда, квитанции СТО, чека АЗС или магазина автозапчастей.
-Извлеки точные данные и верни JSON со структурой:
+    const fiscal = await decodeFiscalReceiptQr(decodedImage).catch(() => null);
+    const sendReceipt = (fields: Record<string, unknown>, text = "") => {
+      const rejection = getReceiptContentRejection(text, fields);
+      if (rejection) {
+        return res.status(422).json({ error: rejection === "inappropriate" ? "Документ содержит недопустимое содержимое. Загрузите фото чека." : "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+      }
+      const bank = fiscal ? null : parseBankReceiptText(text);
+      const result = bank ? { ...fields, ...bank } : fields;
+      const refund = fiscal ? fiscal.operation === "refund"
+        : result.operation === "refund" || isReceiptRefund(text) ||
+          (typeof result.description === "string" && isReceiptRefund(result.description));
+      return res.json({
+        ...result,
+        merchantName: normalizeReceiptMerchant(result.merchantName),
+        date: fiscal?.date ?? normalizeReceiptDate(result.date),
+        totalAmount: fiscal?.totalAmount ?? normalizeReceiptAmount(result.totalAmount),
+        operation: fiscal?.operation ?? (refund ? "refund" : "expense"),
+      });
+    };
+    const localReceipt = async () => {
+      const prepared = await prepareDocumentImage(decodedImage);
+      const local = await recognizeDocumentImage(prepared[0].image, "sparse");
+      const { rawText, ...fields } = parseLocalReceiptText(local.text);
+      return sendReceipt(fields, rawText);
+    };
+
+    const receiptPrompt = `Проанализируй фото чека, заказ-наряда или документа банка по операции.
+Игнорируй кнопки и подписи приложения вокруг документа (например, «Закрыть»). Для документа банка возьми продавца из описания операции и дату из строки операции. Если операция отменена или это возврат, укажи refund. Если изображение не является чеком, заказ-нарядом или подтверждением покупки, верни {"notReceipt": true}. Продукты и бытовые покупки не классифицируй как автозапчасти. Для отсутствующих полей верни null. Не возвращай реквизиты карты, ФИО и банковские реквизиты.
+Верни JSON со структурой:
 {
-  "merchantName": "название СТО, АЗС или магазина",
-  "date": "дата в формате YYYY-MM-DD, если есть, иначе сегодня",
+  "merchantName": "название СТО, АЗС или магазина" | null,
+  "date": "дата в формате YYYY-MM-DD" | null,
+  "operation": "expense" | "refund",
   "totalAmount": 12500,
   "category": "repair" | "fuel" | "parts" | "wash" | "tires" | "tuning" | "other",
   "description": "краткое общее описание чека",
@@ -3166,45 +3293,71 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
         const totalAmount = totalEntity?.normalizedValue?.moneyValue?.units
           ? Number(totalEntity.normalizedValue.moneyValue.units) + Number(totalEntity.normalizedValue.moneyValue.nanos || 0) / 1e9
           : totalText ? Number(String(totalText).replace(/[^0-9.,-]/g, "").replace(",", ".")) : null;
-        const googleResult = { merchantName: documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"]), date: documentEntityValue(entities, ["receipt_date", "date"]), totalAmount, category: "other", description: doc?.text || "", notes: doc?.text || "", _source: "google-document-ai" };
-        const initialClassification = classifyReceiptText(doc?.text || "", googleResult.category);
+        const docText = doc?.text || "";
+        const localFields = parseLocalReceiptText(docText);
+        const googleResult = { merchantName: normalizeReceiptMerchant(documentEntityValue(entities, ["supplier_name", "merchant_name", "supplier"])) ?? localFields.merchantName, date: normalizeReceiptDate(documentEntityValue(entities, ["receipt_date", "date"])) ?? localFields.date, totalAmount: normalizeReceiptAmount(totalAmount) ?? localFields.totalAmount, category: "other", description: localFields.description, _source: "google-document-ai" };
+        const initialClassification = classifyReceiptText(docText, googleResult.category);
+        if (isReceiptRefund(docText) || (!fiscal && parseBankReceiptText(docText))) {
+          return sendReceipt(googleResult, docText);
+        }
         if (doc?.text && getOpenRouterConfig("receipt").key) {
           try {
             const refined = await requestOpenRouterReceiptFields(doc.text);
-            return res.json({
+            const classification = classifyReceiptText(docText, refined.category || initialClassification.category);
+            return sendReceipt({
               ...googleResult,
-              merchantName: refined.merchantName || googleResult.merchantName,
-              date: refined.date || googleResult.date,
-              totalAmount: Number.isFinite(Number(refined.totalAmount)) ? Number(refined.totalAmount) : googleResult.totalAmount,
-              category: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).category,
-              fuelDetails: classifyReceiptText(`${doc.text}\n${JSON.stringify(refined)}`, refined.category || initialClassification.category).fuelDetails || refined.fuelDetails,
+              merchantName: normalizeReceiptMerchant(refined.merchantName) ?? googleResult.merchantName,
+              date: normalizeReceiptDate(refined.date) ?? googleResult.date,
+              totalAmount: normalizeReceiptAmount(refined.totalAmount) ?? googleResult.totalAmount,
+              ...classification,
+              fuelDetails: classification.fuelDetails ?? refined.fuelDetails,
               description: refined.description || googleResult.description,
-              notes: refined.notes || googleResult.notes,
+              notes: refined.notes,
               _source: "google-document-ai+openrouter-text",
-            });
+            }, docText);
           }
-          catch (error) { console.warn("OpenRouter receipt refinement failed; using Google result:", error); }
+          catch { console.warn("OpenRouter receipt refinement failed; using Google result"); }
         }
-        return res.json({ ...googleResult, ...initialClassification });
-      } catch (error) { console.warn("Document AI receipt failed, using vision fallback:", error); }
+        return sendReceipt({ ...googleResult, ...initialClassification }, docText);
+      } catch { console.warn("Document AI receipt failed, using vision fallback"); }
     }
     const hasReceiptOpenRouter = Boolean(process.env.OPENROUTER_RECEIPT_API_KEY || process.env.OPENROUTER_API_KEY);
-    const responseText = hasReceiptOpenRouter
-      ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
-      : (await getAi().models.generateContent({
-          model: GEMINI_MODEL,
-          contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
-          config: { responseMimeType: "application/json" },
-        })).text;
+    if (!hasReceiptOpenRouter && !hasGeminiConfiguration(process.env) && !documentReceiptId) {
+      return await localReceipt();
+    }
+    let responseText = "";
+    try {
+      responseText = hasReceiptOpenRouter
+        ? await requestOpenRouterVision(cleanBase64, supportedMime, receiptPrompt, "receipt")
+        : await Promise.race([
+            getAi().models.generateContent({
+              model: GEMINI_MODEL,
+              contents: { parts: [{ inlineData: { data: cleanBase64, mimeType: supportedMime } }, { text: receiptPrompt }] },
+              config: { responseMimeType: "application/json" },
+            }).then((result) => result.text || ""),
+            new Promise<string>((_, reject) => setTimeout(() => reject(new Error("Receipt vision timeout")), 15_000)),
+          ]);
+    } catch {
+      // A configured provider can still be unavailable for the selected model
+      // or region. Keep the basic scanner usable through local OCR and expose
+      // only the safe source marker to the client.
+      console.warn("Receipt vision provider unavailable; using local OCR fallback");
+      return await localReceipt();
+    }
+    if (!responseText.trim()) {
+      return await localReceipt();
+    }
     const parsed = parseJsonSafely(responseText, null);
-    const parsedRecord = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return await localReceipt();
+    const parsedRecord = parsed as Record<string, unknown>;
+    if (parsedRecord.notReceipt === true) {
+      return res.status(422).json({ error: "Не удалось распознать чек или подтверждение покупки. Загрузите фото чека." });
+    }
     const classification = classifyReceiptText(
       `${responseText}\n${JSON.stringify(parsed)}`,
       parsedRecord.category,
     );
-    res.json({
+    sendReceipt({
       ...parsedRecord,
       category: classification.category,
       ...(classification.fuelDetails && !("fuelDetails" in parsedRecord)
@@ -3212,14 +3365,14 @@ app.post("/api/ai/scan-receipt", requireAiAccess, async (req, res) => {
         : {}),
     });
   } catch (error: any) {
-    console.error("Receipt OCR error:", error);
+    console.error("Receipt OCR failed");
     res.status(500).json({
       error: "Не удалось распознать чек.",
     });
   }
 });
 
-// 2a. Structured OCR for a Russian vehicle registration certificate (STS)
+// 2a. Structured OCR for Russian vehicle registration and title documents
 app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
@@ -3230,11 +3383,12 @@ app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanBase64) || cleanBase64.length % 4 === 1) return res.status(400).json({ error: "Некорректное изображение СТС." });
     if (Buffer.from(cleanBase64, "base64").length === 0) return res.status(400).json({ error: "Пустое изображение СТС." });
     const prompt = [
-      "Ты высокоточный OCR российского свидетельства о регистрации транспортного средства (СТС).",
-      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай.",
+      "Ты высокоточный OCR автомобильных документов России и ЕАЭС.",
+      "Сначала определи тип документа: СТС (свидетельство о регистрации), ПТС/ЭПТС (паспорт транспортного средства), ТТС (таможенный документ о транспортном средстве) или VIN без документа. Верни documentType: sts, pts, tts, vin или unknown.",
+      "Распознай все видимые данные. Используй только то, что напечатано на фото, ничего не додумывай. Если изображение не относится к транспортному средству или VIN не читается, верни documentType unknown и пустые поля.",
       "Верни только JSON. Для отсутствующих или нечитабельных полей используй null.",
-      JSON.stringify({ make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
-      "Подсказка по полям СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест.",
+      JSON.stringify({ documentType: "unknown", make: null, model: null, generation: null, year: null, licensePlate: null, vin: null, engine: null, engineDisplacementCc: null, enginePowerKw: null, enginePowerHp: null, fuelType: null, bodyType: null, maxMassKg: null, massKg: null, seats: null, registrationDate: null, stsNumber: null, stsIssueDate: null, confidence: { make: 0, model: 0, year: 0, licensePlate: 0, vin: 0 }, rawText: null }),
+      "Для СТС: A — госномер; B и I — даты; D.1 — марка; D.2/D.3 — модель; E — VIN; P.1 — объём двигателя в см³; P.2 — мощность в кВт; P.3 — топливо; F.1/F.2 — допустимая масса; G — масса без нагрузки; S.1 — количество мест. Для ПТС/ЭПТС/ТТС считывай те же значения только по явным подписям/полям документа.",
       "Дату верни в формате YYYY-MM-DD. Мощность в л.с. вычисляй из кВт только если P.2 прочитано уверенно. Не подменяй VIN номером свидетельства."
     ].join("\n");
     const responseText = getOpenRouterConfig("document").key
@@ -3253,7 +3407,7 @@ app.post("/api/ai/scan-vehicle-document", requireAiAccess, async (req, res) => {
 });
 
 // 2b. Full document OCR with image preprocessing and local OCR fallback
-app.post("/api/ai/scan-document", requireAiAccess, async (req, res) => {
+app.post("/api/ai/scan-document", requireOcrAccess, async (req, res) => {
   try {
     const { imageBase64, mimeType } = req.body;
     if (typeof imageBase64 !== "string" || !imageBase64) return res.status(400).json({ error: "Изображение документа не предоставлено." });
@@ -3434,6 +3588,16 @@ app.post("/api/ai/part-lookup", requireGeminiAccess, async (req, res) => {
 // ---------------------------------------------------------------------------
 
 async function startServer() {
+  const knowledgeFile = path.join(DATA_DIR, "knowledge_chunks.json");
+  if (fs.existsSync(knowledgeFile)) {
+    try {
+      const rawKnowledge: unknown = JSON.parse(fs.readFileSync(knowledgeFile, "utf-8"));
+      const corpusStatus = loadReviewedKnowledgeChunks(rawKnowledge, ingestedKnowledgeChunks, [...catalogSources, ...publicKnowledgeSources]);
+      console.info("Reviewed vehicle knowledge loaded:", corpusStatus.loaded, "accepted,", corpusStatus.rejected, "rejected");
+    } catch {
+      console.error("Reviewed vehicle knowledge file could not be loaded; no document excerpts enabled");
+    }
+  }
   if (store instanceof PostgresPersistence) {
     await store.initialize();
     await store.healthCheck();

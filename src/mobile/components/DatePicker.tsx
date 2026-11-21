@@ -59,7 +59,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, label =
         <Calendar className="w-3.5 h-3.5 text-neutral-700" />
       </button>
       {open && (
-        <div className="garage-date-panel absolute z-50 mt-1.5 w-56 rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl">
+        <div className="garage-date-panel absolute z-50 mt-1.5 left-0 w-64 max-w-[calc(100vw-24px)] rounded-2xl border border-neutral-200 bg-white p-2 shadow-xl">
           <div className="flex items-center justify-between mb-2 gap-1">
             <button type="button" aria-label="Предыдущий месяц" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="p-1 rounded-lg hover:bg-neutral-100"><ChevronLeft className="w-3.5 h-3.5" /></button>
             <div className="flex min-w-0 items-center gap-1">
@@ -74,7 +74,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({ value, onChange, label =
             <button type="button" aria-label="Следующий месяц" disabled={month.getFullYear() > currentYear || (month.getFullYear() === currentYear && month.getMonth() >= currentMonth)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="p-1 rounded-lg hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed"><ChevronRight className="w-3.5 h-3.5" /></button>
           </div>
           <div className="grid grid-cols-7 mb-0.5">{["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => <span key={day} className="text-center text-[9px] font-bold text-neutral-400">{day}</span>)}</div>
-          <div className="grid grid-cols-7 gap-0.5">{days.map((day, index) => { const exists = day > 0 && day <= new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate(); const key = exists ? toKey(new Date(month.getFullYear(), month.getMonth(), day)) : `empty-${index}`; const selectable = exists && key <= todayKey; const active = exists && key === value; return <button key={key} type="button" disabled={!selectable} onClick={() => selectable && choose(day)} className={`h-6 rounded-md text-[11px] ${!exists ? "invisible" : active ? "bg-brand-strong text-white font-bold" : selectable ? "hover:bg-brand-soft text-neutral-700" : "text-neutral-300 cursor-not-allowed"}`}>{exists ? day : ""}</button>; })}</div>
+          <div className="grid grid-cols-7 gap-0.5">{days.map((day, index) => { const exists = day > 0 && day <= new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate(); const key = exists ? toKey(new Date(month.getFullYear(), month.getMonth(), day)) : `empty-${index}`; const selectable = exists && key <= todayKey; const active = exists && key === value; return <button key={key} type="button" disabled={!selectable} onClick={() => selectable && choose(day)} style={{ minWidth: 0, minHeight: 32 }} className={`w-full h-8 rounded-md text-xs ${!exists ? "invisible" : active ? "bg-brand-strong text-white font-bold" : selectable ? "hover:bg-brand-soft text-neutral-700" : "text-neutral-300 cursor-not-allowed"}`}>{exists ? day : ""}</button>; })}</div>
           <button type="button" onClick={() => { const today = new Date(); onChange(toKey(today)); setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setOpen(false); }} className="w-full mt-2 py-1.5 rounded-lg bg-neutral-100 text-[11px] font-bold text-neutral-700 hover:bg-neutral-200">Сегодня</button>
         </div>
       )}

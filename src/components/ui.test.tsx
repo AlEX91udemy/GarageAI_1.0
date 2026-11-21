@@ -5,6 +5,7 @@ import { useModalFocus } from "./useModalFocus";
 import { ConnectionNotice } from "./ConnectionNotice";
 import { VehicleStage } from "./VehicleStage";
 import { CarCascadeSelector } from "./CarCascadeSelector";
+import { RoundedSelect } from "./RoundedSelect";
 import { Vehicle } from "../types";
 import { getMobileVehicleVisual } from "../mobile/vehicleVisuals";
 import { CATALOG_VEHICLE_VISUALS } from "../mobile/catalogVehicleVisuals";
@@ -115,4 +116,21 @@ it("marks catalog generation details as requiring VIN verification", () => {
 
   expect(container.querySelector('[role="status"]')?.textContent).toContain("подтвердите двигатель, КПП, привод и год выпуска по VIN");
   expect(container.textContent).toContain("Справочный вариант — нужна сверка");
+});
+
+it("supports keyboard selection and required validation for RoundedSelect", () => {
+  const onChange = vi.fn();
+  act(() => root.render(<form><RoundedSelect id="make" value="" options={[{ value: "toyota", label: "Toyota" }, { value: "nissan", label: "Nissan" }]} placeholder="Выберите" required onChange={onChange} /></form>));
+  const button = container.querySelector("button[role='combobox']")!;
+
+  act(() => button.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true, cancelable: true })));
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  expect(button.getAttribute("aria-activedescendant")).toBe("make-listbox-option-1");
+  act(() => button.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true })));
+  expect(onChange).toHaveBeenCalledWith("nissan");
+  expect(button.getAttribute("aria-expanded")).toBe("false");
+
+  const input = container.querySelector("input[required]") as HTMLInputElement;
+  expect(input.type).toBe("text");
+  expect(input.value).toBe("");
 });

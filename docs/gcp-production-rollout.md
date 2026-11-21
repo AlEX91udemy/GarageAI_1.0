@@ -48,7 +48,7 @@ Deploy with the existing Cloud SQL socket, Secret Manager database secret, and
 the dedicated runtime identity. Replace placeholder service-account names with
 the identities already recorded in the deployment log.
 
-    gcloud run deploy garageai-web --image "$env:REGION-docker.pkg.dev/$env:PROJECT_ID/$env:REPO/garageai-web:release-SHA" --region $env:REGION --service-account garageai-web-runtime@$env:PROJECT_ID.iam.gserviceaccount.com --add-cloudsql-instances garage-ai-512223:europe-west1:garageai-postgres --min 0 --max 2 --concurrency 40 --cpu 1 --memory 512Mi --set-env-vars "NODE_ENV=production,PORT=8080,DATABASE_SSL=true,DATABASE_AUTO_MIGRATE=false,GARAGE_POSTGRES_READY=true,TRUSTED_PROXY_HOPS=1,ALLOWED_ORIGINS=https://garageai.site,https://www.garageai.site,https://garageai-1-0.sambur91.workers.dev" --set-secrets "DATABASE_URL=garageai-database-url:latest,RESEND_API_KEY=resend-api-key:latest,EMAIL_CODE_SECRET=email-code-secret:latest"
+    gcloud run deploy garageai-web --image "$env:REGION-docker.pkg.dev/$env:PROJECT_ID/$env:REPO/garageai-web:release-SHA" --region $env:REGION --service-account garageai-web-runtime@$env:PROJECT_ID.iam.gserviceaccount.com --add-cloudsql-instances garage-ai-512223:europe-west1:garageai-postgres --min 0 --max 2 --concurrency 40 --cpu 1 --memory 512Mi --set-env-vars "NODE_ENV=production,PORT=8080,DATABASE_SSL=true,DATABASE_AUTO_MIGRATE=false,GARAGE_POSTGRES_READY=true,TRUSTED_PROXY_HOPS=1,ALLOWED_ORIGINS=https://garageai.site,https://garageai-1-0.sambur91.workers.dev" --set-secrets "DATABASE_URL=garageai-database-url:latest,RESEND_API_KEY=resend-api-key:latest,EMAIL_CODE_SECRET=email-code-secret:latest"
 
 Keep public traffic on the canary until health, auth, tenant isolation, restart,
 concurrency and email-code checks pass. Route traffic only after the observation
@@ -57,7 +57,7 @@ window is clean.
 ## Build and deploy the private agents service
 
     gcloud builds submit --config=cloudbuild-agents.yaml .
-    gcloud run deploy garageai-agents --image "$env:REGION-docker.pkg.dev/$env:PROJECT_ID/$env:REPO/garageai-agents:latest" --region $env:REGION --no-allow-unauthenticated --service-account garageai-agents-runtime@$env:PROJECT_ID.iam.gserviceaccount.com --min 0 --max 1 --concurrency 1 --cpu 1 --memory 512Mi --timeout 120 --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$env:PROJECT_ID,GOOGLE_CLOUD_LOCATION=$env:REGION,GEMINI_MODEL=gemini-3.8-flash,GEMINI_FALLBACK_MODEL=gemini-2.5-flash" --set-secrets "AGENTS_API_TOKEN=agents-api-token:latest"
+    gcloud run deploy garageai-agents --image "$env:REGION-docker.pkg.dev/$env:PROJECT_ID/$env:REPO/garageai-agents:latest" --region $env:REGION --no-allow-unauthenticated --service-account garageai-agents-runtime@$env:PROJECT_ID.iam.gserviceaccount.com --min 0 --max 1 --concurrency 1 --cpu 1 --memory 512Mi --timeout 120 --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GOOGLE_CLOUD_PROJECT=$env:PROJECT_ID,GOOGLE_CLOUD_LOCATION=eu,GEMINI_MODEL=gemini-3.8-flash,GEMINI_FALLBACK_MODEL=gemini-2.5-flash" --set-secrets "AGENTS_API_TOKEN=agents-api-token:latest"
 
 Grant only the web identity permission to invoke the private service and grant
 the agent identity the minimum Vertex role:

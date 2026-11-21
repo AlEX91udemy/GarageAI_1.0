@@ -130,4 +130,20 @@ describe("GarageStore tenant isolation and persistence", () => {
     expect(store.getUserByEmail("pending@example.test")?.emailVerifiedAt).toBe("2026-11-14T00:00:00.000Z");
   });
 
+  it("resets only the account password using a single-use password-reset code", async () => {
+    const store = makeStore();
+    await store.createUser("alice", "old-hash", "user-a", "alice@example.test");
+    await store.createUser("bob", "bob-hash", "user-b", "bob@example.test");
+    const now = Date.now();
+    const code = "123456";
+    const { hashEmailCode } = await import("./emailCodeAuth");
+    await store.createEmailChallenge({ id: "reset-a", userId: "user-a", codeHash: hashEmailCode("reset-a", code, "secret"), expiresAtMs: now + 60_000, attempts: 0, createdAtMs: now, purpose: "password_reset" });
+
+    await expect(store.resetPasswordWithEmailChallenge("user-a", code, "secret", "new-hash", now + 1)).resolves.toBe(true);
+    expect(store.getUserById("user-a")?.passwordHash).toBe("new-hash");
+    expect(store.getUserById("user-b")?.passwordHash).toBe("bob-hash");
+    await expect(store.resetPasswordWithEmailChallenge("user-a", code, "secret", "replayed-hash", now + 2)).resolves.toBe(false);
+    expect(store.getUserById("user-a")?.passwordHash).toBe("new-hash");
+  });
+
 });

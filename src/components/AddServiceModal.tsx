@@ -52,9 +52,10 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
   const [serviceCenter, setServiceCenter] = useState(
-    initialData?.serviceCenter || "Собственными силами / Гараж"
+    initialData?.serviceCenter ?? "Собственными силами / Гараж"
   );
   const [laborCost, setLaborCost] = useState(initialData?.laborCost || 0);
+  const [receiptTotal, setReceiptTotal] = useState<number | undefined>(initialData?.receiptImages?.length ? initialData.totalCost : undefined);
   const [receiptImage, setReceiptImage] = useState<string | null>(
     initialData?.receiptImages?.[0] || null
   );
@@ -141,7 +142,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
   };
 
   const partsCost = parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0);
-  const totalCost = Number(laborCost) + partsCost;
+  const totalCost = receiptTotal ?? (Number(laborCost) + partsCost);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -493,7 +494,7 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
               <input id="addservicemodal-field-8"
                 type="number"
                 min="0"
-                step="100"
+                step="0.01"
                 value={laborCost}
                 onChange={(e) => setLaborCost(Number(e.target.value))}
                 className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-brand"
@@ -504,9 +505,15 @@ export const AddServiceModal: React.FC<AddServiceModalProps> = ({
               <div className="text-[11px] text-neutral-500">
                 Детали: {partsCost.toLocaleString("ru-RU")} ₽ + Работы: {Number(laborCost).toLocaleString("ru-RU")} ₽
               </div>
-              <div className="text-lg font-extrabold text-brand-strong font-mono mt-0.5">
-                Итого: {totalCost.toLocaleString("ru-RU")} ₽
-              </div>
+              {receiptTotal !== undefined ? (
+                <label className="text-xs mt-1">Итого по чеку, ₽
+                  <input type="number" min="0.01" step="0.01" required value={receiptTotal} onChange={e => setReceiptTotal(Number(e.target.value))} className="w-full bg-white border border-neutral-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-neutral-900" />
+                </label>
+              ) : (
+                <div className="text-lg font-extrabold text-brand-strong font-mono mt-0.5">
+                  Итого: {totalCost.toLocaleString("ru-RU")} ₽
+                </div>
+              )}
             </div>
           </div>
 

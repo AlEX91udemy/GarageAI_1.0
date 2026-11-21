@@ -9,6 +9,7 @@ import {
   DollarSign,
   Building2,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import { ServiceRecord, Vehicle } from "../../types";
 import { formatGarageCurrency } from "../currency";
@@ -19,6 +20,7 @@ interface ServiceDetailScreenProps {
   vehicle: Vehicle;
   onBack: () => void;
   onDelete?: (recordId: string) => void;
+  onAskMechanic: (record: ServiceRecord) => void;
 }
 
 export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
@@ -26,6 +28,7 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
   vehicle,
   onBack,
   onDelete,
+  onAskMechanic,
 }) => {
   return (
     <div className="flex flex-col w-full pb-10 bg-neutral-100 text-neutral-900 select-none">
@@ -59,6 +62,14 @@ export const ServiceDetailScreen: React.FC<ServiceDetailScreenProps> = ({
 
       {/* Main summary card */}
       <div className="p-4 space-y-3.5">
+        <button
+          type="button"
+          onClick={() => onAskMechanic(record)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white"
+        >
+          <Sparkles className="h-4 w-4" />
+          Получить совет по этому ремонту
+        </button>
         <div className="p-4 rounded-3xl bg-white border border-neutral-200/90 shadow-xs">
           <span className="text-[10px] font-mono text-brand-strong font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-soft border border-brand-border inline-block mb-1.5">
             {record.category}

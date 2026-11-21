@@ -74,6 +74,20 @@ export interface ScannedResult {
   };
 }
 
+const normalizeCompatibilityName = (value: string) => value.toLocaleLowerCase("ru-RU").replace(/[^a-zа-я0-9]/giu, "");
+
+/** Confirms fitment only when a catalog entry names the exact model variant. */
+export function isPartCompatibleWithVehicle(part: AutoPartItemData | undefined, vehicle: Pick<Vehicle, "make" | "model" | "generation">): boolean {
+  if (!part?.compatibleModels?.length || !vehicle.make || !vehicle.model) return false;
+  const candidates = new Set([
+    `${vehicle.make} ${vehicle.model} ${vehicle.generation || ""}`,
+    `${vehicle.make} ${vehicle.model}`,
+    `${vehicle.model} ${vehicle.generation || ""}`,
+    vehicle.model,
+  ].map(normalizeCompatibilityName));
+  return part.compatibleModels.some((model) => candidates.has(normalizeCompatibilityName(model)));
+}
+
 // Comprehensive database of real automotive barcodes and parts
 export const AUTOMOTIVE_BARCODE_CATALOG: Record<string, AutoPartItemData> = {
   // Mann-Filter W67/1 (Nissan, Honda, Subaru, Mazda)
@@ -340,36 +354,6 @@ export const WMI_MAPPING: Record<string, { make: string; country: string }> = {
   SAL: { make: "Land Rover", country: "Великобритания" },
 };
 
-// Model Year character mapping (10th character in 17-char VIN)
-export const VIN_YEAR_MAP: Record<string, number> = {
-  "1": 2001,
-  "2": 2002,
-  "3": 2003,
-  "4": 2004,
-  "5": 2005,
-  "6": 2006,
-  "7": 2007,
-  "8": 2008,
-  "9": 2009,
-  A: 2010,
-  B: 2011,
-  C: 2012,
-  D: 2013,
-  E: 2014,
-  F: 2015,
-  G: 2016,
-  H: 2017,
-  J: 2018,
-  K: 2019,
-  L: 2020,
-  M: 2021,
-  N: 2022,
-  P: 2023,
-  R: 2024,
-  S: 2025,
-  T: 2026,
-};
-
 /**
  * Validates and decodes a VIN string (17 characters, no I, O, Q)
  */
@@ -399,35 +383,24 @@ export function decodeVin(
     country: "Международный стандарт",
   };
 
-  const yearChar = cleaned[9];
-  const year = VIN_YEAR_MAP[yearChar] || 2020;
-
   // Check matching in current garage
   const matchingVehicle = allVehicles.find(
     (v) => v.vin && v.vin.toUpperCase() === cleaned
-  );
+  ) ?? (currentVehicle?.vin?.toUpperCase() === cleaned ? currentVehicle : undefined);
 
   const isCurrent = Boolean(
     currentVehicle?.vin && currentVehicle.vin.toUpperCase() === cleaned
   );
 
-  // Model deduction based on make & WMI
-  let modelGuess = "Автомобиль";
-  if (cleaned.startsWith("JN1TBNT31")) modelGuess = "X-Trail T31";
-  else if (cleaned.startsWith("JTDAGACF")) modelGuess = "Corolla Cross";
-  else if (cleaned.startsWith("WBA8E1106")) modelGuess = "3 Series (F30)";
-  else if (cleaned.startsWith("XTA2170")) modelGuess = "Priora / Vesta";
-  else if (matchingVehicle) {
-    modelGuess = `${matchingVehicle.make} ${matchingVehicle.model}`;
-  } else {
-    modelGuess = `${wmiInfo.make} (${year})`;
-  }
+  // VIN prefixes and the repeating model-year character are not enough to
+  // identify the model and year reliably without market-specific decoding.
+  const model = matchingVehicle?.model || "Автомобиль";
 
   return {
     vin: cleaned,
     make: matchingVehicle ? matchingVehicle.make : wmiInfo.make,
-    model: modelGuess,
-    year: matchingVehicle ? matchingVehicle.year : year,
+    model,
+    year: matchingVehicle?.year,
     country: wmiInfo.country,
     engineGuess: matchingVehicle?.engine,
     isCurrentVehicle: isCurrent,
@@ -540,37 +513,10 @@ export function parseBarcodeOrQr(
         }
       }
 
-      const pathParts = url.pathname.split("/").filter(Boolean);
-      const lastSegment = pathParts[pathParts.length - 1] || "";
-      const querySku = url.searchParams.get("sku") || url.searchParams.get("art");
-      const candidateSku = (querySku || lastSegment).toUpperCase().replace(/[-_]/g, " ");
-
-      // If not in catalog, create dynamic part from URL
-      const hostClean = url.hostname.replace("www.", "");
-      const detectedPart: AutoPartItemData = {
-        name: `Запчасть по QR-ссылке (${candidateSku || hostClean})`,
-        brand: hostClean.includes("mann") ? "Mann-Filter" : hostClean.includes("brembo") ? "Brembo" : "OEM",
-        partNumber: candidateSku || "QR-ITEM",
-        category: "ТО и замена жидкостей",
-        estimatedPrice: 2200,
-        description: `Деталь проверена по официальной QR-ссылке: ${trimmed}`,
-        suggestedServiceTitle: `Установка запчасти ${candidateSku}`,
-        suggestedLaborCost: 1200,
-        location: "Склад гаража",
-      };
-
       return {
         rawCode: trimmed,
         format: "QR_URL",
-        scanType: "qr_payload",
-        partInfo: detectedPart,
-        serviceInfo: {
-          title: detectedPart.suggestedServiceTitle!,
-          category: detectedPart.category,
-          laborCost: 1200,
-          totalCost: 3400,
-          description: `Установка запчасти по ссылке ${hostClean}.`,
-        },
+        scanType: "unknown",
       };
     } catch {
       // not a parseable URL
@@ -616,32 +562,10 @@ export function parseBarcodeOrQr(
     }
   }
 
-  // 6. Generic Barcode fallback (e.g. any retail barcode or SKU code on a box)
-  const isDigits = /^\d{8,14}$/.test(trimmed);
-  const genericPart: AutoPartItemData = {
-    name: isDigits ? `Автозапчасть (Штрихкод #${trimmed.slice(-6)})` : `Деталь ${trimmed}`,
-    brand: "Автозапчасти",
-    partNumber: trimmed,
-    category: "ТО и замена жидкостей",
-    estimatedPrice: 1800,
-    description: `Отсканировано камерой устройства (${isDigits ? "EAN-13" : "Штрихкод/QR"}: ${trimmed}).`,
-    suggestedServiceTitle: `Установка / замена детали: ${trimmed}`,
-    suggestedLaborCost: 1200,
-    location: "Склад гаража: Стеллаж A",
-  };
-
   return {
     rawCode: trimmed,
-    format: isDigits ? "EAN-13" : "BARCODE_OR_QR",
-    scanType: "part",
-    partInfo: genericPart,
-    serviceInfo: {
-      title: genericPart.suggestedServiceTitle!,
-      category: genericPart.category,
-      laborCost: 1200,
-      totalCost: 3000,
-      description: `Установка автокомпонента по штрихкоду: ${trimmed}.`,
-    },
+    format: /^\d{8,14}$/.test(trimmed) ? (trimmed.length === 8 ? "EAN-8" : "EAN/UPC") : "BARCODE_OR_QR",
+    scanType: "unknown",
   };
 }
 

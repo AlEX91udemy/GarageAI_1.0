@@ -119,6 +119,17 @@ export class PostgresPersistence {
     return rows[0] as UserRecord | undefined;
   }
 
+  async updatePassword(userId: string, passwordHash: string): Promise<boolean> {
+    this.assertInitialized();
+    const rows = await this.sql`UPDATE garageai_users SET password_hash = ${passwordHash} WHERE id = ${userId} RETURNING id`;
+    return Boolean(rows[0]);
+  }
+
+  async revokeUserSessions(userId: string, now = Date.now()): Promise<void> {
+    this.assertInitialized();
+    await this.sql`UPDATE garageai_sessions SET revoked_at_ms = ${now} WHERE user_id = ${userId} AND revoked_at_ms IS NULL`;
+  }
+
   async listUsers(): Promise<UserRecord[]> {
     this.assertInitialized();
     const rows = await this.sql`
@@ -194,16 +205,37 @@ export class PostgresPersistence {
     `;
   }
 
-  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+  async verifyEmailChallenge(userId: string, code: string, secret: string, now = Date.now(), maxAttempts = 5, purpose: "login" | "password_reset" = "login"): Promise<boolean> {
     this.assertInitialized();
     return this.sql.begin(async (tx) => {
-      const rows = await tx`SELECT id, code_hash, attempts, expires_at_ms FROM garageai_email_auth_challenges WHERE user_id = ${userId} AND consumed_at_ms IS NULL ORDER BY created_at_ms DESC LIMIT 1 FOR UPDATE`;
+      const idPattern = purpose === "password_reset" ? "email-reset-%" : "email-challenge-%";
+      const rows = await tx`SELECT id, code_hash, attempts, expires_at_ms FROM garageai_email_auth_challenges WHERE user_id = ${userId} AND id LIKE ${idPattern} AND consumed_at_ms IS NULL ORDER BY created_at_ms DESC LIMIT 1 FOR UPDATE`;
       const row = rows[0];
       if (!row || Number(row.expires_at_ms) <= now || Number(row.attempts) >= maxAttempts) return false;
       const { hashEmailCode } = await import("./emailCodeAuth");
       const accepted = row.code_hash === hashEmailCode(String(row.id), code, secret);
       await tx`UPDATE garageai_email_auth_challenges SET attempts = attempts + 1, consumed_at_ms = CASE WHEN ${accepted} THEN ${now} ELSE consumed_at_ms END WHERE id = ${row.id}`;
       return accepted;
+    }) as Promise<boolean>;
+  }
+
+  async resetPasswordWithEmailChallenge(userId: string, code: string, secret: string, passwordHash: string, now = Date.now(), maxAttempts = 5): Promise<boolean> {
+    this.assertInitialized();
+    return this.sql.begin(async (tx) => {
+      const rows = await tx`SELECT id, code_hash, attempts, expires_at_ms FROM garageai_email_auth_challenges WHERE user_id = ${userId} AND id LIKE 'email-reset-%' AND consumed_at_ms IS NULL ORDER BY created_at_ms DESC LIMIT 1 FOR UPDATE`;
+      const row = rows[0];
+      if (!row || Number(row.expires_at_ms) <= now || Number(row.attempts) >= maxAttempts) return false;
+      const { hashEmailCode } = await import("./emailCodeAuth");
+      const accepted = row.code_hash === hashEmailCode(String(row.id), code, secret);
+      if (!accepted) {
+        await tx`UPDATE garageai_email_auth_challenges SET attempts = attempts + 1 WHERE id = ${row.id}`;
+        return false;
+      }
+      const updated = await tx`UPDATE garageai_users SET password_hash = ${passwordHash} WHERE id = ${userId} RETURNING id`;
+      if (!updated[0]) return false;
+      await tx`UPDATE garageai_email_auth_challenges SET attempts = attempts + 1, consumed_at_ms = ${now} WHERE id = ${row.id}`;
+      await tx`UPDATE garageai_sessions SET revoked_at_ms = ${now} WHERE user_id = ${userId} AND revoked_at_ms IS NULL`;
+      return true;
     }) as Promise<boolean>;
   }
 

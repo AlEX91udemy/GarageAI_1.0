@@ -594,11 +594,11 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
 
       {/* Modal to add manual schedule item */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-neutral-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm overflow-hidden" onClick={(event) => { if (event.target === event.currentTarget) setShowAddModal(false); }}>
+          <div role="dialog" aria-modal="true" aria-label="Добавить пункт в регламент ТО" className="bg-white dark:bg-neutral-900 rounded-3xl p-4 sm:p-6 w-full max-w-md shadow-2xl border border-neutral-200 dark:border-neutral-700 space-y-4 max-h-[92dvh] overflow-y-auto">
+            <h2 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white leading-tight">
               Добавить пункт в регламент ТО
-            </h3>
+            </h2>
 
             <form onSubmit={handleAddNewItem} className="space-y-3 text-xs">
               <div>
@@ -676,13 +676,13 @@ export const OemScheduleView: React.FC<OemScheduleViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl"
+                  className="min-h-11 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 text-neutral-700 dark:text-neutral-200 text-xs font-semibold rounded-xl transition"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-brand-strong hover:bg-brand text-white font-bold rounded-xl"
+                  className="min-h-11 px-5 py-2.5 bg-brand-strong hover:bg-brand-hover text-white text-xs font-bold rounded-xl transition"
                 >
                   Сохранить
                 </button>

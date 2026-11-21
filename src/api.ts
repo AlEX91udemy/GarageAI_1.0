@@ -52,12 +52,14 @@ export async function authenticatedFetch(input: RequestInfo | URL, init: Request
   return fetch(input, { ...init, headers, credentials: "same-origin" });
 }
 
-export async function register(username: string, password: string, email: string): Promise<AuthSession | PendingRegistration> {
+export async function register(email: string, password: string): Promise<AuthSession | PendingRegistration> {
+  const address = email.trim();
   const res = await authenticatedFetch("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password, email: email.trim() }),
+    // Compatibility with the deployed API, which also requires an internal username.
+    body: JSON.stringify({ email: address, password, username: "garage-" + crypto.randomUUID().replace(/-/g, "").slice(0, 16) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось создать аккаунт");
@@ -69,12 +71,12 @@ export async function register(username: string, password: string, email: string
   return data.session;
 }
 
-export async function login(username: string, password: string): Promise<AuthSession> {
+export async function login(email: string, password: string): Promise<AuthSession> {
   const res = await authenticatedFetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "same-origin",
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ email: email.trim(), password, username: email.trim() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Не удалось войти");
@@ -106,6 +108,24 @@ export async function verifyEmailCode(email: string, code: string): Promise<Auth
   authSessionActive = true;
   setActiveUsername(data.session.username);
   return data.session;
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/password/reset/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось запросить восстановление пароля");
+}
+
+export async function confirmPasswordReset(email: string, code: string, password: string): Promise<void> {
+  const res = await authenticatedFetch("/api/auth/password/reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({ email, code, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Не удалось изменить пароль");
 }
 
 export async function restoreSession(): Promise<AuthSession | null> {
@@ -280,7 +300,7 @@ export async function searchTechnicalKnowledge(query: string, context: Partial<{
 }
 
 export interface VehicleRecommendationResponse {
-  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string }>;
+  recommendations: Array<{ id: string; title: string; text: string; category: string; risk: "safety" | "urgent" | "routine" | "informational"; confidence: "high" | "medium" | "low"; sourceIds: string[]; sources: Array<{ id: string; title: string; publisher: string; url: string; notes: string }>; applicability: string; evidenceType?: "general_guidance" | "make_guidance" | "model_series_guidance" | "vehicle_document_excerpt"; knowledgeLevel?: "make" | "model" | "generation" | "configuration"; citation?: { locator: string; documentHash: string; documentName?: string; sourceUrl?: string } }>;
   sources: unknown[];
 }
 
@@ -566,11 +586,11 @@ export async function requestAiDiagnosis(payload: {
   return res.json();
 }
 
-export async function requestReceiptOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<any> {
+export async function requestReceiptOcr(imageBase64: string, mimeType = "image/jpeg", receiptText?: string): Promise<any> {
   const res = await authenticatedFetch("/api/ai/scan-receipt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageBase64, mimeType }),
+    body: JSON.stringify({ imageBase64, mimeType, ...(receiptText ? { receiptText } : {}) }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -584,6 +604,7 @@ export async function requestReceiptOcr(imageBase64: string, mimeType = "image/j
 }
 
 export interface VehicleDocumentOcrResult {
+  documentType?: "sts" | "pts" | "tts" | "vin" | "unknown";
   make?: string;
   model?: string;
   generation?: string;
@@ -602,8 +623,8 @@ export interface VehicleDocumentOcrResult {
   registrationDate?: string;
   stsNumber?: string;
   stsIssueDate?: string;
-  confidence?: Record<string, number>;
   rawText?: string;
+  confidence?: Record<string, number>;
 }
 
 export async function requestVehicleDocumentOcr(imageBase64: string, mimeType = "image/jpeg"): Promise<VehicleDocumentOcrResult> {

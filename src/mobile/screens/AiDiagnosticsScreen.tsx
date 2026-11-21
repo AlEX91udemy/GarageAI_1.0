@@ -206,28 +206,6 @@ export const AiDiagnosticsScreen: React.FC<AiDiagnosticsScreenProps> = ({
           </div>
         )}
 
-        {/* Action button */}
-        <div className="pt-2">
-          <button
-            onClick={() => {
-              onAddTask?.({
-                id: "tf-ai-" + Date.now(),
-                vehicleId: vehicle.id,
-                title: "Проверка системы охлаждения и промывка радиаторов (AI)",
-                priority: "medium",
-                estimatedCost: 6500,
-                category: "ТО и замена жидкостей",
-                description: "Добавлено по рекомендации Garage AI Core после анализа ресурса антифриза.",
-                status: "pending",
-              });
-              onBack?.();
-            }}
-            className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-[0.98] transition cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Добавить задачу в To-Fix по рекомендации</span>
-          </button>
-        </div>
       </div>
     </div>
   );

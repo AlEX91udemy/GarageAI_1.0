@@ -11,11 +11,13 @@ data/garage_store.json
 data/sessions.json
 data/*.tmp
 data/email_auth_challenges.json
+data/manuals/*.pdf
 
 # AI Studio debug artifacts (temporary media storage, brain artifacts)
 artifacts/
 .aistudio/
 .codex-autorouter/
+.playwright-cli/
 
 # Local audit exports, Python caches and generated visual/diagnostic artifacts
 *.zip

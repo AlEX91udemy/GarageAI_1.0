@@ -12,6 +12,9 @@ export interface PublicKnowledgeSource {
   retrievedAt: string;
   notes: string;
   verificationStatus?: "verified" | "network_unverified" | "reference_only";
+  marketCode?: string;
+  documentStatus?: "entry_page_only" | "downloaded_not_eligible" | "document_verified";
+  checkedAt?: string;
 }
 
 export interface PublicKnowledgeSourceStatus {
@@ -46,11 +49,16 @@ export interface VehicleRecommendation {
   sourceIds: string[];
   sources: PublicKnowledgeSource[];
   applicability: string;
+  citation?: KnowledgeChunkCitation;
+  evidenceType?: "general_guidance" | "make_guidance" | "model_series_guidance" | "vehicle_document_excerpt";
+  knowledgeLevel?: "make" | "model" | "generation" | "configuration";
 }
 
 export interface KnowledgeChunkCitation {
   locator: string;
   documentHash: string;
+  documentName?: string;
+  sourceUrl?: string;
 }
 
 export interface IngestedKnowledgeChunk extends KnowledgeChunk {
@@ -67,6 +75,16 @@ export interface CatalogSource {
   publicationYear: number | null;
   retrievedAt: string;
   confidence: "high" | "medium" | "low";
+}
+
+export interface ApplicableKnowledgeContext {
+  make?: string;
+  model?: string;
+  generation?: string;
+  market?: string;
+  year?: number;
+  engine?: string;
+  transmission?: string;
 }
 
 export type EvidenceTier = 1 | 2 | 3 | 4 | 5;
@@ -210,10 +228,14 @@ export interface ModificationAudit {
 export interface KnowledgeChunk {
   id: string;
   text: string;
+  citation?: KnowledgeChunkCitation;
   metadata: {
+    heading?: string;
+    reviewedAt?: string;
     brand: string | null;
     model: string | null;
     generation: string | null;
+    market: string | null;
     yearStart: number | null;
     yearEnd: number | null;
     engine: string | null;

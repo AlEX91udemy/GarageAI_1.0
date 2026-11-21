@@ -214,7 +214,7 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                 ].map(({ key, label, value, icon }) => (
                   <button key={key} type="button" onClick={() => setSelectedMetric((prev) => prev === key ? null : key as typeof selectedMetric)} className={`rounded-2xl border p-2 text-left transition active:scale-95 ${selectedMetric === key ? "bg-brand-soft border-brand-border shadow-sm" : "bg-neutral-50 border-neutral-200 hover:border-neutral-300"}`}>
                     <span className={`flex items-center gap-1.5 text-[10px] font-semibold ${selectedMetric === key ? "text-brand-hover" : "text-neutral-500"}`}>{icon}{label}</span>
-                    <span className="block text-sm font-black font-mono mt-0.5">{value}</span>
+                    <span className="block text-sm font-medium font-mono mt-0.5">{value}</span>
                   </button>
                 ))}
               </div>
@@ -256,20 +256,20 @@ export const ExpensesScreen: React.FC<ExpensesScreenProps> = ({
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                     <span className="text-[10px] text-neutral-400">Всего</span>
-                    <span className="text-lg font-black font-mono text-neutral-900">{formatGarageCurrency(grandTotal)}</span>
+                    <span className="text-lg font-medium font-mono text-neutral-900">{formatGarageCurrency(grandTotal)}</span>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-2 py-2">
                   {nonEmptyCategories.map((cat, idx) => {
                     const active = isCategoryActive(cat.name);
-                    return <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className="w-full text-left"><div className="flex items-center justify-between text-[11px] mb-1"><span className="font-semibold text-neutral-700">{cat.name}</span><span className="font-mono font-bold">{cat.percent}%</span></div><div className="h-3 rounded-full bg-neutral-100 overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${cat.percent}%`, backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length], opacity: activeCategory || selectedMetric ? (active ? 1 : 0.25) : 1 }} /></div></button>;
+                    return <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className="w-full text-left"><div className="flex items-center justify-between text-[11px] mb-1"><span className="font-semibold text-neutral-700">{cat.name}</span><span className="font-mono font-medium">{cat.percent}%</span></div><div className="h-3 rounded-full bg-neutral-100 overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${cat.percent}%`, backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length], opacity: activeCategory || selectedMetric ? (active ? 1 : 0.25) : 1 }} /></div></button>;
                   })}
                 </div>
               )}
 
               <div className="space-y-1.5 pt-1">
-                {categories.map((cat, idx) => <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className={`w-full flex items-center justify-between text-xs py-1.5 rounded-lg px-1 transition ${activeCategory === cat.name ? "bg-neutral-100" : ""}`}><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length] }} /><span className="text-neutral-700 font-medium">{cat.name}</span></span><span className="font-mono font-bold text-neutral-900">{formatGarageCurrency(cat.cost)} <span className="text-[10px] text-neutral-400">({cat.percent}%)</span></span></button>)}
+                {categories.map((cat, idx) => <button key={cat.name} type="button" onClick={() => setActiveCategory((prev) => prev === cat.name ? null : cat.name)} className={`w-full flex items-center justify-between text-xs py-1.5 rounded-lg px-1 transition ${activeCategory === cat.name ? "bg-neutral-100" : ""}`}><span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: EXPENSE_COLORS[idx % EXPENSE_COLORS.length] }} /><span className="text-neutral-700 font-medium">{cat.name}</span></span><span className="font-mono font-medium text-neutral-900">{formatGarageCurrency(cat.cost)} <span className="text-[10px] text-neutral-400">({cat.percent}%)</span></span></button>)}
               </div>
             </div>
 

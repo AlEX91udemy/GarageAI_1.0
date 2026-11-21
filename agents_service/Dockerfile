@@ -19,7 +19,7 @@ COPY . .
 COPY scripts/cloud-run-agent-smoke.py /app/scripts/cloud-run-agent-smoke.py
 
 ENV GOOGLE_GENAI_USE_VERTEXAI=true
-ENV GOOGLE_CLOUD_LOCATION=europe-west1
+ENV GOOGLE_CLOUD_LOCATION=eu
 EXPOSE 8080
 USER app
 # Force h11 so the explicit 8 KiB incomplete-event limit is active as defense

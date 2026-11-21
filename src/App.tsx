@@ -281,9 +281,11 @@ export default function App() {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [showScanReceiptModal, setShowScanReceiptModal] = useState(false);
   const [showAiMechanicModal, setShowAiMechanicModal] = useState(false);
+  const [aiMechanicServiceRecord, setAiMechanicServiceRecord] = useState<ServiceRecord | undefined>();
   const [showServiceBookModal, setShowServiceBookModal] = useState(false);
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [vehicleModalMode, setVehicleModalMode] = useState<"edit" | "add">("edit");
+  const [initialVehicleVin, setInitialVehicleVin] = useState<string | undefined>(undefined);
   const [showRemindersModal, setShowRemindersModal] = useState(false);
   const [showInstallPcModal, setShowInstallPcModal] = useState(false);
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -964,16 +966,9 @@ export default function App() {
           }}
           onApplyFuel={(fuelData) => {
             handleAddFuelRecord({
+              ...fuelData,
               id: "fuel-" + crypto.randomUUID(),
               vehicleId: currentVehicle.id,
-              date: fuelData.date || new Date().toISOString().split("T")[0],
-              mileage: fuelData.mileage || currentVehicle.currentMileage,
-              liters: fuelData.liters || 50,
-              pricePerLiter: fuelData.pricePerLiter || 60,
-              totalCost: fuelData.totalCost || 3000,
-              fuelType: fuelData.fuelType || "АИ-95",
-              isFullTank: true,
-              station: fuelData.station || "АЗС",
             });
             setActiveView("expenses");
           }}
@@ -984,6 +979,7 @@ export default function App() {
         <AiMechanicModal
           vehicle={currentVehicle}
           serviceRecords={serviceRecords}
+          selectedServiceRecord={aiMechanicServiceRecord}
           onClose={() => setShowAiMechanicModal(false)}
           onAddTaskToFix={(task) => {
             // Сохраняем задачу на сервере, иначе она теряется после перезагрузки.
@@ -1008,7 +1004,11 @@ export default function App() {
           currentVehicle={currentVehicle}
           allVehicles={vehicles}
           initialMode={vehicleModalMode}
-          onClose={() => setShowVehicleModal(false)}
+          initialVin={initialVehicleVin}
+          onClose={() => {
+            setShowVehicleModal(false);
+            setInitialVehicleVin(undefined);
+          }}
           onSaveVehicle={handleSaveVehicle}
           onAddVehicle={handleAddVehicle}
           onDeleteVehicle={handleDeleteVehicle}
@@ -1116,7 +1116,10 @@ export default function App() {
           }}
           onOpenAddService={() => setShowAddServiceModal(true)}
           onOpenScanReceipt={() => setShowScanReceiptModal(true)}
-          onOpenAiMechanic={() => setShowAiMechanicModal(true)}
+          onOpenAiMechanic={(record) => {
+            setAiMechanicServiceRecord(record);
+            setShowAiMechanicModal(true);
+          }}
           onOpenServiceBook={handleOpenServiceBook}
           onOpenReminders={() => setShowRemindersModal(true)}
           onOpenAddVehicle={() => {
@@ -1153,28 +1156,44 @@ export default function App() {
           oemSchedules={oemSchedules}
           toFixTasks={toFixTasks}
           garageParts={garageParts}
+          tuningStages={tuningStages}
           onAddServiceRecord={handleAddServiceRecord}
           onDeleteServiceRecord={handleDeleteServiceRecord}
           onAddFuelRecord={handleAddFuelRecord}
           onAddGaragePart={handleAddGaragePart}
           onDeleteGaragePart={handleDeleteGaragePart}
           onUpdateGaragePart={handleUpdateGaragePart}
+          onCreateTuningStage={handleCreateTuningStage}
+          onUpdateTuningStage={handleUpdateTuningStage}
+          onDeleteTuningStage={handleDeleteTuningStage}
           onAddToFixTask={handleCreateToFixTask}
           onToggleToFixStatus={handleToggleToFixStatus}
           onUpdateMileage={handleUpdateMileage}
           onOpenAddVehicleModal={() => {
             setVehicleModalMode("add");
+            setInitialVehicleVin(undefined);
             setShowVehicleModal(true);
           }}
           onOpenEditVehicleModal={() => {
             setVehicleModalMode("edit");
+            setInitialVehicleVin(undefined);
+            setShowVehicleModal(true);
+          }}
+          onApplyVinToVehicle={(vin, matchingVehicleId) => {
+            const matchingVehicle = vehicles.find((vehicle) => vehicle.id === matchingVehicleId);
+            if (matchingVehicle) setActiveVehicleId(matchingVehicle.id);
+            setVehicleModalMode(matchingVehicle ? "edit" : "add");
+            setInitialVehicleVin(vin);
             setShowVehicleModal(true);
           }}
           onOpenDataBackupModal={() => setShowBackupModal(true)}
           onSwitchToWebView={() => handleSetPlatform("web")}
           onOpenServiceBookModal={handleOpenServiceBook}
           onOpenRemindersModal={() => setShowRemindersModal(true)}
-          onOpenAiMechanicModal={() => setShowAiMechanicModal(true)}
+          onOpenAiMechanicModal={(record) => {
+            setAiMechanicServiceRecord(record);
+            setShowAiMechanicModal(true);
+          }}
           onOpenScanReceiptModal={() => setShowScanReceiptModal(true)}
           onOpenAddServiceModal={(data) => {
             setServiceModalInitialData(data);
@@ -1529,6 +1548,10 @@ export default function App() {
               }}
               onScanReceipt={() => setShowScanReceiptModal(true)}
               onDeleteRecord={handleDeleteServiceRecord}
+              onAskMechanic={(record) => {
+                setAiMechanicServiceRecord(record);
+                setShowAiMechanicModal(true);
+              }}
             />
           )}
 

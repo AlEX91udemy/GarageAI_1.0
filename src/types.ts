@@ -137,6 +137,8 @@ export interface Vehicle {
   make: string;
   model: string;
   generation?: string;
+  /** Country/market the vehicle was originally specified for, e.g. RU, EU, US. */
+  market?: string;
   year: number;
   licensePlate?: string;
   vin?: string;
@@ -173,22 +175,18 @@ export interface TuningStage {
 
 /**
  * Схема ответа POST /api/ai/diagnose (см. промпт в server.ts).
- * Поля опциональны, т.к. модель может вернуть не все ключи —
- * клиент обязан предусматривать fallback-значения.
+ * Клиент допускает отсутствующие поля для совместимости с сохранёнными ответами.
  */
 export interface DiagnosticResult {
   primaryDiagnosis?: string;
   summary?: string;
-  confidence?: number;
   urgency?: "high" | "medium" | "low";
   safetyAssessment?: string;
   likelyCauses?: Array<{
     cause: string;
-    probability: number;
   }>;
   possibleCauses?: Array<{
     cause: string;
-    probability: number;
     explanation: string;
     checkMethod: string;
   }>;
@@ -202,6 +200,15 @@ export interface DiagnosticResult {
   }>;
   mechanicTip?: string;
   proTip?: string;
+  /** Server-attached provenance for the knowledge actually supplied to the model. */
+  knowledgeSources?: Array<{
+    evidenceType: "vehicle_document_excerpt" | "make_guidance" | "model_series_guidance" | "general_guidance";
+    title: string;
+    documentName?: string;
+    locator?: string;
+    sourceUrl?: string;
+    applicability: string;
+  }>;
 }
 
 export const CAR_PAINT_PRESETS = [

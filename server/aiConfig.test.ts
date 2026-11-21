@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasAiConfiguration, hasGeminiConfiguration } from "./aiConfig";
+import { hasAiConfiguration, hasGeminiConfiguration, hasOcrConfiguration } from "./aiConfig";
 
 describe("AI backend configuration", () => {
   it("accepts a configured Gemini API key", () => {
@@ -35,5 +35,11 @@ describe("AI backend configuration", () => {
       GOOGLE_GENAI_USE_VERTEXAI: "true",
       GOOGLE_CLOUD_PROJECT: "   ",
     })).toBe(false);
+  });
+
+  it("keeps local OCR available when cloud AI is not configured", () => {
+    expect(hasOcrConfiguration({})).toBe(true);
+    expect(hasOcrConfiguration({ OCR_LOCAL_ENABLED: "false" })).toBe(false);
+    expect(hasOcrConfiguration({ GEMINI_API_KEY: "configured", OCR_LOCAL_ENABLED: "false" })).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ import {
   ToFixTask,
   GaragePart,
   ReminderRecord,
+  TuningStage,
 } from "../types";
 import { MobileTab, MobileScreenId, QuickActionType, SyncStatus } from "./types";
 import { DarkVariant, ThemeMode, readDarkVariant, saveDarkVariant } from "./theme";
@@ -63,12 +64,16 @@ interface MobileAppProps {
   oemSchedules: OemScheduleItem[];
   toFixTasks: ToFixTask[];
   garageParts: GaragePart[];
+  tuningStages: TuningStage[];
   onAddServiceRecord: (record: ServiceRecord) => void;
   onDeleteServiceRecord: (id: string) => void;
   onAddFuelRecord: (record: FuelRecord) => void;
   onAddGaragePart: (part: GaragePart) => void;
   onDeleteGaragePart: (id: string) => void;
   onUpdateGaragePart: (part: GaragePart) => void;
+  onCreateTuningStage: (stage: TuningStage) => void;
+  onUpdateTuningStage: (stage: TuningStage) => void;
+  onDeleteTuningStage: (stageId: string) => void;
   onAddToFixTask: (task: ToFixTask) => void;
   onToggleToFixStatus: (id: string, currentStatus: string) => void;
   onUpdateMileage: (mileage: number) => void;
@@ -77,10 +82,11 @@ interface MobileAppProps {
   onSwitchToWebView?: () => void;
   onOpenServiceBookModal?: () => void;
   onOpenRemindersModal?: () => void;
-  onOpenAiMechanicModal?: () => void;
+  onOpenAiMechanicModal?: (record?: ServiceRecord) => void;
   onOpenScanReceiptModal?: () => void;
   onOpenAddServiceModal?: (data?: Partial<ServiceRecord>) => void;
   onOpenEditVehicleModal?: () => void;
+  onApplyVinToVehicle?: (vin: string, matchingVehicleId?: string) => void;
   onUpdateVehicleColor?: (vehicleId: string, color: string) => void;
   onAuthSuccess?: () => void;
   syncStatus?: SyncStatus;
@@ -99,12 +105,16 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   oemSchedules,
   toFixTasks,
   garageParts,
+  tuningStages,
   onAddServiceRecord,
   onDeleteServiceRecord,
   onAddFuelRecord,
   onAddGaragePart,
   onDeleteGaragePart,
   onUpdateGaragePart,
+  onCreateTuningStage,
+  onUpdateTuningStage,
+  onDeleteTuningStage,
   onAddToFixTask,
   onToggleToFixStatus,
   onUpdateMileage,
@@ -117,6 +127,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
   onOpenScanReceiptModal,
   onOpenAddServiceModal,
   onOpenEditVehicleModal,
+  onApplyVinToVehicle,
   onUpdateVehicleColor,
   onAuthSuccess,
   syncStatus = "loading",
@@ -179,38 +190,27 @@ export const MobileApp: React.FC<MobileAppProps> = ({
     setCurrentScreen("add_event");
   };
 
-  // Tuning projects state
-  const [projects, setProjects] = useState<TuningProject[]>([
-    {
-      id: "proj-1",
-      vehicleId: currentVehicle.id,
-      title: "Экспедиционная подготовка & Доп. Свет",
-      category: "Overland / Off-Road",
-      status: "in_progress",
-      progressPct: 72,
-      spent: 28000,
-      budget: 45000,
-      stagesCount: 3,
-      completedStages: 2,
-      description: "Лифт-комплект +30мм, диодные балки в рейлинги и броня картера.",
-      updatedAt: "2024-09-02",
-    },
-    {
-      id: "proj-2",
-      vehicleId: currentVehicle.id,
-      title: "Stage 1 ЭБУ & Оптимизация вариатора CVT",
-      category: "Performance / Chiptuning",
-      status: "planning",
-      progressPct: 20,
-      spent: 5000,
-      budget: 35000,
-      stagesCount: 4,
-      completedStages: 0,
-      description: "Прошивка блока управления двигателем, снижение температуры включения вентиляторов.",
-      updatedAt: "2024-08-20",
-    },
-  ]);
-  const [selectedProject, setSelectedProject] = useState<TuningProject>(projects[0]);
+  // Mobile tuning views use the same persisted, per-vehicle stages as the web garage.
+  const projectStages = tuningStages.filter((stage) => stage.vehicleId === currentVehicle.id);
+  const completedStages = projectStages.filter((stage) => stage.status === "completed").length;
+  const mobileProject: TuningProject = {
+    id: `tuning-${currentVehicle.id}`,
+    vehicleId: currentVehicle.id,
+    title: "План доработок",
+    category: "Этапы автомобиля",
+    status: projectStages.length > 0 && completedStages === projectStages.length
+      ? "completed"
+      : projectStages.some((stage) => stage.status === "in_progress")
+      ? "in_progress"
+      : "planning",
+    progressPct: projectStages.length > 0 ? Math.round((completedStages / projectStages.length) * 100) : 0,
+    spent: projectStages.reduce((total, stage) => total + (stage.actualCost || (stage.status === "completed" ? stage.estimatedBudget : 0)), 0),
+    budget: projectStages.reduce((total, stage) => total + stage.estimatedBudget, 0),
+    stagesCount: projectStages.length,
+    completedStages,
+    description: "Этапы тюнинга и запланированные доработки этого автомобиля.",
+    updatedAt: "",
+  };
 
   // Handle Bottom Bar Tab changes
   const handleTabChange = (tab: MobileTab) => {
@@ -466,6 +466,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setInitialQuickActionType("service");
               setCurrentScreen("add_event");
             }}
+            onOpenScanReceipt={() => setCurrentScreen("scan_receipt")}
             onEditVehicle={() => {
               if (typeof onOpenEditVehicleModal === "function") {
                 onOpenEditVehicleModal();
@@ -538,6 +539,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             vehicle={currentVehicle}
             onBack={() => setCurrentScreen("service")}
             onDelete={onDeleteServiceRecord}
+            onAskMechanic={(record) => onOpenAiMechanicModal?.(record)}
           />
         ) : (
           <div className="p-8 text-center text-white">Запись не найдена</div>
@@ -668,38 +670,20 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         return (
           <ProjectsScreen
             vehicle={currentVehicle}
-            projects={projects}
-            onSelectProject={(p) => {
-              setSelectedProject(p);
-              setCurrentScreen("project_detail");
-            }}
-            onAddProject={() => {
-              const newProj: TuningProject = {
-                id: `proj-${Date.now()}`,
-                vehicleId: currentVehicle.id,
-                title: "Новый проект доработки",
-                category: "Тюнинг",
-                status: "planning",
-                progressPct: 10,
-                spent: 0,
-                budget: 50000,
-                stagesCount: 3,
-                completedStages: 0,
-                description: "Запланированы работы по дооснащению.",
-                updatedAt: new Date().toISOString().slice(0, 10),
-              };
-              setProjects((prev) => [newProj, ...prev]);
-              setSelectedProject(newProj);
-              setCurrentScreen("project_detail");
-            }}
+            projects={[mobileProject]}
+            onSelectProject={() => setCurrentScreen("project_detail")}
+            onAddProject={() => setCurrentScreen("project_detail")}
           />
         );
 
       case "project_detail":
         return (
           <ProjectDetailScreen
-            project={selectedProject}
             vehicle={currentVehicle}
+            stages={projectStages}
+            onCreateStage={onCreateTuningStage}
+            onUpdateStage={onUpdateTuningStage}
+            onDeleteStage={onDeleteTuningStage}
             onBack={() => setCurrentScreen("projects")}
             onOpenBeforeAfter={() => setCurrentScreen("before_after")}
           />
@@ -708,6 +692,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       case "before_after":
         return (
           <BeforeAfterScreen
+            key={currentVehicle.id}
             vehicle={currentVehicle}
             onBack={() => setCurrentScreen("vehicle_profile")}
           />
@@ -787,7 +772,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
                 partNumber: part.partNumber || "SKU-100",
                 category: (part.category as any) || "ТО и замена жидкостей",
                 quantity: part.quantity || 1,
-                purchasePrice: part.purchasePrice || 1000,
+                purchasePrice: typeof part.purchasePrice === "number" ? part.purchasePrice : 0,
                 purchaseDate: new Date().toISOString().slice(0, 10),
                 status: "in_stock",
                 location: part.location || "Полка A1",
@@ -807,6 +792,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
               setCurrentScreen(initialQuickActionType === "part" ? "parts" : "home")
             }
             onApplyResult={handleApplyScanResult}
+            onApplyVin={onApplyVinToVehicle}
           />
         );
 
@@ -817,32 +803,14 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             onBack={() => setCurrentScreen("service")}
             onConfirmFuel={(fuel) => {
               onAddFuelRecord?.({
-                id: `fuel-scan-${Date.now()}`,
-                vehicleId: currentVehicle.id,
-                date: fuel.date || new Date().toISOString().slice(0, 10),
-                mileage: currentVehicle.currentMileage,
-                liters: fuel.liters || 0,
-                pricePerLiter: fuel.pricePerLiter || 0,
-                totalCost: fuel.totalCost || 0,
-                fuelType: fuel.fuelType || "АИ-95",
-                isFullTank: true,
-                station: fuel.station || "АЗС",
+                ...fuel,
+                id: `fuel-scan-${crypto.randomUUID()}`,
               });
             }}
             onConfirmRecord={(rec) => {
               onAddServiceRecord?.({
-                id: `srv-scan-${Date.now()}`,
-                vehicleId: currentVehicle.id,
-                title: rec.title || "Заказ-наряд",
-                category: rec.category || "ТО и замена жидкостей",
-                date: rec.date || new Date().toISOString().slice(0, 10),
-                mileage: currentVehicle.currentMileage,
-                totalCost: rec.totalCost || 0,
-                laborCost: rec.laborCost || 0,
-                description: rec.description || "Распознано AI OCR",
-                serviceCenter: rec.serviceCenter || "Сервис",
-                parts: rec.parts || [],
-                receiptImages: rec.receiptImages || [],
+                ...rec,
+                id: `srv-scan-${crypto.randomUUID()}`,
               });
             }}
           />
@@ -906,7 +874,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
   return (
     <div
-      className={`h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
+      className={`garage-mobile h-[100dvh] w-full text-neutral-100 flex flex-col items-center justify-start p-0 overflow-hidden ${
         isWeb ? "bg-[#0D131D]" : "bg-neutral-950 sm:py-6"
       }`}
     >

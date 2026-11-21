@@ -48,10 +48,11 @@ interface VehicleProfileScreenProps {
   garageParts: GaragePart[];
   onNavigate: (screen: MobileScreenId) => void;
   onOpenAddEvent: () => void;
+  onOpenScanReceipt?: () => void;
   onEditVehicle: (v: Vehicle) => void;
   onOpenServiceBook?: () => void;
   onOpenReminders?: () => void;
-  onOpenAiMechanic?: () => void;
+  onOpenAiMechanic?: (record?: ServiceRecord) => void;
   onUpdateColor?: (color: string) => void;
   themeMode?: ThemeMode;
   initialTab?: "overview" | "works" | "expenses" | "fuel" | "documents";
@@ -69,6 +70,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
   garageParts,
   onNavigate,
   onOpenAddEvent,
+  onOpenScanReceipt,
   onEditVehicle,
   onOpenServiceBook,
   onOpenReminders,
@@ -544,7 +546,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
             <div className="text-xs text-slate-400">Последняя заправка</div>
             {lastFuel ? (
               <>
-                <div className="text-lg font-black mt-1">
+                <div className="text-lg font-medium mt-1">
                   {fmtFuelDate(lastFuel.date)} • {fmtLiters(lastFuel.liters)} л
                 </div>
                 <div className="text-xs text-blue-500 font-bold mt-0.5">
@@ -552,7 +554,7 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
                 </div>
               </>
             ) : (
-              <div className="text-lg font-black mt-1">Нет данных о заправках</div>
+              <div className="text-lg font-medium mt-1">Нет данных о заправках</div>
             )}
           </div>
         </div>
@@ -562,18 +564,18 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
         <div className="px-4 pt-3 flex flex-col gap-3">
           <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#17202e] border-[#243044]" : "bg-white border-[#E2E8F0] shadow-xs"}`}>
             <div>
-              <div className="text-xs font-bold">СТС (Свидетельство о регистрации)</div>
+              <div className="text-xs font-medium">СТС (Свидетельство о регистрации)</div>
               <div className="text-[11px] text-slate-400 mt-0.5">Данные документа не добавлены</div>
             </div>
-            <span className="text-xs text-slate-400 font-bold">Не указан</span>
+            <span className="text-xs text-slate-400 font-medium">Не указан</span>
           </div>
 
           <div className={`p-4 rounded-2xl border flex items-center justify-between ${isDark ? "bg-[#17202e] border-[#243044]" : "bg-white border-[#E2E8F0] shadow-xs"}`}>
             <div>
-              <div className="text-xs font-bold">ОСАГО (Полис страхования)</div>
+              <div className="text-xs font-medium">ОСАГО (Полис страхования)</div>
               <div className="text-[11px] text-slate-400 mt-0.5">Срок действия не указан</div>
             </div>
-            <span className="text-xs text-slate-400 font-bold">Не указан</span>
+            <span className="text-xs text-slate-400 font-medium">Не указан</span>
           </div>
         </div>
       )}
@@ -588,16 +590,18 @@ export const VehicleProfileScreen: React.FC<VehicleProfileScreenProps> = ({
       >
         <button
           onClick={() => {
-            if (typeof onAddServiceRecord === "function") {
+            if (activeTab === "documents" && typeof onOpenScanReceipt === "function") {
+              onOpenScanReceipt();
+            } else if (typeof onAddServiceRecord === "function") {
               onAddServiceRecord();
             } else if (typeof onOpenAddEvent === "function") {
               onOpenAddEvent();
             }
           }}
-          className="w-full py-3.5 px-4 rounded-2xl bg-brand-strong hover:bg-brand active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-brand-strong/35 transition-all cursor-pointer border border-brand/40"
+          className="w-full py-3.5 px-4 rounded-2xl bg-brand-strong hover:bg-brand active:scale-98 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-xl shadow-brand-strong/35 transition-all cursor-pointer border border-brand/40"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />
-          <span>Добавить работу</span>
+          <span>{activeTab === "documents" ? "Добавить документ" : "Добавить работу"}</span>
         </button>
       </div>
     </div>

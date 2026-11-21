@@ -22,7 +22,7 @@ import {
 import { Vehicle, ServiceRecord, GaragePart } from "../../types";
 import { MobileScreenId } from "../types";
 import { SyncStatus } from "../types";
-import { login, register, restoreSession, requestEmailCode, verifyEmailCode } from "../../api";
+import { login, register, restoreSession, requestEmailCode, verifyEmailCode, requestPasswordReset, confirmPasswordReset } from "../../api";
 
 interface ProfileScreenProps {
   vehicles: Vehicle[];
@@ -56,29 +56,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   syncStatus = "loading",
 }) => {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-  const [sessionUsername, setSessionUsername] = React.useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = React.useState<string | null>(null);
   const [authMode, setAuthMode] = React.useState<"login" | "register" | null>(null);
-  const [authUsername, setAuthUsername] = React.useState("");
+  const [resetMode, setResetMode] = React.useState(false);
+  const [resetRequested, setResetRequested] = React.useState(false);
   const [authPassword, setAuthPassword] = React.useState("");
   const [authEmail, setAuthEmail] = React.useState("");
   const [authEmailCode, setAuthEmailCode] = React.useState("");
   const [emailCodeRequested, setEmailCodeRequested] = React.useState(false);
   const [emailMode, setEmailMode] = React.useState(false);
   const [authError, setAuthError] = React.useState<string | null>(null);
+  const [authNotice, setAuthNotice] = React.useState<string | null>(null);
   const [authBusy, setAuthBusy] = React.useState(false);
 
   React.useEffect(() => {
     restoreSession()
       .then((session) => {
         setIsAuthenticated(Boolean(session));
-        setSessionUsername(session?.username ?? null);
         setSessionEmail(session?.email ?? null);
       })
       .catch(() => {
         // Treat an unavailable API as the normal guest/offline state.
         setIsAuthenticated(false);
-        setSessionUsername(null);
         setSessionEmail(null);
       });
   }, []);
@@ -102,14 +101,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (!authMode) return;
     setAuthBusy(true);
     setAuthError(null);
+    setAuthNotice(null);
     try {
+      if (resetMode) {
+        if (!resetRequested) {
+          await requestPasswordReset(authEmail.trim());
+          setResetRequested(true);
+          setAuthNotice("Если аккаунт с таким email существует, код отправлен на почту.");
+        } else {
+          await confirmPasswordReset(authEmail.trim(), authEmailCode.trim(), authPassword);
+          setResetMode(false);
+          setResetRequested(false);
+          setAuthMode("login");
+          setAuthPassword("");
+          setAuthEmailCode("");
+          setAuthError(null);
+          setAuthNotice("Пароль изменён. Войдите с новым паролем.");
+        }
+        return;
+      }
       const session = emailMode
         ? (emailCodeRequested
           ? await verifyEmailCode(authEmail.trim(), authEmailCode.trim())
           : (await requestEmailCode(authEmail.trim()), setEmailCodeRequested(true), null))
         : authMode === "login"
-          ? await login(authUsername.trim(), authPassword)
-          : await register(authUsername.trim(), authPassword, authEmail.trim());
+          ? await login(authEmail.trim(), authPassword)
+          : await register(authEmail.trim(), authPassword);
       if (session && "pendingEmailVerification" in session) {
         setAuthEmail(session.email);
         setEmailMode(true);
@@ -118,7 +135,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       }
       if (!session) return;
       setIsAuthenticated(true);
-      setSessionUsername(session.username);
       setSessionEmail(session.email ?? (authEmail.trim() || null));
       setAuthMode(null);
       setAuthPassword("");
@@ -129,9 +145,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ошибка авторизации";
       setAuthError(
-        message === "Пользователь с таким логином уже существует"
-          ? "Этот логин уже занят. Выберите другой."
-          : message
+        message
       );
     } finally {
       setAuthBusy(false);
@@ -161,7 +175,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-base font-black text-neutral-900 truncate">
-              {isAuthenticated ? sessionUsername ?? "Владелец гаража" : "Гостевой профиль"}
+              {isAuthenticated ? "Владелец гаража" : "Гостевой профиль"}
             </h3>
             {isAuthenticated && (sessionEmail || userEmail) && (
               <div className="text-xs text-neutral-500 font-mono truncate">
@@ -208,19 +222,53 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <form onSubmit={submitAuth} className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-bold text-neutral-800">
-                    {authMode === "login" ? "Вход в аккаунт" : "Новый аккаунт"}
+                    {resetMode ? "Восстановление пароля" : authMode === "login" ? "Вход в аккаунт" : "Новый аккаунт"}
                   </span>
-                  <button type="button" onClick={() => { setAuthMode(null); setEmailMode(false); setEmailCodeRequested(false); setAuthError(null); }} className="text-[12px] font-semibold text-neutral-500 hover:text-neutral-900">
+                  <button type="button" onClick={() => { setAuthMode(null); setResetMode(false); setResetRequested(false); setEmailMode(false); setEmailCodeRequested(false); setAuthError(null); }} className="text-[12px] font-semibold text-neutral-500 hover:text-neutral-900">
                     Отмена
                   </button>
                 </div>
-                {emailMode ? (
+                {resetMode ? (
                   <>
                     <input
                       type="email"
                       value={authEmail}
                       onChange={(event) => setAuthEmail(event.target.value)}
-                      placeholder="Email"
+                      placeholder="Электронная почта"
+                      autoComplete="email"
+                      required
+                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
+                    />
+                    {resetRequested && <>
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        value={authEmailCode}
+                        onChange={(event) => setAuthEmailCode(event.target.value)}
+                        placeholder="Код из письма"
+                        autoComplete="one-time-code"
+                        required
+                        className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
+                      />
+                      <input
+                        type="password"
+                        value={authPassword}
+                        onChange={(event) => setAuthPassword(event.target.value)}
+                        placeholder="Новый пароль"
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                        className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
+                      />
+                    </>}
+                  </>
+                ) : emailMode ? (
+                  <>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                      placeholder="Электронная почта"
                       autoComplete="email"
                       required
                       className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
@@ -244,7 +292,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       type="email"
                       value={authEmail}
                       onChange={(event) => setAuthEmail(event.target.value)}
-                      placeholder="Email"
+                      placeholder="Электронная почта"
                       autoComplete="email"
                       required
                       className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
@@ -259,22 +307,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       required
                       className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
-                    <input
-                      value={authUsername}
-                      onChange={(event) => setAuthUsername(event.target.value)}
-                      placeholder="Логин"
-                      autoComplete="username"
-                      required
-                      className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
-                    />
                   </>
                 ) : (
                   <>
                     <input
-                      value={authUsername}
-                      onChange={(event) => setAuthUsername(event.target.value)}
-                      placeholder="Логин"
-                      autoComplete="username"
+                      type="email"
+                      value={authEmail}
+                      onChange={(event) => setAuthEmail(event.target.value)}
+                      placeholder="Электронная почта"
+                      autoComplete="email"
                       required
                       className="w-full rounded-2xl border border-[#d9e2ec] bg-[#f8fafc] px-3 py-2.5 text-[15px] text-neutral-900 outline-none transition focus:border-brand-strong focus:ring-2 focus:ring-red-100"
                     />
@@ -291,8 +332,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   </>
                 )}
                 {authError && <p role="alert" className="rounded-xl border border-red-100 bg-red-50/80 px-3 py-2 text-[12px] font-semibold leading-[1.25] text-red-700">{authError}</p>}
+                {authNotice && <p role="status" className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[12px] font-semibold leading-[1.25] text-emerald-800">{authNotice}</p>}
+                {!emailMode && !resetMode && (
+                  <button type="button" onClick={() => { setResetMode(true); setResetRequested(false); setAuthEmail(authEmail.trim()); setAuthPassword(""); setAuthError(null); }} className="w-full py-1 text-xs font-semibold text-brand-strong hover:text-brand-hover">
+                    Восстановить пароль
+                  </button>
+                )}
                 <button type="submit" disabled={authBusy} className="w-full rounded-xl bg-brand-strong px-3 py-2.5 text-[12px] font-bold text-white transition hover:bg-brand-hover disabled:opacity-60">
-                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : emailMode ? (emailCodeRequested ? "Войти" : "Отправить код") : authMode === "login" ? "Войти" : "Создать аккаунт"}
+                  {authBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : resetMode ? (resetRequested ? "Изменить пароль" : "Отправить код") : emailMode ? (emailCodeRequested ? "Войти" : "Отправить код") : authMode === "login" ? "Войти" : "Создать аккаунт"}
                 </button>
               </form>
             )}
@@ -408,7 +455,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <button
             onClick={() => {
               setIsAuthenticated(false);
-              setSessionUsername(null);
               setSessionEmail(null);
               setAuthMode(null);
               setEmailMode(false);
